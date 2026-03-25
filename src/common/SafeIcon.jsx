@@ -2,17 +2,17 @@ import React from 'react';
 import * as FiIcons from 'react-icons/fi';
 import { FiAlertTriangle } from 'react-icons/fi';
 
-const SafeIcon = ({ icon, name, ...props }) => {
-  let IconComponent;
+const SafeIcon = ({ icon: IconComponent, name, ...props }) => {
   try {
-    IconComponent = icon || (name && FiIcons[`Fi${name}`]);
+    if (IconComponent) return <IconComponent {...props} />;
+    if (name) {
+      const ResolvedIcon = FiIcons[name];
+      if (ResolvedIcon) return <ResolvedIcon {...props} />;
+    }
   } catch (e) {
-    IconComponent = null;
+    console.error('Icon rendering error:', e);
   }
-
-  return IconComponent
-    ? React.createElement(IconComponent, props)
-    : <FiAlertTriangle {...props} />;
+  return <FiAlertTriangle {...props} />;
 };
 
 export default SafeIcon;
