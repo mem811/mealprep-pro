@@ -1,145 +1,310 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../context/AuthContext';
-import pb from '../lib/pb';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Plus, Search, Trash2, Edit2, Loader2, UtensilsCrossed, Clock, Users, Tag, Lock 
+import pb from '../lib/pb';
+import {
+  Plus, Search, ChefHat, Edit, Trash2, Clock, Filter, ListFilter,
+  UtensilsCrossed, Coffee, Sandwich, Apple, Leaf, Sprout, Wheat,
+  Dumbbell, Croissant, Bookmark, Soup, BookmarkCheck
 } from 'lucide-react';
 
-const FREE_LIMIT = 15;
+const RECIPE_FILTERS = [
+  { label: 'All Recipes', icon: UtensilsCrossed },
+  { label: 'Breakfast', icon: Coffee },
+  { label: 'Lunch', icon: Sandwich },
+  { label: 'Dinner', icon: ChefHat },
+  { label: 'Snack', icon: Apple },
+  { label: 'Dessert', icon: ChefHat },
+  { label: 'Sides', icon: Leaf },
+  { label: 'Soups', icon: Soup },
+  { label: 'Vegan', icon: Leaf },
+  { label: 'Vegetarian', icon: Sprout },
+  { label: 'Gluten-Free', icon: Wheat },
+  { label: 'High-Protein', icon: Dumbbell },
+  { label: 'Bread', icon: Croissant },
+  { label: 'Favorites', icon: Bookmark },
+];
+
+function getProxiedImage(url) {
+  if (!url) return null;
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=400&h=300&fit=cover&q=80`;
+}
+
+function getSourceSiteName(url) {
+  if (!url) return '';
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace('www.', '').split('.')[0];
+  } catch (e) {
+    return '';
+  }
+}
 
 export default function RecipesPage() {
-  const { user } = useAuth();
-  const qc = useQueryClient();
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const isPro = user?.plan === 'pro';
+  const [selectedTab, setSelectedTab] = useState('All Recipes');
+  const [togglingFav, setTogglingFav] = useState(null);
 
-  const { data: recipes = [], isLoading } = useQuery({
-    queryKey: ['recipes', user?.id],
-    queryFn: async () => {
-      const result = await pb.collection('recipes').getList(1, 200, {
-        filter: `user_id="${user.id}"`,
+  const fetchRecipes = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const userId = pb.authStore.model.id;
+      const result = await pb.collection('recipes').getList(1, 100, {
+        filter: `user = "${userId}"`,
         sort: '-created',
       });
-      return result.items;
-    },
-    enabled: !!user,
+      setRecipes(result.items);
+    } catch (err) {
+      console.error('Error fetching recipes:', err);
+      setError('Failed to load recipes.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecipes();
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this recipe?')) return;
+    try {
+      await pb.collection('recipes').delete(id);
+      setRecipes((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      console.error('Error deleting recipe:', err);
+      alert('Failed to delete recipe.');
+    }
+  };
+
+  const handleToggleFavorite = async (e, recipe) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (togglingFav === recipe.id) return;
+    setTogglingFav(recipe.id);
+    try {
+      const updated = await pb.collection('recipes').update(recipe.id, {
+        favorited: !recipe.favorited,
+      });
+      setRecipes((prev) =>
+        prev.map((r) => (r.id === updated.id ? { ...r, favorited: updated.favorited } : r))
+      );
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    } finally {
+      setTogglingFav(null);
+    }
+  };
+
+  const filteredRecipes = recipes.filter((r) => {
+    const matchesSearch = r.title?.toLowerCase().includes(search.toLowerCase());
+    if (selectedTab === 'All Recipes') return matchesSearch;
+    if (selectedTab === 'Favorites') return matchesSearch && !!r.favorited;
+
+    let recipeTags = [];
+    if (typeof r.tags === 'string') {
+      try { recipeTags = JSON.parse(r.tags); } catch { recipeTags = []; }
+    } else if (Array.isArray(r.tags)) {
+      recipeTags = r.tags;
+    }
+    const matchesTag = recipeTags.some(
+      (tag) => tag.toLowerCase() === selectedTab.toLowerCase()
+    );
+    return matchesSearch && matchesTag;
   });
 
-  const deleteRecipe = useMutation({
-    mutationFn: (id) => pb.collection('recipes').delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recipes', user?.id] }),
-  });
-
-  const filtered = recipes.filter((r) => 
-    r.title.toLowerCase().includes(search.toLowerCase()) || 
-    (r.tags || []).some((t) => t.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const atLimit = !isPro && recipes.length >= FREE_LIMIT;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
+    <div className="max-w-6xl mx-auto px-4 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Playfair Display', serif" }}>
-            My Recipes
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {recipes.length} recipe{recipes.length !== 1 ? 's' : ''}
-            {!isPro && <span className="text-gray-400"> · {FREE_LIMIT - recipes.length} free slots left</span>}
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-4">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">My Recipes</h1>
+          <span className="text-gray-400 text-sm font-medium">· {filteredRecipes.length} recipes</span>
         </div>
-        {atLimit ? (
-          <Link to="/profile" className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-2xl transition-colors shadow-sm">
-            <Lock className="w-4 h-4" /> Upgrade
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
+            <ListFilter size={15} />
+            Sort
+          </button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
+            <Filter size={15} />
+            Filter
+          </button>
+          <Link
+            to="/recipes/new"
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
+          >
+            <Plus size={16} />
+            Add Recipe
           </Link>
-        ) : (
-          <Link to="/recipes/new" className="flex items-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-2xl transition-colors shadow-sm">
-            <Plus className="w-4 h-4" /> New Recipe
-          </Link>
-        )}
+        </div>
       </div>
 
-      {/* Search */}
+      {/* Search Bar */}
       <div className="relative mb-5">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input 
-          type="text" 
-          value={search} 
-          onChange={(e) => setSearch(e.target.value)} 
-          placeholder="Search recipes or tags…" 
-          className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-sm placeholder:text-gray-400" 
+        <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search recipes..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-sm"
         />
       </div>
 
-      {/* Recipe List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-7 h-7 text-green-400 animate-spin" />
+      {/* Filter Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+        {RECIPE_FILTERS.map(({ label, icon: Icon }) => {
+          const isActive = selectedTab === label;
+          return (
+            <button
+              key={label}
+              onClick={() => setSelectedTab(label)}
+              className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+                isActive
+                  ? 'bg-green-500 text-white shadow-md shadow-green-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">
+          {error}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-green-50 rounded-3xl flex items-center justify-center mb-4">
-            <UtensilsCrossed className="w-8 h-8 text-green-300" />
+      )}
+
+      {filteredRecipes.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            {selectedTab === 'Favorites'
+              ? <Bookmark size={36} className="text-green-500" />
+              : <ChefHat size={36} className="text-green-500" />}
           </div>
           <h3 className="text-lg font-semibold text-gray-700 mb-1">
-            {search ? 'No recipes found' : 'No recipes yet'}
+            {selectedTab === 'Favorites' ? 'No favorites yet' : 'No recipes found'}
           </h3>
-          <p className="text-sm text-gray-400 mb-6">
-            {search ? 'Try a different search term' : 'Add your first recipe to get started'}
+          <p className="text-gray-400 mb-6 text-sm">
+            {selectedTab === 'Favorites'
+              ? 'Bookmark recipes to find them here quickly'
+              : selectedTab === 'All Recipes'
+              ? 'Start building your recipe library'
+              : `No recipes tagged "${selectedTab}"`}
           </p>
+          {selectedTab !== 'All Recipes' && (
+            <button
+              onClick={() => setSelectedTab('All Recipes')}
+              className="inline-flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-600 px-4 py-2.5 rounded-xl font-medium transition-colors text-sm"
+            >
+              View All Recipes
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid gap-3">
-          {filtered.map((recipe) => (
-            <Link 
-              key={recipe.id} 
-              to={`/recipes/${recipe.id}`} 
-              className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all duration-200 overflow-hidden flex"
-            >
-              {recipe.image_url ? (
-                <img 
-                  src={`https://images.weserv.nl/?url=${encodeURIComponent(recipe.image_url)}&w=200&h=200&fit=cover`} 
-                  alt={recipe.title} 
-                  className="w-24 h-24 object-cover shrink-0" 
-                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} 
-                />
-              ) : null}
-              <div className="w-24 h-24 bg-green-50 flex items-center justify-center shrink-0" style={{ display: recipe.image_url ? 'none' : 'flex' }}>
-                <UtensilsCrossed className="w-8 h-8 text-green-200" />
-              </div>
-              <div className="flex-1 p-4 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-gray-900 text-sm leading-snug group-hover:text-green-600 transition-colors truncate">
-                    {recipe.title}
-                  </h3>
-                  <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (confirm('Delete this recipe?')) deleteRecipe.mutate(recipe.id); }} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredRecipes.map((recipe) => {
+            const proxiedImg = getProxiedImage(recipe.image_url);
+            const sourceSite = getSourceSiteName(recipe.source_url);
+            const isFav = !!recipe.favorited;
+            return (
+              <div
+                key={recipe.id}
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group"
+              >
+                <Link to={`/recipes/${recipe.id}`}>
+                  <div className="relative h-36 sm:h-44 bg-green-50">
+                    {proxiedImg ? (
+                      <>
+                        <img
+                          src={proxiedImg}
+                          alt={recipe.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const placeholder = e.target.parentElement.querySelector('.placeholder');
+                            if (placeholder) placeholder.style.display = 'flex';
+                          }}
+                        />
+                        <div
+                          className="placeholder absolute inset-0 items-center justify-center bg-green-50"
+                          style={{ display: 'none' }}
+                        >
+                          <ChefHat size={40} className="text-green-300" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ChefHat size={40} className="text-green-300" />
+                      </div>
+                    )}
+
+                    {/* Cook Time Badge */}
+                    <div className="absolute bottom-2 left-2 bg-black/55 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1">
+                      <Clock size={11} />
+                      30 min
+                    </div>
+
+                    {/* Bookmark Button */}
+                    <button
+                      onClick={(e) => handleToggleFavorite(e, recipe)}
+                      disabled={togglingFav === recipe.id}
+                      className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm ${
+                        isFav
+                          ? 'bg-green-500 text-white'
+                          : 'bg-white/80 backdrop-blur-sm text-gray-500 opacity-0 group-hover:opacity-100'
+                      } hover:scale-110`}
+                      title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      {isFav
+                        ? <BookmarkCheck size={16} strokeWidth={2.5} />
+                        : <Bookmark size={15} strokeWidth={2} />}
+                    </button>
+                  </div>
+                </Link>
+
+                <div className="p-3">
+                  <Link to={`/recipes/${recipe.id}`}>
+                    <h3 className="font-semibold text-gray-800 mb-0.5 hover:text-green-600 transition-colors line-clamp-1 text-sm">
+                      {recipe.title}
+                    </h3>
+                  </Link>
+                  {sourceSite && (
+                    <p className="text-xs text-gray-400 mb-2 capitalize">{sourceSite}</p>
+                  )}
+                  <div className="flex items-center justify-end gap-1">
+                    <Link
+                      to={`/recipes/${recipe.id}/edit`}
+                      className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    >
+                      <Edit size={14} />
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(recipe.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                  <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {recipe.servings} servings</span>
-                  {recipe.ingredients?.length > 0 && (
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {recipe.ingredients.length} items</span>
-                  )}
-                </div>
-                {recipe.tags?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {recipe.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="flex items-center gap-0.5 text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">
-                        <Tag className="w-2.5 h-2.5" /> {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

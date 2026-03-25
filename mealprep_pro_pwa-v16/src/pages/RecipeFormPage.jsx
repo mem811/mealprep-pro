@@ -1,279 +1,470 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
-import { 
-  ArrowLeft, Plus, Trash2, Upload, Loader2, 
-  Flame, HardDrive, Wheat, Droplets, Sparkles, Info 
-} from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat } from 'lucide-react';
 
-const UNITS = ['g', 'kg', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'oz', 'lb', 'piece', 'slice', 'clove', 'handful', ''];
+const TAG_OPTIONS = [
+  'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Sides', 'Soups',
+  'Vegetarian', 'Vegan', 'Gluten-Free', 'High-Protein', 'Low-Carb',
+  'Quick (under 30 min)', 'Meal Prep', 'Bread'
+];
+
+const UNITS = ['cup', 'tbsp', 'tsp', 'oz', 'lb', 'g', 'kg', 'ml', 'l', 'piece', 'slice', 'clove', 'bunch', 'can', 'package', 'pinch', 'to taste'];
 
 export default function RecipeFormPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const { id } = useParams();
-  const isEditing = Boolean(id);
-  const isPro = user?.plan === 'pro';
+  const navigate = useNavigate();
+  const isEdit = !!id;
+
+  const [title, setTitle] = useState('');
+  const [servings, setServings] = useState(4);
+  const [instructions, setInstructions] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [tags, setTags] = useState([]);
+  const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: 'cup' }]);
 
   const [loading, setLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importUrl, setImportUrl] = useState('');
-  const [importError, setImportError] = useState('');
-  const [importSuccess, setImportSuccess] = useState('');
+  const [pageLoading, setPageLoading] = useState(isEdit);
+  const [error, setError] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
+  const [duplicateRecipe, setDuplicateRecipe] = useState(null);
 
-  const [form, setForm] = useState({
-    title: '',
-    servings: 2,
-    instructions: '',
-    image_url: '',
-    source_url: '',
-    tags: '',
-    nutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-    ingredients: [{ name: '', quantity: '', unit: 'g' }],
-  });
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
+
+  const userPlan = pb.authStore.model?.plan || 'free';
+  const isPro = userPlan === 'pro';
 
   useEffect(() => {
-    if (isEditing) {
-      fetchRecipe();
-    }
-  }, [id]);
+    if (isEdit) {
+      (async () => {
+        try {
+          const record = await pb.collection('recipes').getOne(id);
+          setTitle(record.title || '');
+          setServings(record.servings || 4);
+          setInstructions(record.instructions || '');
+          setImageUrl(record.image_url || '');
+          setSourceUrl(record.source_url || '');
 
-  const fetchRecipe = async () => {
-    try {
-      const record = await pb.collection('recipes').getOne(id);
-      setForm({
-        title: record.title || '',
-        servings: record.servings || 2,
-        instructions: record.instructions || '',
-        image_url: record.image_url || '',
-        source_url: record.source_url || '',
-        tags: Array.isArray(record.tags) ? record.tags.join(',') : '',
-        nutrition: record.nutrition || { calories: 0, protein: 0, carbs: 0, fat: 0 },
-        ingredients: record.ingredients || [{ name: '', quantity: '', unit: 'g' }],
-      });
-    } catch (err) {
-      console.error('Failed to fetch recipe:', err);
+          let parsedTags = [];
+          if (typeof record.tags === 'string') {
+            try { parsedTags = JSON.parse(record.tags); } catch { parsedTags = []; }
+          } else if (Array.isArray(record.tags)) {
+            parsedTags = record.tags;
+          }
+          setTags(parsedTags);
+
+          let parsedIngredients = [];
+          if (typeof record.ingredients === 'string') {
+            try { parsedIngredients = JSON.parse(record.ingredients); } catch { parsedIngredients = []; }
+          } else if (Array.isArray(record.ingredients)) {
+            parsedIngredients = record.ingredients;
+          }
+          if (parsedIngredients.length > 0) {
+            setIngredients(parsedIngredients);
+          }
+        } catch (err) {
+          console.error('Error loading recipe:', err);
+          setError('Failed to load recipe.');
+        } finally {
+          setPageLoading(false);
+        }
+      })();
     }
+  }, [id, isEdit]);
+
+  const handleIngredientChange = (index, field, value) => {
+    setIngredients((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const addIngredient = () => {
+    setIngredients((prev) => [...prev, { name: '', quantity: '', unit: 'cup' }]);
+  };
+
+  const removeIngredient = (index) => {
+    setIngredients((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleTag = (tag) => {
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
   };
 
   const handleImport = async () => {
-    if (!isPro) return;
-    if (!importUrl.trim()) {
-      setImportError('Please enter a recipe URL.');
+    if (!isPro) {
+      setImportError('Recipe import is a Pro feature. Upgrade to unlock it.');
       return;
     }
+    if (!importUrl.trim()) {
+      setImportError('Please enter a URL.');
+      return;
+    }
+    setImporting(true);
+    setImportError(null);
 
     const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
-    if (!apiKey) {
-      setImportError('Spoonacular API key missing.');
-      return;
-    }
-
-    setImporting(true);
-    setImportError('');
-    setImportSuccess('');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const endpoint = `https://api.spoonacular.com/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(importUrl.trim())}&includeNutrition=true`;
-      const res = await fetch(endpoint);
-      if (!res.ok) throw new Error('API error');
+      const res = await fetch(
+        `https://api.spoonacular.com/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(importUrl.trim())}&measurementSystem=us`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
-      
-      const ingredients = (data.extendedIngredients || []).map((ing) => ({
-        name: ing.name || '',
-        quantity: String(ing.amount || ''),
-        unit: ing.unit || '',
-      }));
 
-      const nutrients = data.nutrition?.nutrients || [];
-      const getVal = (name) => nutrients.find(n => n.name === name)?.amount || 0;
+      setTitle(data.title || '');
+      setServings(data.servings || 4);
+      setImageUrl(data.image || '');
+      setSourceUrl(importUrl.trim());
 
-      setForm((prev) => ({
-        ...prev,
-        title: data.title || prev.title,
-        servings: data.servings || prev.servings,
-        image_url: data.image || prev.image_url,
-        source_url: data.sourceUrl || importUrl.trim(),
-        ingredients: ingredients.length ? ingredients : prev.ingredients,
-        instructions: data.instructions?.replace(/<[^>]+>/g, '') || prev.instructions,
-        nutrition: {
-          calories: getVal('Calories'),
-          protein: getVal('Protein'),
-          carbs: getVal('Carbohydrates'),
-          fat: getVal('Fat'),
-        }
-      }));
+      if (data.extendedIngredients?.length) {
+        setIngredients(
+          data.extendedIngredients.map((ing) => ({
+            name: ing.name || '',
+            quantity: String(ing.amount || ''),
+            unit: ing.unit || 'piece',
+          }))
+        );
+      }
 
-      setImportSuccess('Import successful!');
+      if (data.analyzedInstructions?.[0]?.steps?.length) {
+        setInstructions(
+          data.analyzedInstructions[0].steps.map((s) => `${s.number}. ${s.step}`).join('\n\n')
+        );
+      }
+
       setImportUrl('');
     } catch (err) {
-      setImportError('Failed to import recipe.');
+      clearTimeout(timeout);
+      if (err.name === 'AbortError') {
+        setImportError('Request timed out. Please try again.');
+      } else {
+        setImportError('Failed to import recipe. Check the URL and try again.');
+      }
+      console.error('Import error:', err);
     } finally {
       setImporting(false);
     }
   };
 
-  const handleNutrientChange = (field, value) => {
-    setForm(prev => ({
-      ...prev,
-      nutrition: { ...prev.nutrition, [field]: parseFloat(value) || 0 }
-    }));
-  };
-
-  const updateIngredient = (index, field, value) => {
-    const updated = [...form.ingredients];
-    updated[index][field] = value;
-    setForm({ ...form, ingredients: updated });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError(null);
+    setDuplicateRecipe(null);
+
+    if (!title.trim()) {
+      setSubmitError('Recipe title is required.');
+      return;
+    }
+
+    if (sourceUrl && !isEdit) {
+      try {
+        const dupeCheck = await pb.collection('recipes').getList(1, 1, {
+          filter: `user = "${pb.authStore.model.id}" && source_url = "${sourceUrl}"`,
+        });
+        if (dupeCheck.items.length > 0) {
+          setDuplicateRecipe(dupeCheck.items[0]);
+          return;
+        }
+      } catch (err) {
+        console.error('Duplicate check error:', err);
+      }
+    }
+
     setLoading(true);
     try {
-      const tagsArray = form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-      const payload = {
-        user_id: user.id,
-        title: form.title,
-        servings: parseInt(form.servings),
-        ingredients: form.ingredients.filter(ing => ing.name.trim()),
-        instructions: form.instructions,
-        image_url: form.image_url,
-        source_url: form.source_url,
-        tags: tagsArray,
-        nutrition: form.nutrition, // This maps to your new JSON field
+      const data = {
+        user: pb.authStore.model.id,
+        title: title.trim(),
+        servings: Number(servings),
+        instructions: instructions.trim(),
+        ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
+        tags: JSON.stringify(tags),
+        ...(imageUrl ? { image_url: imageUrl } : {}),
+        ...(sourceUrl ? { source_url: sourceUrl } : {}),
       };
 
-      if (isEditing) {
-        await pb.collection('recipes').update(id, payload);
+      console.log('Recipe data being sent:', JSON.stringify(data));
+
+      if (isEdit) {
+        await pb.collection('recipes').update(id, data);
       } else {
-        await pb.collection('recipes').create(payload);
+        await pb.collection('recipes').create(data);
       }
+
       navigate('/recipes');
     } catch (err) {
-      console.error('Save error:', err);
+      console.error('Full error:', err.response);
+      setSubmitError(
+        err?.response?.message || err?.message || 'Failed to save recipe.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
-      <header className="flex items-center justify-between mb-8">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-xl font-bold">{isEditing ? 'Edit Recipe' : 'New Recipe'}</h1>
-        <div className="w-10" />
-      </header>
+  if (pageLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
+      </div>
+    );
+  }
 
-      {/* Import Section */}
-      <div className={`p-5 mb-8 rounded-3xl border ${isPro ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-gray-50'}`}>
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles size={18} className={isPro ? 'text-green-600' : 'text-gray-400'} />
-          <h2 className="font-bold text-gray-800 text-sm italic">Spoonacular Smart Import</h2>
-          {!isPro && <span className="ml-auto text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black">PRO</span>}
-        </div>
-        <div className="flex gap-2">
-          <input 
-            type="url" 
-            value={importUrl} 
-            onChange={(e) => setImportUrl(e.target.value)} 
-            placeholder="Paste recipe URL..." 
-            className="flex-1 border bg-white border-gray-200 rounded-2xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-green-400" 
-            disabled={!isPro || importing} 
-          />
-          <button 
-            type="button" 
-            onClick={handleImport} 
-            disabled={!isPro || importing} 
-            className="bg-green-600 text-white px-6 py-3 rounded-2xl font-bold text-sm disabled:opacity-50"
-          >
-            {importing ? <Loader2 size={18} className="animate-spin" /> : 'Import'}
-          </button>
-        </div>
-        {importError && <p className="text-red-500 text-xs mt-3">{importError}</p>}
-        {importSuccess && <p className="text-green-600 text-xs mt-3">{importSuccess}</p>}
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="flex items-center gap-3 mb-6">
+        <Link to="/recipes" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+          <ArrowLeft size={20} className="text-gray-600" />
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {isEdit ? 'Edit Recipe' : 'Add Recipe'}
+        </h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Basic Fields */}
-        <div className="space-y-4">
-          <input 
-            type="text" 
-            placeholder="Recipe Title" 
-            value={form.title} 
-            onChange={e => setForm({...form, title: e.target.value})}
-            className="w-full text-2xl font-bold bg-transparent border-b-2 border-gray-100 focus:border-green-400 outline-none pb-2"
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">{error}</div>
+      )}
+
+      {/* Import from URL */}
+      <div className={`mb-6 p-4 rounded-2xl border ${isPro ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <Download size={18} className={isPro ? 'text-green-600' : 'text-gray-400'} />
+          <span className="font-semibold text-gray-800 text-sm">Import from URL</span>
+          {!isPro && (
+            <span className="ml-auto flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">
+              <Lock size={11} /> Pro
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            placeholder="Paste recipe URL..."
+            value={importUrl}
+            onChange={(e) => setImportUrl(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+            disabled={!isPro}
+          />
+          <button
+            type="button"
+            onClick={handleImport}
+            disabled={importing}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
+              isPro
+                ? 'bg-green-500 hover:bg-green-600 text-white'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {importing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Import
+          </button>
+        </div>
+        {importError && (
+          <p className="text-red-500 text-xs mt-2">{importError}</p>
+        )}
+        {!isPro && (
+          <p className="text-xs text-gray-400 mt-2">Upgrade to Pro to import recipes from any URL.</p>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Title */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Recipe Title *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Avocado Toast"
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
             required
           />
-          <div className="grid grid-cols-2 gap-4">
-            <input type="number" placeholder="Servings" value={form.servings} onChange={e => setForm({...form, servings: e.target.value})} className="border border-gray-100 rounded-2xl px-4 py-3 text-sm" />
-            <input type="text" placeholder="Tags (comma separated)" value={form.tags} onChange={e => setForm({...form, tags: e.target.value})} className="border border-gray-100 rounded-2xl px-4 py-3 text-sm" />
-          </div>
         </div>
 
-        {/* Nutrition Section */}
-        <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Nutrition per serving</h3>
-            <Info className="w-4 h-4 text-gray-300" />
+        {/* Servings */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Servings</label>
+          <input
+            type="number"
+            min="1"
+            value={servings}
+            onChange={(e) => setServings(e.target.value)}
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+          />
+        </div>
+
+        {/* Image URL */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Image URL</label>
+          <input
+            type="url"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+          />
+          {imageUrl && (
+            <div className="mt-2 h-32 rounded-xl overflow-hidden bg-gray-100">
+              <img
+                src={`https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}&w=400&h=200&fit=cover&q=80`}
+                alt="Preview"
+                className="w-full h-full object-cover"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Source URL */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Source URL</label>
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+          />
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tags</label>
+          <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-xl bg-white min-h-[48px]">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className="hover:text-green-900 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            {tags.length === 0 && (
+              <span className="text-gray-400 text-xs self-center">Select tags below...</span>
+            )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-            {[
-              { label: 'Calories', field: 'calories', icon: Flame, color: 'text-orange-500' },
-              { label: 'Protein (g)', field: 'protein', icon: HardDrive, color: 'text-blue-500' },
-              { label: 'Carbs (g)', field: 'carbs', icon: Wheat, color: 'text-amber-500' },
-              { label: 'Fat (g)', field: 'fat', icon: Droplets, color: 'text-pink-500' },
-            ].map((n) => (
-              <div key={n.field}>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <n.icon className={`w-3 h-3 ${n.color}`} />
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">{n.label}</span>
-                </div>
-                <input 
-                  type="number" 
-                  value={form.nutrition[n.field]} 
-                  onChange={(e) => handleNutrientChange(n.field, e.target.value)} 
-                  className="w-full bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-green-400 rounded-xl px-3 py-2 text-sm font-bold text-gray-700 outline-none" 
-                />
-              </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {TAG_OPTIONS.filter((t) => !tags.includes(t)).map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-700 transition-colors border border-gray-200"
+              >
+                + {tag}
+              </button>
             ))}
           </div>
         </div>
 
         {/* Ingredients */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Ingredients</label>
-            <button type="button" onClick={() => setForm({...form, ingredients: [...form.ingredients, {name: '', quantity: '', unit: 'g'}]})} className="text-xs font-bold text-green-600">+ Add</button>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Ingredients</label>
+          <div className="space-y-2">
+            {ingredients.map((ing, index) => (
+              <div key={index} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="Quantity"
+                  value={ing.quantity}
+                  onChange={(e) => handleIngredientChange(index, 'quantity', e.target.value)}
+                  className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                <select
+                  value={ing.unit}
+                  onChange={(e) => handleIngredientChange(index, 'unit', e.target.value)}
+                  className="w-24 px-2 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+                >
+                  {UNITS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Ingredient name"
+                  value={ing.name}
+                  onChange={(e) => handleIngredientChange(index, 'name', e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                {ingredients.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeIngredient(index)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-          {form.ingredients.map((ing, i) => (
-            <div key={i} className="flex gap-2">
-              <input value={ing.quantity} onChange={e => updateIngredient(i, 'quantity', e.target.value)} placeholder="Qty" className="w-16 border rounded-xl px-2 py-2 text-sm" />
-              <input value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} placeholder="Ingredient" className="flex-1 border rounded-xl px-3 py-2 text-sm" />
-              <button type="button" onClick={() => setForm({...form, ingredients: form.ingredients.filter((_, idx) => idx !== i)})} className="text-gray-300 hover:text-red-500"><Trash2 size={16} /></button>
-            </div>
-          ))}
+          <button
+            type="button"
+            onClick={addIngredient}
+            className="mt-2 flex items-center gap-2 text-green-600 hover:text-green-700 text-sm font-medium px-3 py-2 hover:bg-green-50 rounded-xl transition-colors"
+          >
+            <Plus size={16} />
+            Add Ingredient
+          </button>
         </div>
 
         {/* Instructions */}
-        <div className="space-y-2">
-          <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Instructions</label>
-          <textarea 
-            value={form.instructions} 
-            onChange={e => setForm({...form, instructions: e.target.value})} 
-            rows={6} 
-            className="w-full border border-gray-100 rounded-3xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-400 outline-none" 
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Instructions</label>
+          <textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Write the steps..."
+            rows={6}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm resize-none"
           />
         </div>
 
-        <button 
-          type="submit" 
-          disabled={loading} 
-          className="w-full bg-green-600 text-white font-black py-4 rounded-3xl shadow-xl shadow-green-600/20 disabled:opacity-50"
+        {/* Submit Error / Duplicate Warning */}
+        {duplicateRecipe && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
+            <p className="font-semibold mb-1">Looks like you already have this recipe!</p>
+            <Link
+              to={`/recipes/${duplicateRecipe.id}`}
+              className="text-green-600 underline font-medium"
+            >
+              View existing recipe →
+            </Link>
+          </div>
+        )}
+
+        {submitError && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm">{submitError}</div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-60"
         >
-          {loading ? 'SAVING...' : isEditing ? 'UPDATE RECIPE' : 'SAVE RECIPE'}
+          {loading ? (
+            <><Loader2 size={18} className="animate-spin" /> Saving...</>
+          ) : (
+            <><ChefHat size={18} /> {isEdit ? 'Update Recipe' : 'Save Recipe'}</>
+          )}
         </button>
       </form>
     </div>

@@ -1,191 +1,400 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../context/AuthContext';
+import { useState, useEffect, useCallback } from 'react';
 import pb from '../lib/pb';
 import RecipePickerModal from '../components/RecipePickerModal';
-import { 
-  Plus, Trash2, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed, 
-  Flame, HardDrive, Wheat, Droplets 
-} from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, X, Utensils } from 'lucide-react';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
-
-const SLOT_COLORS = {
-  Breakfast: 'bg-amber-50 border-amber-200 text-amber-700',
-  Lunch: 'bg-blue-50 border-blue-200 text-blue-700',
-  Dinner: 'bg-purple-50 border-purple-200 text-purple-700',
-  Snacks: 'bg-green-50 border-green-200 text-green-700',
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+const MEAL_COLORS = {
+  breakfast: 'from-amber-50 to-orange-50 border-amber-200',
+  lunch:     'from-green-50 to-emerald-50 border-green-200',
+  dinner:    'from-blue-50 to-indigo-50 border-blue-200',
+  snack:     'from-purple-50 to-pink-50 border-purple-200',
 };
+const MEAL_ICONS = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' };
 
-const SLOT_DOT = {
-  Breakfast: 'bg-amber-400',
-  Lunch: 'bg-blue-400',
-  Dinner: 'bg-purple-400',
-  Snacks: 'bg-green-400',
-};
-
-function getWeekStart(offset = 0) {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1) + offset * 7;
-  const monday = new Date(now.setDate(diff));
+function getWeekDays(baseDate) {
+  const day = baseDate.getDay();
+  const monday = new Date(baseDate);
+  monday.setDate(baseDate.getDate() - ((day + 6) % 7));
   monday.setHours(0, 0, 0, 0);
-  return monday;
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
 }
 
-function formatWeekStart(date) {
-  return date.toISOString().split('T')[0];
+function fmt(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function getProxiedImage(url) {
+  if (!url) return null;
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=80&h=80&fit=cover&q=80`;
 }
 
 export default function HomePage() {
-  const { user } = useAuth();
-  const qc = useQueryClient();
   const [weekOffset, setWeekOffset] = useState(0);
-  const [activeDay, setActiveDay] = useState(0);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerTarget, setPickerTarget] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(fmt(new Date()));
+  const [slots, setSlots] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeCell, setActiveCell] = useState(null); // { date, mealType }
+  const [saving, setSaving] = useState(false);
 
-  const weekStart = getWeekStart(weekOffset);
-  const weekStartStr = formatWeekStart(weekStart);
+  const today = fmt(new Date());
+  const baseDate = new Date();
+  baseDate.setDate(baseDate.getDate() + weekOffset * 7);
+  const weekDays = getWeekDays(baseDate);
+  const weekStart = fmt(weekDays[0]);
+  const weekEnd = fmt(weekDays[6]);
 
-  const { data: mealPlan, isLoading: planLoading } = useQuery({
-    queryKey: ['meal-plan', user?.id, weekStartStr],
-    queryFn: async () => {
-      const plans = await pb.collection('meal_plans').getList(1, 1, {
-        filter: `user_id="${user.id}" && week_start_date="${weekStartStr}"`,
+  const fetchSlots = useCallback(async () => {
+    setLoading(true);
+    try {
+      const userId = pb.authStore.model?.id;
+      if (!userId) return;
+      const res = await pb.collection('meal_slots').getList(1, 200, {
+        filter: `meal_plan.user = "${userId}" && date >= "${weekStart}" && date <= "${weekEnd}"`,
+        expand: 'recipe',
       });
-      if (plans.items.length > 0) return plans.items[0];
-      return await pb.collection('meal_plans').create({ user_id: user.id, week_start_date: weekStartStr });
-    },
-    enabled: !!user,
-  });
+      const map = {};
+      for (const slot of res.items) {
+        const key = `${slot.date}__${slot.slot}`;
+        if (!map[key]) map[key] = [];
+        map[key].push({
+          slotId: slot.id,
+          recipe: slot.expand?.recipe || null,
+          servings_multiplier: slot.servings_multiplier || 1,
+        });
+      }
+      setSlots(map);
+    } catch (e) {
+      console.error('Fetch slots error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [weekStart, weekEnd]);
 
-  const { data: slots = [] } = useQuery({
-    queryKey: ['meal-slots', mealPlan?.id],
-    queryFn: async () => {
-      const result = await pb.collection('meal_slots').getList(1, 200, {
-        filter: `meal_plan_id="${mealPlan.id}"`,
-        expand: 'recipe_id',
+  useEffect(() => { fetchSlots(); }, [fetchSlots]);
+
+  const openModal = (date, mealType) => {
+    setActiveCell({ date, mealType });
+    setModalOpen(true);
+  };
+
+  const handleRecipeSelect = async ({ recipe, servingsMultiplier }) => {
+    if (!activeCell) return;
+    setSaving(true);
+    try {
+      const userId = pb.authStore.model?.id;
+      const { date, mealType } = activeCell;
+
+      // Get or create meal_plan for this week
+      let mealPlan;
+      const existing = await pb.collection('meal_plans').getList(1, 1, {
+        filter: `user = "${userId}" && week_start_date = "${weekStart}"`,
       });
-      return result.items;
-    },
-    enabled: !!mealPlan?.id,
-  });
+      if (existing.items.length > 0) {
+        mealPlan = existing.items[0];
+      } else {
+        mealPlan = await pb.collection('meal_plans').create({
+          user: userId,
+          week_start_date: weekStart,
+        });
+      }
 
-  const addSlot = useMutation({
-    mutationFn: async ({ recipeId, servingsMultiplier }) => {
-      return pb.collection('meal_slots').create({
-        meal_plan_id: mealPlan.id,
-        day: pickerTarget.day,
-        slot: pickerTarget.slot,
-        recipe_id: recipeId,
+      await pb.collection('meal_slots').create({
+        meal_plan: mealPlan.id,
+        date,
+        slot: mealType,
+        recipe: recipe.id,
         servings_multiplier: servingsMultiplier,
       });
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['meal-slots', mealPlan?.id] }),
-  });
 
-  const removeSlot = useMutation({
-    mutationFn: (slotId) => pb.collection('meal_slots').delete(slotId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['meal-slots', mealPlan?.id] }),
-  });
+      await fetchSlots();
+    } catch (e) {
+      console.error('Save slot error:', e);
+    } finally {
+      setSaving(false);
+      setModalOpen(false);
+      setActiveCell(null);
+    }
+  };
 
-  const daySlots = slots.filter(s => s.day === activeDay);
-  const dailyNutrition = daySlots.reduce((acc, s) => {
-    const nutrition = s.expand?.recipe_id?.nutrition || { calories: 0, protein: 0, carbs: 0, fat: 0 };
-    const mult = s.servings_multiplier || 1;
-    return {
-      calories: acc.calories + (nutrition.calories * mult),
-      protein: acc.protein + (nutrition.protein * mult),
-      carbs: acc.carbs + (nutrition.carbs * mult),
-      fat: acc.fat + (nutrition.fat * mult),
-    };
-  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const removeSlot = async (slotId) => {
+    try {
+      await pb.collection('meal_slots').delete(slotId);
+      await fetchSlots();
+    } catch (e) {
+      console.error('Remove slot error:', e);
+    }
+  };
 
-  if (planLoading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="animate-spin text-green-500" /></div>;
+  const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Meal Planner</h1>
-        <div className="flex items-center gap-1">
-          <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronLeft /></button>
-          <button onClick={() => setWeekOffset(0)} className="px-3 py-1.5 text-xs font-bold text-green-600 bg-green-50 rounded-xl">Today</button>
-          <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronRight /></button>
+    <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meal Planner</h1>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} –{' '}
+            {weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
         </div>
-      </header>
-
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-        {DAYS.map((day, i) => {
-          const date = new Date(weekStart);
-          date.setDate(date.getDate() + i);
-          return (
-            <button key={day} onClick={() => setActiveDay(i)} className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-2xl min-w-[64px] ${activeDay === i ? 'bg-green-500 text-white shadow-lg' : 'bg-white border text-gray-400'}`}>
-              <span className="text-[10px] font-black uppercase mb-1">{day.slice(0, 3)}</span>
-              <span className="text-xl font-black">{date.getDate()}</span>
-            </button>
-          );
-        })}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setWeekOffset(w => w - 1)}
+            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            <ChevronLeft size={18} className="text-gray-600" />
+          </button>
+          <button
+            onClick={() => setWeekOffset(0)}
+            className="px-3 py-1.5 text-xs font-medium rounded-xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setWeekOffset(w => w + 1)}
+            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            <ChevronRight size={18} className="text-gray-600" />
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white border rounded-[2rem] p-6 shadow-sm mb-6 grid grid-cols-4 gap-4">
-        {[
-          { label: 'CAL', val: dailyNutrition.calories, icon: Flame, col: 'text-orange-500' },
-          { label: 'PRO', val: dailyNutrition.protein, icon: HardDrive, col: 'text-blue-500' },
-          { label: 'CHO', val: dailyNutrition.carbs, icon: Wheat, col: 'text-amber-500' },
-          { label: 'FAT', val: dailyNutrition.fat, icon: Droplets, col: 'text-pink-500' },
-        ].map(n => (
-          <div key={n.label} className="text-center">
-            <n.icon className={`w-4 h-4 mx-auto mb-2 ${n.col}`} />
-            <p className="text-lg font-black text-gray-800 leading-none mb-1">{Math.round(n.val)}</p>
-            <p className="text-[9px] font-black text-gray-400 tracking-wider">{n.label}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="space-y-4">
-        {SLOTS.map((slot) => {
-          const slotData = daySlots.filter(s => s.slot === slot);
-          return (
-            <div key={slot} className="bg-white rounded-3xl border shadow-sm overflow-hidden">
-              <div className={`flex items-center justify-between px-5 py-3.5 border-b ${SLOT_COLORS[slot]}`}>
-                <div className="flex items-center gap-2.5">
-                  <span className={`w-2.5 h-2.5 rounded-full border-2 border-white ${SLOT_DOT[slot]}`} />
-                  <span className="font-black text-xs uppercase tracking-widest">{slot}</span>
-                </div>
-                <button onClick={() => { setPickerTarget({ day: activeDay, slot }); setPickerOpen(true); }} className="text-[10px] font-black uppercase px-3 py-1.5 rounded-xl bg-white/60 hover:bg-white transition-all">+ Add</button>
-              </div>
-              <div className="p-4 space-y-3">
-                {slotData.length === 0 ? (
-                  <p className="text-center py-6 text-xs text-gray-300 font-bold uppercase tracking-widest">No meals planned</p>
-                ) : (
-                  slotData.map((s) => (
-                    <div key={s.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl group transition-all hover:bg-white hover:shadow-md border border-transparent hover:border-gray-100">
-                      {s.expand?.recipe_id?.image_url ? (
-                        <img 
-                          src={`https://images.weserv.nl/?url=${encodeURIComponent(s.expand.recipe_id.image_url)}&w=100&h=100&fit=cover`} 
-                          alt="" 
-                          className="w-14 h-14 rounded-xl object-cover" 
-                        />
-                      ) : (
-                        <div className="w-14 h-14 rounded-xl bg-green-100 flex items-center justify-center shrink-0"><UtensilsCrossed className="text-green-400" /></div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-gray-800 truncate">{s.expand?.recipe_id?.title}</p>
-                        <p className="text-[10px] font-bold text-gray-400">{s.servings_multiplier}× portion · {Math.round((s.expand?.recipe_id?.nutrition?.calories || 0) * s.servings_multiplier)} kcal</p>
+      {loading ? (
+        <div className="flex items-center justify-center py-24">
+          <div className="w-9 h-9 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        /* DESKTOP: full weekly grid */
+        <>
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full border-separate border-spacing-1.5">
+              <thead>
+                <tr>
+                  <th className="w-24" />
+                  {weekDays.map((d, i) => {
+                    const isToday = fmt(d) === today;
+                    return (
+                      <th key={i} className="text-center pb-1">
+                        <div className={`inline-flex flex-col items-center px-3 py-1.5 rounded-xl ${isToday ? 'bg-green-500 text-white' : 'text-gray-500'}`}>
+                          <span className="text-xs font-medium">{DAY_NAMES[i]}</span>
+                          <span className={`text-base font-bold ${isToday ? '' : 'text-gray-800'}`}>
+                            {d.getDate()}
+                          </span>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {MEAL_TYPES.map(meal => (
+                  <tr key={meal}>
+                    <td className="pr-2 py-1 align-top">
+                      <div className="text-right">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+                        </span>
                       </div>
-                      <button onClick={() => removeSlot.mutate(s.id)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                    </td>
+                    {weekDays.map((d, di) => {
+                      const date = fmt(d);
+                      const key = `${date}__${meal}`;
+                      const cellSlots = slots[key] || [];
+                      return (
+                        <td key={di} className="align-top">
+                          <MealCell
+                            date={date}
+                            meal={meal}
+                            cellSlots={cellSlots}
+                            onAdd={() => openModal(date, meal)}
+                            onRemove={removeSlot}
+                            saving={saving}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      {pickerOpen && <RecipePickerModal onClose={() => setPickerOpen(false)} onSelect={(id, m) => { addSlot.mutate({ recipeId: id, servingsMultiplier: m }); setPickerOpen(false); }} />}
+          {/* MOBILE: day selector + vertical meal cards */}
+          <div className="md:hidden">
+            {/* Day strip */}
+            <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+              {weekDays.map((d, i) => {
+                const date = fmt(d);
+                const isToday = date === today;
+                const isSelected = date === selectedDay;
+                const hasAny = MEAL_TYPES.some(m => (slots[`${date}__${m}`] || []).length > 0);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedDay(date)}
+                    className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl transition-all ${
+                      isSelected
+                        ? 'bg-green-500 text-white shadow-md'
+                        : isToday
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-white text-gray-600 border border-gray-100'
+                    }`}
+                  >
+                    <span className="text-xs font-medium">{DAY_NAMES[i]}</span>
+                    <span className="text-base font-bold">{d.getDate()}</span>
+                    {hasAny && (
+                      <div className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-white' : 'bg-green-400'}`} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Meal cards for selected day */}
+            <div className="space-y-3">
+              {MEAL_TYPES.map(meal => {
+                const key = `${selectedDay}__${meal}`;
+                const cellSlots = slots[key] || [];
+                return (
+                  <div key={meal} className={`bg-gradient-to-r ${MEAL_COLORS[meal]} border rounded-2xl p-3`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-700">
+                        {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+                      </span>
+                      <button
+                        onClick={() => openModal(selectedDay, meal)}
+                        className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center hover:bg-green-50 transition-colors"
+                      >
+                        <Plus size={14} className="text-green-600" />
+                      </button>
+                    </div>
+                    {cellSlots.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">No recipes added</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {cellSlots.map(({ slotId, recipe, servings_multiplier }) => (
+                          <MobileRecipeCard
+                            key={slotId}
+                            recipe={recipe}
+                            servings={servings_multiplier}
+                            onRemove={() => removeSlot(slotId)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      <RecipePickerModal
+        isOpen={modalOpen}
+        onClose={() => { setModalOpen(false); setActiveCell(null); }}
+        onSelect={handleRecipeSelect}
+      />
+    </div>
+  );
+}
+
+function MealCell({ date, meal, cellSlots, onAdd, onRemove, saving }) {
+  return (
+    <div className="min-h-[90px] bg-white border border-gray-100 rounded-xl p-1.5 flex flex-col gap-1 group hover:border-green-200 transition-colors">
+      {cellSlots.map(({ slotId, recipe, servings_multiplier }) => (
+        <DesktopRecipeCard
+          key={slotId}
+          recipe={recipe}
+          servings={servings_multiplier}
+          onRemove={() => onRemove(slotId)}
+        />
+      ))}
+      <button
+        onClick={onAdd}
+        disabled={saving}
+        className="flex items-center justify-center w-full mt-auto py-1 rounded-lg border border-dashed border-gray-200 hover:border-green-400 hover:bg-green-50 transition-colors group/btn"
+      >
+        <Plus size={14} className="text-gray-300 group-hover/btn:text-green-500 transition-colors" />
+      </button>
+    </div>
+  );
+}
+
+function DesktopRecipeCard({ recipe, servings, onRemove }) {
+  const [imgError, setImgError] = useState(false);
+  if (!recipe) return null;
+  const proxied = !imgError && recipe.image_url ? getProxiedImage(recipe.image_url) : null;
+
+  return (
+    <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-1.5 py-1 group/card relative">
+      {proxied ? (
+        <img
+          src={proxied}
+          alt={recipe.title}
+          className="w-7 h-7 rounded-md object-cover flex-shrink-0"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className="w-7 h-7 rounded-md bg-green-100 flex items-center justify-center flex-shrink-0">
+          <Utensils size={12} className="text-green-500" />
+        </div>
+      )}
+      <span className="text-xs text-gray-700 font-medium leading-tight flex-1 truncate" title={recipe.title}>
+        {recipe.title}
+      </span>
+      {servings > 1 && (
+        <span className="text-[10px] text-green-600 font-semibold flex-shrink-0">{servings}x</span>
+      )}
+      <button
+        onClick={onRemove}
+        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white hidden group-hover/card:flex items-center justify-center shadow-sm"
+      >
+        <X size={9} strokeWidth={3} />
+      </button>
+    </div>
+  );
+}
+
+function MobileRecipeCard({ recipe, servings, onRemove }) {
+  const [imgError, setImgError] = useState(false);
+  if (!recipe) return null;
+  const proxied = !imgError && recipe.image_url ? getProxiedImage(recipe.image_url) : null;
+
+  return (
+    <div className="flex items-center gap-2 bg-white rounded-xl px-2.5 py-2 shadow-sm">
+      {proxied ? (
+        <img
+          src={proxied}
+          alt={recipe.title}
+          className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+          <Utensils size={14} className="text-green-500" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800 truncate">{recipe.title}</p>
+        {servings > 1 && (
+          <p className="text-xs text-green-600">{servings}x serving</p>
+        )}
+      </div>
+      <button
+        onClick={onRemove}
+        className="w-6 h-6 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors flex-shrink-0"
+      >
+        <X size={13} className="text-red-400" />
+      </button>
     </div>
   );
 }
