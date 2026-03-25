@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import pb from '../lib/pb';
-import { ArrowLeft, Edit2, Users, ExternalLink, Loader2, UtensilsCrossed } from 'lucide-react';
+import { 
+  ArrowLeft, Edit2, Users, ExternalLink, Loader2, UtensilsCrossed, 
+  Flame, HardDrive, Wheat, Droplets
+} from 'lucide-react';
 
 const MULTIPLIERS = [1, 2, 3, 4];
 
@@ -17,169 +20,85 @@ export default function RecipeDetailPage() {
     enabled: !!id,
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
-      </div>
-    );
-  }
+  if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-green-500" /></div>;
+  if (!recipe) return <div className="text-center py-20 text-gray-400">Recipe not found</div>;
 
-  if (!recipe) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <UtensilsCrossed className="w-12 h-12 text-gray-200 mb-3" />
-        <h2 className="text-lg font-semibold text-gray-700">Recipe not found</h2>
-        <button
-          onClick={() => navigate('/recipes')}
-          className="mt-4 text-sm text-green-600 hover:underline"
-        >
-          Back to recipes
-        </button>
-      </div>
-    );
-  }
-
-  const scaleQty = (qty) => {
-    if (!qty) return '';
-    const num = parseFloat(qty);
-    if (isNaN(num)) return qty;
-    const scaled = num * multiplier;
-    return scaled % 1 === 0 ? scaled.toString() : scaled.toFixed(1);
-  };
-
-  const instructions = recipe.instructions
-    ? recipe.instructions.split('\n').filter((l) => l.trim())
-    : [];
+  const nutrition = recipe.nutrition || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  const nutrients = [
+    { label: 'Calories', value: Math.round(nutrition.calories * multiplier), unit: 'kcal', icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50' },
+    { label: 'Protein', value: Math.round(nutrition.protein * multiplier), unit: 'g', icon: HardDrive, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { label: 'Carbs', value: Math.round(nutrition.carbs * multiplier), unit: 'g', icon: Wheat, color: 'text-amber-500', bg: 'bg-amber-50' },
+    { label: 'Fat', value: Math.round(nutrition.fat * multiplier), unit: 'g', icon: Droplets, color: 'text-pink-500', bg: 'bg-pink-50' },
+  ];
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={() => navigate('/recipes')}
-          className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
-        <Link
-          to={`/recipes/${id}/edit`}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors"
-        >
-          <Edit2 className="w-4 h-4" />
-          Edit
-        </Link>
+      <div className="flex items-center justify-between mb-8">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><ArrowLeft /></button>
+        <Link to={`/recipes/${id}/edit`} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400"><Edit2 size={18} /></Link>
       </div>
 
-      {/* Hero Image */}
       {recipe.image_url && (
-        <div className="rounded-2xl overflow-hidden mb-6 shadow-sm">
-          <img
-            src={recipe.image_url}
-            alt={recipe.title}
-            className="w-full h-52 object-cover"
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
-        </div>
+        <img 
+          src={`https://images.weserv.nl/?url=${encodeURIComponent(recipe.image_url)}&w=800&h=600&fit=cover&q=85`} 
+          alt={recipe.title} 
+          className="w-full h-64 object-cover rounded-[2.5rem] shadow-lg mb-8" 
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
       )}
 
-      {/* Title & Meta */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
-          {recipe.title}
-        </h1>
-        {recipe.description && (
-          <p className="text-gray-500 text-sm leading-relaxed">{recipe.description}</p>
-        )}
-        <div className="flex items-center gap-4 mt-3">
-          <span className="flex items-center gap-1.5 text-sm text-gray-500">
-            <Users className="w-4 h-4" />
-            {recipe.servings * multiplier} servings
-          </span>
-          {recipe.source_url && (
-            <a
-              href={recipe.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-sm text-green-600 hover:underline"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Source
-            </a>
-          )}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{recipe.title}</h1>
+        <div className="flex items-center gap-4 text-sm text-gray-500">
+          <span className="flex items-center gap-1"><Users size={14} /> {recipe.servings * multiplier} servings</span>
+          {recipe.source_url && <a href={recipe.source_url} target="_blank" rel="noreferrer" className="text-green-600 hover:underline">Source</a>}
         </div>
-        {recipe.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {recipe.tags.map((tag) => (
-              <span key={tag} className="text-xs bg-green-50 text-green-600 px-2.5 py-1 rounded-full font-medium">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Serving Multiplier */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-2xl">
-        <p className="text-sm font-semibold text-gray-700 mb-3">Scale Servings</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        {nutrients.map((n) => (
+          <div key={n.label} className={`${n.bg} rounded-3xl p-4 border border-white/50 shadow-sm`}>
+            <div className="flex items-center gap-2 mb-1">
+              <n.icon className={`w-3 h-3 ${n.color}`} />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{n.label}</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-gray-800">{n.value}</span>
+              <span className="text-[10px] font-bold text-gray-400">{n.unit}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-3xl p-5 mb-8">
+        <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Adjust Portions</p>
         <div className="flex gap-2">
-          {MULTIPLIERS.map((m) => (
-            <button
-              key={m}
-              onClick={() => setMultiplier(m)}
-              className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${
-                multiplier === m
-                  ? 'bg-green-500 text-white shadow-sm'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:border-green-300 hover:text-green-600'
-              }`}
-            >
-              {m}×
-            </button>
+          {MULTIPLIERS.map(m => (
+            <button key={m} onClick={() => setMultiplier(m)} className={`flex-1 py-3 rounded-2xl font-bold transition-all ${multiplier === m ? 'bg-green-500 text-white' : 'bg-gray-50 text-gray-500'}`}>{m}×</button>
           ))}
         </div>
       </div>
 
-      {/* Ingredients */}
-      {recipe.ingredients?.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
-            Ingredients
-          </h2>
-          <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50 shadow-sm overflow-hidden">
-            {recipe.ingredients.map((ing, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                <span className="text-sm font-semibold text-gray-700 w-14 shrink-0">
-                  {scaleQty(ing.quantity)}{ing.unit ? ` ${ing.unit}` : ''}
-                </span>
-                <span className="text-sm text-gray-600">{ing.name}</span>
+      <div className="space-y-8">
+        <section>
+          <h2 className="text-lg font-bold mb-4">Ingredients</h2>
+          <div className="bg-white rounded-3xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+            {recipe.ingredients?.map((ing, i) => (
+              <div key={i} className="px-6 py-4 flex justify-between text-sm">
+                <span className="text-gray-600">{ing.name}</span>
+                <span className="font-bold text-gray-900">{(parseFloat(ing.quantity) * multiplier) || ''} {ing.unit}</span>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        </section>
 
-      {/* Instructions */}
-      {instructions.length > 0 && (
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
-            Instructions
-          </h2>
-          <div className="space-y-3">
-            {instructions.map((step, i) => {
-              const clean = step.replace(/^\d+\.\s*/, '');
-              return (
-                <div key={i} className="flex gap-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                  <span className="w-7 h-7 rounded-xl bg-green-500 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {i + 1}
-                  </span>
-                  <p className="text-sm text-gray-700 leading-relaxed">{clean}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        <section>
+          <h2 className="text-lg font-bold mb-4">Instructions</h2>
+          <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap bg-white p-6 rounded-3xl border border-gray-100">
+            {recipe.instructions}
+          </p>
+        </section>
+      </div>
     </div>
   );
 }

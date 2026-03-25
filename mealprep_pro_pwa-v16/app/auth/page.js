@@ -112,7 +112,7 @@ export default function AuthPage() {
               {message}
             </p>
           )}
-        </motion.div> 
+        </motion.div>
       </div>
     </Suspense>
   );

@@ -3,7 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import pb from '../lib/pb';
 import RecipePickerModal from '../components/RecipePickerModal';
-import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed } from 'lucide-react';
+import { 
+  Plus, Trash2, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed, 
+  Flame, HardDrive, Wheat, Droplets 
+} from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -46,34 +49,23 @@ export default function HomePage() {
   const weekStart = getWeekStart(weekOffset);
   const weekStartStr = formatWeekStart(weekStart);
 
-  const weekLabel = (() => {
-    const end = new Date(weekStart);
-    end.setDate(end.getDate() + 6);
-    const opts = { month: 'short', day: 'numeric' };
-    return `${weekStart.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
-  })();
-
   const { data: mealPlan, isLoading: planLoading } = useQuery({
     queryKey: ['meal-plan', user?.id, weekStartStr],
     queryFn: async () => {
       const plans = await pb.collection('meal_plans').getList(1, 1, {
-        filter: `user_id = "${user.id}" && week_start_date = "${weekStartStr}"`,
+        filter: `user_id="${user.id}" && week_start_date="${weekStartStr}"`,
       });
       if (plans.items.length > 0) return plans.items[0];
-      const newPlan = await pb.collection('meal_plans').create({
-        user_id: user.id,
-        week_start_date: weekStartStr,
-      });
-      return newPlan;
+      return await pb.collection('meal_plans').create({ user_id: user.id, week_start_date: weekStartStr });
     },
     enabled: !!user,
   });
 
-  const { data: slots = [], isLoading: slotsLoading } = useQuery({
+  const { data: slots = [] } = useQuery({
     queryKey: ['meal-slots', mealPlan?.id],
     queryFn: async () => {
       const result = await pb.collection('meal_slots').getList(1, 200, {
-        filter: `meal_plan_id = "${mealPlan.id}"`,
+        filter: `meal_plan_id="${mealPlan.id}"`,
         expand: 'recipe_id',
       });
       return result.items;
@@ -99,167 +91,101 @@ export default function HomePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['meal-slots', mealPlan?.id] }),
   });
 
-  const openPicker = (day, slot) => {
-    setPickerTarget({ day, slot });
-    setPickerOpen(true);
-  };
+  const daySlots = slots.filter(s => s.day === activeDay);
+  const dailyNutrition = daySlots.reduce((acc, s) => {
+    const nutrition = s.expand?.recipe_id?.nutrition || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    const mult = s.servings_multiplier || 1;
+    return {
+      calories: acc.calories + (nutrition.calories * mult),
+      protein: acc.protein + (nutrition.protein * mult),
+      carbs: acc.carbs + (nutrition.carbs * mult),
+      fat: acc.fat + (nutrition.fat * mult),
+    };
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-  const getSlotsForDayMeal = (dayIndex, slot) =>
-    slots.filter((s) => s.day === dayIndex && s.slot === slot);
-
-  if (planLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
-      </div>
-    );
-  }
+  if (planLoading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="animate-spin text-green-500" /></div>;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
-      {/* Week Navigator */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Playfair Display', serif" }}>
-            Meal Planner
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{weekLabel}</p>
-        </div>
+      <header className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Meal Planner</h1>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setWeekOffset((w) => w - 1)}
-            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <button
-            onClick={() => setWeekOffset(0)}
-            className="px-3 py-1.5 text-xs font-semibold text-green-600 bg-green-50 hover:bg-green-100 rounded-xl transition-colors"
-          >
-            Today
-          </button>
-          <button
-            onClick={() => setWeekOffset((w) => w + 1)}
-            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-          >
-            <ChevronRight className="w-5 h-5 text-gray-600" />
-          </button>
+          <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronLeft /></button>
+          <button onClick={() => setWeekOffset(0)} className="px-3 py-1.5 text-xs font-bold text-green-600 bg-green-50 rounded-xl">Today</button>
+          <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronRight /></button>
         </div>
-      </div>
+      </header>
 
-      {/* Day Tabs */}
-      <div className="flex gap-1 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-2 scrollbar-hide">
         {DAYS.map((day, i) => {
           const date = new Date(weekStart);
           date.setDate(date.getDate() + i);
-          const isToday = new Date().toDateString() === date.toDateString();
           return (
-            <button
-              key={day}
-              onClick={() => setActiveDay(i)}
-              className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-2xl transition-all duration-200 min-w-[56px] ${
-                activeDay === i
-                  ? 'bg-green-500 text-white shadow-md shadow-green-200'
-                  : 'bg-gray-50 hover:bg-gray-100 text-gray-600'
-              }`}
-            >
-              <span className="text-xs font-medium">{day.slice(0, 3)}</span>
-              <span className={`text-lg font-bold leading-tight ${isToday && activeDay !== i ? 'text-green-500' : ''}`}>
-                {date.getDate()}
-              </span>
-              {isToday && (
-                <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${activeDay === i ? 'bg-white' : 'bg-green-500'}`} />
-              )}
+            <button key={day} onClick={() => setActiveDay(i)} className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-2xl min-w-[64px] ${activeDay === i ? 'bg-green-500 text-white shadow-lg' : 'bg-white border text-gray-400'}`}>
+              <span className="text-[10px] font-black uppercase mb-1">{day.slice(0, 3)}</span>
+              <span className="text-xl font-black">{date.getDate()}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Meal Slots */}
-      {slotsLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 text-green-400 animate-spin" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {SLOTS.map((slot) => {
-            const daySlots = getSlotsForDayMeal(activeDay, slot);
-            return (
-              <div key={slot} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className={`flex items-center justify-between px-4 py-3 border-b ${SLOT_COLORS[slot]}`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${SLOT_DOT[slot]}`} />
-                    <span className="font-semibold text-sm">{slot}</span>
-                  </div>
-                  <button
-                    onClick={() => openPicker(activeDay, slot)}
-                    className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/70 hover:bg-white transition-colors shadow-sm"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Add
-                  </button>
-                </div>
+      <div className="bg-white border rounded-[2rem] p-6 shadow-sm mb-6 grid grid-cols-4 gap-4">
+        {[
+          { label: 'CAL', val: dailyNutrition.calories, icon: Flame, col: 'text-orange-500' },
+          { label: 'PRO', val: dailyNutrition.protein, icon: HardDrive, col: 'text-blue-500' },
+          { label: 'CHO', val: dailyNutrition.carbs, icon: Wheat, col: 'text-amber-500' },
+          { label: 'FAT', val: dailyNutrition.fat, icon: Droplets, col: 'text-pink-500' },
+        ].map(n => (
+          <div key={n.label} className="text-center">
+            <n.icon className={`w-4 h-4 mx-auto mb-2 ${n.col}`} />
+            <p className="text-lg font-black text-gray-800 leading-none mb-1">{Math.round(n.val)}</p>
+            <p className="text-[9px] font-black text-gray-400 tracking-wider">{n.label}</p>
+          </div>
+        ))}
+      </div>
 
-                <div className="p-3 space-y-2">
-                  {daySlots.length === 0 ? (
-                    <button
-                      onClick={() => openPicker(activeDay, slot)}
-                      className="w-full py-4 flex flex-col items-center gap-1 text-gray-300 hover:text-gray-400 hover:bg-gray-50 rounded-xl transition-colors border-2 border-dashed border-gray-100 hover:border-gray-200"
-                    >
-                      <UtensilsCrossed className="w-5 h-5" />
-                      <span className="text-xs font-medium">Tap to add a recipe</span>
-                    </button>
-                  ) : (
-                    daySlots.map((s) => {
-                      const recipe = s.expand?.recipe_id;
-                      return (
-                        <div key={s.id} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl group">
-                          {recipe?.image_url ? (
-                            <img
-                              src={recipe.image_url}
-                              alt={recipe.title}
-                              className="w-10 h-10 rounded-lg object-cover shrink-0"
-                              onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
-                              <UtensilsCrossed className="w-4 h-4 text-green-400" />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">
-                              {recipe?.title || 'Unknown Recipe'}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {s.servings_multiplier}× servings
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => removeSlot.mutate(s.id)}
-                            className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
+      <div className="space-y-4">
+        {SLOTS.map((slot) => {
+          const slotData = daySlots.filter(s => s.slot === slot);
+          return (
+            <div key={slot} className="bg-white rounded-3xl border shadow-sm overflow-hidden">
+              <div className={`flex items-center justify-between px-5 py-3.5 border-b ${SLOT_COLORS[slot]}`}>
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2.5 h-2.5 rounded-full border-2 border-white ${SLOT_DOT[slot]}`} />
+                  <span className="font-black text-xs uppercase tracking-widest">{slot}</span>
                 </div>
+                <button onClick={() => { setPickerTarget({ day: activeDay, slot }); setPickerOpen(true); }} className="text-[10px] font-black uppercase px-3 py-1.5 rounded-xl bg-white/60 hover:bg-white transition-all">+ Add</button>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="p-4 space-y-3">
+                {slotData.length === 0 ? (
+                  <p className="text-center py-6 text-xs text-gray-300 font-bold uppercase tracking-widest">No meals planned</p>
+                ) : (
+                  slotData.map((s) => (
+                    <div key={s.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-2xl group transition-all hover:bg-white hover:shadow-md border border-transparent hover:border-gray-100">
+                      {s.expand?.recipe_id?.image_url ? (
+                        <img 
+                          src={`https://images.weserv.nl/?url=${encodeURIComponent(s.expand.recipe_id.image_url)}&w=100&h=100&fit=cover`} 
+                          alt="" 
+                          className="w-14 h-14 rounded-xl object-cover" 
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-xl bg-green-100 flex items-center justify-center shrink-0"><UtensilsCrossed className="text-green-400" /></div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-800 truncate">{s.expand?.recipe_id?.title}</p>
+                        <p className="text-[10px] font-bold text-gray-400">{s.servings_multiplier}× portion · {Math.round((s.expand?.recipe_id?.nutrition?.calories || 0) * s.servings_multiplier)} kcal</p>
+                      </div>
+                      <button onClick={() => removeSlot.mutate(s.id)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-      {pickerOpen && pickerTarget && (
-        <RecipePickerModal
-          onClose={() => setPickerOpen(false)}
-          onSelect={(recipeId, multiplier) => {
-            addSlot.mutate({ recipeId, servingsMultiplier: multiplier });
-            setPickerOpen(false);
-          }}
-        />
-      )}
+      {pickerOpen && <RecipePickerModal onClose={() => setPickerOpen(false)} onSelect={(id, m) => { addSlot.mutate({ recipeId: id, servingsMultiplier: m }); setPickerOpen(false); }} />}
     </div>
   );
 }

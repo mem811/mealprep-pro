@@ -1,3 +1,4 @@
+/* eslint-env node */
 const express = require('express');
 const cors = require('cors');
 
@@ -35,7 +36,6 @@ app.post('/api/scrape-recipe', async (req, res) => {
 
     let recipeData = null;
 
-    // Parse all JSON-LD script tags
     $('script[type="application/ld+json"]').each((_, el) => {
       try {
         const json = JSON.parse($(el).html());
@@ -53,20 +53,18 @@ app.post('/api/scrape-recipe', async (req, res) => {
         };
         const found = findRecipe(json);
         if (found && !recipeData) recipeData = found;
-      } catch (e) {
+      } catch {
         // skip invalid JSON
       }
     });
 
     if (!recipeData) {
-      return res.status(404).json({ error: 'No Recipe schema found on this page. Try a different recipe site.' });
+      return res.status(404).json({ error: 'No Recipe schema found on this page.' });
     }
 
-    // Parse ingredients
     const rawIngredients = recipeData.recipeIngredient || [];
     const ingredients = rawIngredients.map((line) => {
       const str = typeof line === 'string' ? line.trim() : String(line).trim();
-      // Try to parse "2 cups flour" → quantity, unit, name
       const match = str.match(/^([\d./\s¼½¾⅓⅔⅛⅜⅝⅞]+)\s*([a-zA-Z]+(?:\s+[a-zA-Z]+)?\.?)?\s+(.+)$/);
       if (match) {
         return {
@@ -78,7 +76,6 @@ app.post('/api/scrape-recipe', async (req, res) => {
       return { quantity: '', unit: '', name: str };
     });
 
-    // Parse instructions
     const rawInstructions = recipeData.recipeInstructions || [];
     let instructions = '';
     if (typeof rawInstructions === 'string') {
@@ -88,19 +85,12 @@ app.post('/api/scrape-recipe', async (req, res) => {
         .map((step, i) => {
           if (typeof step === 'string') return `${i + 1}. ${step}`;
           if (step['@type'] === 'HowToStep') return `${i + 1}. ${step.text || step.name || ''}`;
-          if (step['@type'] === 'HowToSection') {
-            const sectionSteps = (step.itemListElement || [])
-              .map((s, j) => `  ${j + 1}. ${s.text || s.name || ''}`)
-              .join('\n');
-            return `${step.name ? step.name + ':\n' : ''}${sectionSteps}`;
-          }
           return '';
         })
         .filter(Boolean)
         .join('\n');
     }
 
-    // Parse servings
     let servings = 4;
     const yieldRaw = recipeData.recipeYield;
     if (yieldRaw) {
@@ -109,16 +99,13 @@ app.post('/api/scrape-recipe', async (req, res) => {
       if (match) servings = parseInt(match[0]);
     }
 
-    // Parse image
     let imageUrl = '';
     const imgRaw = recipeData.image;
     if (imgRaw) {
       if (typeof imgRaw === 'string') imageUrl = imgRaw;
       else if (Array.isArray(imgRaw)) imageUrl = typeof imgRaw[0] === 'string' ? imgRaw[0] : imgRaw[0]?.url || '';
-      else if (imgRaw.url) imageUrl = imgRaw.url;
     }
 
-    // Parse tags
     const keywords = recipeData.keywords || '';
     const tags = typeof keywords === 'string'
       ? keywords.split(',').map(t => t.trim()).filter(Boolean)
@@ -135,9 +122,8 @@ app.post('/api/scrape-recipe', async (req, res) => {
       tags,
     });
 
-  } catch (err) {
-    console.error('Scrape error:', err);
-    res.status(500).json({ error: `Failed to scrape recipe: ${err.message}` });
+  } catch {
+    res.status(500).json({ error: 'Failed to scrape recipe' });
   }
 });
 
