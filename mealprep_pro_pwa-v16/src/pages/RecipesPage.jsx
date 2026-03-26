@@ -69,16 +69,20 @@ export default function RecipesPage() {
     fetchRecipes();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this recipe?')) return;
-    try {
-      await pb.collection('recipes').delete(id);
-      setRecipes((prev) => prev.filter((r) => r.id !== id));
-    } catch (err) {
-      console.error('Error deleting recipe:', err);
-      alert('Failed to delete recipe.');
-    }
-  };
+  const handleDelete = async (recipeId) => {
+  if (!window.confirm('Are you sure you want to delete this recipe?')) {
+    return;
+  }
+
+  try {
+    await pb.collection('recipes').delete(recipeId);
+    // Remove from local state so the UI updates immediately
+    setRecipes((prev) => prev.filter((r) => r.id !== recipeId));
+  } catch (err) {
+    console.error('Delete error:', err);
+    alert('Failed to delete recipe.');
+  }
+};
 
   const handleToggleFavorite = async (e, recipe) => {
     e.preventDefault();
