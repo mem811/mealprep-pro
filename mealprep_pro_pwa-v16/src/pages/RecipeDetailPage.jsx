@@ -552,7 +552,6 @@ export default function RecipeDetailPage() {
       </button>
     </div>
   </div>
-) : (
       
               ) : (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
