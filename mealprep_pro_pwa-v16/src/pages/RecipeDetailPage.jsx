@@ -125,6 +125,9 @@ export default function RecipeDetailPage() {
   setNutritionError('');
   const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
   let n = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  console.log('Ingredients:', recipe.ingredients);
+  console.log('Ingredients type:', typeof recipe.ingredients);
+  console.log('Source URL:', recipe.source_url);
 
   try {
     // Method 1: Try URL extraction first
