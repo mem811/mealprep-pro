@@ -152,8 +152,12 @@ export default function RecipeDetailPage() {
     // Method 2: If URL extraction returned zeros, try parsing ingredients
     if (n.calories === 0 && n.protein === 0 && recipe.ingredients?.length) {
       const ingredientList = Array.isArray(recipe.ingredients)
-        ? recipe.ingredients.join('\n')
-        : recipe.ingredients;
+  ? recipe.ingredients.map(i =>
+      typeof i === 'object'
+        ? `${i.quantity || ''} ${i.unit || ''} ${i.name || ''}`.trim()
+        : i
+    ).join('\n')
+  : recipe.ingredients;
 
       const res2 = await fetch(
         `https://api.spoonacular.com/recipes/parseIngredients?apiKey=${apiKey}`,
