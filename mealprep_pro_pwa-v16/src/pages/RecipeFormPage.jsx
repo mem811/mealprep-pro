@@ -115,29 +115,36 @@ export default function RecipeFormPage() {
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const res = await fetch(
-        `https://api.spoonacular.com/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(importUrl.trim())}&measurementSystem=us&addRecipeNutrition=true`,
-        { signal: controller.signal }
-      );
-      clearTimeout(timeout);
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const data = await res.json();
-      console.log('Spoonacular response nutrition:', data.nutrition);
+  const res = await fetch(
+    'https://n8n.srv1052955.hstgr.cloud/webhook/5ea8e8c8-94bf-41e7-8ffa-5dd843cdfe13',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: importUrl.trim() }),
+      signal: controller.signal
+    }
+  );
+  clearTimeout(timeout);
+  if (!res.ok) throw new Error(`Import error: ${res.status}`);
+  const data = await res.json();
+    
 
       setTitle(data.title || '');
-      setServings(data.servings || 4);
-      setImageUrl(data.image || '');
-      setSourceUrl(importUrl.trim());
+setServings(data.servings || 4);
+setImageUrl(data.image_url || '');
+setSourceUrl(data.source_url || importUrl.trim());
 
-      if (data.extendedIngredients?.length) {
-        setIngredients(
-          data.extendedIngredients.map((ing) => ({
-            name: ing.name || '',
-            quantity: String(ing.amount || ''),
-            unit: ing.unit || 'piece',
-          }))
-        );
+if (data.ingredients?.length) {
+  setIngredients(
+    data.ingredients.map((ing) => {
+      if (typeof ing === 'string') {
+        // n8n returns ingredients as strings like "1 cup flour"
+        return { name: ing, quantity: '', unit: '' };
       }
+      return { name: ing.name || '', quantity: String(ing.quantity || ''), unit: ing.unit || '' };
+    })
+  );
+}
 // Extract nutrition data
 let nutritionData = null;
 if (data.nutrition?.nutrients) {
