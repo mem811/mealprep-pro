@@ -40,7 +40,7 @@ function getSourceSiteName(url) {
 }
 
 export default function RecipesPage() {
-  const const [recipes, setRecipes] = useState([]);
+  const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
