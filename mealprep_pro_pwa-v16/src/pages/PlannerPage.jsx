@@ -5,6 +5,8 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import RecipePickerModal from '../components/RecipePickerModal';
+import { Link } from 'react-router-dom';
+
 
 const { FiChevronLeft, FiChevronRight, FiPlus, FiCoffee, FiTrash2, FiUsers } = FiIcons;
 
@@ -69,7 +71,7 @@ export default function PlannerPage() {
     }
   };
 
-  const handleAddMeal = async ({ recipe, servings_multiplier }) => {
+  const handleAddMeal = async ({ , servings_multiplier }) => {
     if (!activeCell) return;
     try {
       const userId = pb.authStore.model?.id;
@@ -95,7 +97,7 @@ export default function PlannerPage() {
         user_id: userId,
         date,
         slot,
-        recipe: recipe.id,
+        : .id,
         servings_multiplier
       });
       fetchMealPlan();
@@ -165,7 +167,9 @@ export default function PlannerPage() {
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-[9px] text-gray-900 leading-tight truncate">{item.expand?.recipe?.title}</h4>
+                                <Link to={`/recipes/${item.recipe || item.expand?.recipe?.id}`}>
+  <h4 className="font-bold text-[9px] text-gray-900 leading-tight truncate hover:text-emerald-600 transition-colors cursor-pointer">{item.expand?.recipe?.title}</h4>
+</Link>
                                 <div className="flex items-center justify-between mt-0.5">
                                   <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded-sm">{item.servings_multiplier}x</span>
                                   {/* CALL DELETE HANDLER WITH STOP PROPAGATION */}
