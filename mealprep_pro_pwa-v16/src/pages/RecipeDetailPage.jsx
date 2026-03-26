@@ -119,60 +119,83 @@ export default function RecipeDetailPage() {
     window.print();
   };
 
-  const handleFetchNutrition = async () => {
-    if (!recipe) return;
-    setFetchingNutrition(true);
-    setNutritionError('');
-    const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
-    try {
-      // Try extract with nutrition first
-      if (recipe.source_url) {
-        const res = await fetch(
-          `https://api.spoonacular.com/recipes/extract?url=${encodeURIComponent(recipe.source_url)}&addRecipeNutrition=true&apiKey=${apiKey}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          console.log('Spoonacular response:', data);  // ← add this new line
-          if (data.nutrition?.nutrients) {
-            const nutrients = data.nutrition.nutrients;
-            const n = {
-              calories: Math.round(nutrients.find(x => x.name === 'Calories')?.amount || 0),
-              protein: Math.round(nutrients.find(x => x.name === 'Protein')?.amount || 0),
-              carbs: Math.round(nutrients.find(x => x.name === 'Carbohydrates')?.amount || 0),
-              fat: Math.round(nutrients.find(x => x.name === 'Fat')?.amount || 0)
-            };
-            await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
-            setNutrition(n);
-            setFetchingNutrition(false);
-            return;
-          }
+ const handleFetchNutrition = async () => {
+  if (!recipe) return;
+  setFetchingNutrition(true);
+  setNutritionError('');
+  const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
+  let n = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+
+  try {
+    // Method 1: Try URL extraction first
+    if (recipe.source_url) {
+      const res = await fetch(
+        `https://api.spoonacular.com/recipes/extract?url=${encodeURIComponent(recipe.source_url)}&addRecipeNutrition=true&apiKey=${apiKey}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.nutrition?.nutrients) {
+          const nutrients = data.nutrition.nutrients;
+          n = {
+            calories: Math.round(nutrients.find(x => x.name === 'Calories')?.amount || 0),
+            protein: Math.round(nutrients.find(x => x.name === 'Protein')?.amount || 0),
+            carbs: Math.round(nutrients.find(x => x.name === 'Carbohydrates')?.amount || 0),
+            fat: Math.round(nutrients.find(x => x.name === 'Fat')?.amount || 0),
+          };
         }
       }
-      // Fallback: guess nutrition from title
-      const title = recipe.title || '';
-      const nutRes = await fetch(
-        `https://api.spoonacular.com/recipes/guessNutrition?title=${encodeURIComponent(title)}&apiKey=${apiKey}`
-      );
-      if (nutRes.ok) {
-        const nutData = await nutRes.json();
-        const n = {
-          calories: Math.round(nutData.calories?.value || 0),
-          protein: Math.round(nutData.protein?.value || 0),
-          carbs: Math.round(nutData.carbs?.value || 0),
-          fat: Math.round(nutData.fat?.value || 0)
-        };
-        await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
-        setNutrition(n);
-      } else {
-        setNutritionError('Could not fetch nutrition. Use manual entry below.');
-      }
-    } catch (err) {
-      console.error('Nutrition fetch error:', err);
-      setNutritionError('Failed to fetch. Use manual entry below.');
-    } finally {
-      setFetchingNutrition(false);
     }
-  };
+
+    // Method 2: If URL extraction returned zeros, try parsing ingredients
+    if (n.calories === 0 && n.protein === 0 && recipe.ingredients?.length) {
+      const ingredientList = Array.isArray(recipe.ingredients)
+        ? recipe.ingredients.join('\n')
+        : recipe.ingredients;
+
+      const res2 = await fetch(
+        `https://api.spoonacular.com/recipes/parseIngredients?apiKey=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `ingredientList=${encodeURIComponent(ingredientList)}&servings=${recipe.servings || 1}&includeNutrition=true`,
+        }
+      );
+
+      if (res2.ok) {
+        const parsed = await res2.json();
+        let totalCal = 0, totalPro = 0, totalCarb = 0, totalFat = 0;
+
+        parsed.forEach(item => {
+          const nuts = item.nutrition?.nutrients || [];
+          totalCal += nuts.find(x => x.name === 'Calories')?.amount || 0;
+          totalPro += nuts.find(x => x.name === 'Protein')?.amount || 0;
+          totalCarb += nuts.find(x => x.name === 'Carbohydrates')?.amount || 0;
+          totalFat += nuts.find(x => x.name === 'Fat')?.amount || 0;
+        });
+
+        n = {
+          calories: Math.round(totalCal),
+          protein: Math.round(totalPro),
+          carbs: Math.round(totalCarb),
+          fat: Math.round(totalFat),
+        };
+      }
+    }
+
+    // If still zeros after both methods, show a message
+    if (n.calories === 0 && n.protein === 0 && n.carbs === 0 && n.fat === 0) {
+      setNutritionError('Could not auto-detect nutrition. Use manual entry below.');
+    }
+
+    await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
+    setNutrition(n);
+  } catch (err) {
+    console.error('Nutrition fetch error:', err);
+    setNutritionError('Failed to fetch nutrition. Try manual entry.');
+  } finally {
+    setFetchingNutrition(false);
+  }
+};
 
   const handleSaveManualNutrition = async () => {
     try {
