@@ -161,8 +161,8 @@ export default function PlannerPage() {
   exit= opacity: 0, scale: 0.95, height: 0 
   className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0"
 >
-  <Link
-    to={`/recipes/${item.recipe || item.expand?.recipe?.id}`}
+  <a
+    href={`/recipes/${item.recipe}`}
     className="flex items-center gap-2 p-2 no-underline"
   >
     <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
@@ -173,12 +173,12 @@ export default function PlannerPage() {
       )}
     </div>
     <div className="flex-1 min-w-0">
-      <a href={`/recipes/${item.recipe}`} className="font-bold text-[9px] text-gray-900 leading-tight truncate block hover:text-emerald-600">{item.expand?.recipe?.title}</a>
+      <h4 className="font-bold text-[9px] text-gray-900 leading-tight truncate hover:text-emerald-600">{item.expand?.recipe?.title}</h4>
       <div className="flex items-center justify-between mt-0.5">
         <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded-sm">{item.servings_multiplier}x</span>
       </div>
     </div>
-  </Link>
+  </a>
   <button
     onClick={(e) => {
       e.preventDefault();
