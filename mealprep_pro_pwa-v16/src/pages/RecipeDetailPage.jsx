@@ -512,32 +512,30 @@ export default function RecipeDetailPage() {
             <div className="lg:col-span-1 space-y-5">
 
               {/* Nutrition Card */}
-              {nutrition ? (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-gray-100">
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Nutrition Facts</h3>
-                    <p className="text-xs text-gray-400">Per serving</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 p-5">
-                    <div className="text-center bg-green-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-green-600">{nutrition.calories}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Calories</div>
-                    </div>
-                    <div className="text-center bg-blue-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-blue-600">{nutrition.protein}g</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Protein</div>
-                    </div>
-                    <div className="text-center bg-amber-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-amber-600">{nutrition.carbs}g</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Carbs</div>
-                    </div>
-                    <div className="text-center bg-red-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-red-500">{nutrition.fat}g</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Fat</div>
-                    </div>
-                  </div>
+{nutrition ? (
+  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="px-5 py-4 border-b border-gray-100">
+      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Nutrition Facts</h3>
+      <p className="text-xs text-gray-400">Per serving</p>
     </div>
-    {/* Add this re-fetch button */}
+    <div className="grid grid-cols-2 gap-4 p-5">
+      <div className="text-center bg-green-50 rounded-xl py-3">
+        <div className="text-xl font-bold text-green-600">{nutrition.calories}</div>
+        <div className="text-xs text-gray-500 mt-0.5">Calories</div>
+      </div>
+      <div className="text-center bg-blue-50 rounded-xl py-3">
+        <div className="text-xl font-bold text-blue-600">{nutrition.protein}g</div>
+        <div className="text-xs text-gray-500 mt-0.5">Protein</div>
+      </div>
+      <div className="text-center bg-amber-50 rounded-xl py-3">
+        <div className="text-xl font-bold text-amber-600">{nutrition.carbs}g</div>
+        <div className="text-xs text-gray-500 mt-0.5">Carbs</div>
+      </div>
+      <div className="text-center bg-red-50 rounded-xl py-3">
+        <div className="text-xl font-bold text-red-500">{nutrition.fat}g</div>
+        <div className="text-xs text-gray-500 mt-0.5">Fat</div>
+      </div>
+    </div>
     <div className="px-5 pb-4">
       <button
         onClick={handleFetchNutrition}
@@ -552,83 +550,81 @@ export default function RecipeDetailPage() {
       </button>
     </div>
   </div>
-      
-              ) : (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="p-6 text-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Zap className="w-6 h-6 text-green-600" />
-                    </div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Nutrition Scanner</h3>
-                    <button
-                      onClick={handleFetchNutrition}
-                      disabled={fetchingNutrition}
-                      className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-60"
-                    >
-                      {fetchingNutrition ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Fetching...</>
-                      ) : (
-                        <><Zap className="w-4 h-4" /> Fetch Nutrition</>
-                      )}
-                    </button>
-                    {nutritionError && (
-                      <p className="text-red-500 text-xs mt-2 font-medium">{nutritionError}</p>
-                    )}
-                  </div>
+) : (
+  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="p-6 text-center">
+      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <Zap className="w-6 h-6 text-green-600" />
+      </div>
+      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Nutrition Scanner</h3>
+      <button
+        onClick={handleFetchNutrition}
+        disabled={fetchingNutrition}
+        className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-60"
+      >
+        {fetchingNutrition ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Fetching...</>
+        ) : (
+          <><Zap className="w-4 h-4" /> Fetch Nutrition</>
+        )}
+      </button>
+      {nutritionError && (
+        <p className="text-red-500 text-xs mt-2 font-medium">{nutritionError}</p>
+      )}
+    </div>
 
-                  {/* Manual Entry */}
-                  <div className="px-5 pb-5 border-t border-gray-100 pt-4">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                      <Pencil className="w-3 h-3" /> Manual Entry Fallback
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Calories</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.calories}
-                          onChange={e => setManualNutrition(prev => ({ ...prev, calories: Number(e.target.value) }))}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Protein</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.protein}
-                          onChange={e => setManualNutrition(prev => ({ ...prev, protein: Number(e.target.value) }))}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Carbs</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.carbs}
-                          onChange={e => setManualNutrition(prev => ({ ...prev, carbs: Number(e.target.value) }))}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Fat</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.fat}
-                          onChange={e => setManualNutrition(prev => ({ ...prev, fat: Number(e.target.value) }))}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleSaveManualNutrition}
-                      className="mt-3 w-full flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-xl font-medium text-sm transition-colors border border-green-200"
-                    >
-                      <Save className="w-4 h-4" /> Save Nutrition
-                    </button>
-                  </div>
-                </div>
-              )}
-
+    {/* Manual Entry */}
+    <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+        <Pencil className="w-3 h-3" /> Manual Entry Fallback
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Calories</label>
+          <input
+            type="number"
+            value={manualNutrition.calories}
+            onChange={e => setManualNutrition(prev => ({ ...prev, calories: Number(e.target.value) }))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Protein</label>
+          <input
+            type="number"
+            value={manualNutrition.protein}
+            onChange={e => setManualNutrition(prev => ({ ...prev, protein: Number(e.target.value) }))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Carbs</label>
+          <input
+            type="number"
+            value={manualNutrition.carbs}
+            onChange={e => setManualNutrition(prev => ({ ...prev, carbs: Number(e.target.value) }))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Fat</label>
+          <input
+            type="number"
+            value={manualNutrition.fat}
+            onChange={e => setManualNutrition(prev => ({ ...prev, fat: Number(e.target.value) }))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+        </div>
+      </div>
+      <button
+        onClick={handleSaveManualNutrition}
+        className="mt-3 w-full flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-xl font-medium text-sm transition-colors border border-green-200"
+      >
+        <Save className="w-4 h-4" /> Save Nutrition
+      </button>
+    </div>
+  </div>
+)}
               {/* Chef's Note */}
               <div className="bg-green-500 rounded-2xl p-5 text-white shadow-sm">
                 <h3 className="font-bold text-sm flex items-center gap-2 mb-2">
