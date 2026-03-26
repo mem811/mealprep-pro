@@ -110,7 +110,7 @@ export default function RecipeFormPage() {
     setImporting(true);
     setImportError(null);
 
-    const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
+  
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
