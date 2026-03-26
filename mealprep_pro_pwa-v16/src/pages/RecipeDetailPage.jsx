@@ -27,6 +27,11 @@ const parseTags = (raw) => {
   if (Array.isArray(raw)) return raw;
   try { return JSON.parse(raw); } catch { return []; }
 };
+const parseNutrition = (raw) => {
+  if (!raw) return null;
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  try { return JSON.parse(raw); } catch { return null; }
+};
 
 const parseInstructions = (raw) => {
   if (!raw) return [];
@@ -292,6 +297,37 @@ export default function RecipeDetailPage() {
 
         {/* Main Content */}
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 print-layout">
+          {/* Nutrition */}
+{(() => {
+  const nutrition = parseNutrition(recipe.nutrition);
+  if (!nutrition) return null;
+  return (
+    <div className="mb-8 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100">
+        <h2 className="text-lg font-bold text-gray-900">Nutrition Facts</h2>
+        <p className="text-xs text-gray-400">Per serving</p>
+      </div>
+      <div className="grid grid-cols-4 gap-4 p-6">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">{nutrition.calories}</div>
+          <div className="text-xs text-gray-500 mt-1">Calories</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-blue-600">{nutrition.protein}g</div>
+          <div className="text-xs text-gray-500 mt-1">Protein</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-amber-600">{nutrition.carbs}g</div>
+          <div className="text-xs text-gray-500 mt-1">Carbs</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-red-500">{nutrition.fat}g</div>
+          <div className="text-xs text-gray-500 mt-1">Fat</div>
+        </div>
+      </div>
+    </div>
+  );
+})()}
 
           {/* Ingredients */}
           <div className="recipe-card-print mb-8 md:mb-0">
