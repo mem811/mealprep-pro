@@ -145,16 +145,8 @@ if (data.ingredients?.length) {
     })
   );
 }
-// Extract nutrition data
+// n8n scraping doesn't return nutrition - skip it
 let nutritionData = null;
-if (data.nutrition?.nutrients) {
-  const nutrients = data.nutrition.nutrients;
-  nutritionData = JSON.stringify({
-    calories: Math.round(nutrients.find(n => n.name === 'Calories')?.amount || 0),
-    protein: Math.round(nutrients.find(n => n.name === 'Protein')?.amount || 0),
-    carbs: Math.round(nutrients.find(n => n.name === 'Carbohydrates')?.amount || 0),
-    fat: Math.round(nutrients.find(n => n.name === 'Fat')?.amount || 0)
-  });
 } else {
   try {
     const title = data.title || importUrl.trim();
