@@ -122,6 +122,7 @@ export default function RecipeFormPage() {
       clearTimeout(timeout);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
+      console.log('Spoonacular response nutrition:', data.nutrition);
 
       setTitle(data.title || '');
       setServings(data.servings || 4);
