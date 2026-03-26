@@ -4,24 +4,24 @@ import pb from '../lib/pb';
 import {
   Plus, Search, ChefHat, Edit, Trash2, Clock, Filter, ListFilter,
   UtensilsCrossed, Coffee, Sandwich, Apple, Leaf, Sprout, Wheat,
-  Dumbbell, Croissant, Bookmark, Soup, BookmarkCheck
+  Dumbbell, Croissant, Bookmark, Soup, BookmarkCheck, LayoutDashboard
 } from 'lucide-react';
 
 const FILTERS = [
-  { label: 'All Recipes', icon: FiLayout },
-  { label: 'Breakfast', icon: FiSunrise },
-  { label: 'Lunch', icon: FiActivity },
-  { label: 'Dinner', icon: FiSunset },
-  { label: 'Snack', icon: FiZap },
-  { label: 'Dessert', icon: FiTarget },
-  { label: 'Sides', icon: FiLayers },
-  { label: 'Soups', icon: FiBox },
-  { label: 'Vegan', icon: FiWind },
-  { label: 'Vegetarian', icon: FiAperture },
-  { label: 'Gluten-Free', icon: FiDroplet },
-  { label: 'High-Protein', icon: FiDumbbell },
-  { label: 'Bread', icon: FiBox },
-  { label: 'Favorites', icon: FiBookmark },
+  { label: 'All Recipes', icon: LayoutDashboard },
+  { label: 'Breakfast', icon: Coffee },
+  { label: 'Lunch', icon: Sandwich },
+  { label: 'Dinner', icon: ChefHat },
+  { label: 'Snack', icon: Apple },
+  { label: 'Dessert', icon: ChefHat },
+  { label: 'Sides', icon: Leaf },
+  { label: 'Soups', icon: Soup },
+  { label: 'Vegan', icon: Leaf },
+  { label: 'Vegetarian', icon: Sprout },
+  { label: 'Gluten-Free', icon: Wheat },
+  { label: 'High-Protein', icon: Dumbbell },
+  { label: 'Bread', icon: Croissant },
+  { label: 'Favorites', icon: Bookmark },
 ];
 
 function getProxiedImage(url) {
