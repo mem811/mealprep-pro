@@ -145,48 +145,27 @@ if (data.ingredients?.length) {
     })
   );
 }
-// n8n scraping doesn't return nutrition - skip it
-let nutritionData = null;
-} else {
-  try {
-    const title = data.title || importUrl.trim();
-    const nutRes = await fetch(
-      `https://api.spoonacular.com/recipes/guessNutrition?title=${encodeURIComponent(title)}&apiKey=${apiKey}`
-    );
-    if (nutRes.ok) {
-      const nutData = await nutRes.json();
-      nutritionData = JSON.stringify({
-        calories: Math.round(nutData.calories?.value || 0),
-        protein: Math.round(nutData.protein?.value || 0),
-        carbs: Math.round(nutData.carbs?.value || 0),
-        fat: Math.round(nutData.fat?.value || 0)
-      });
+// n8n doesn't return nutrition - user can fetch it from the recipe detail page
+
+if (data.instructions) {
+  // n8n returns instructions as a newline-separated string
+    if (data.instructions) {
+      setInstructions(data.instructions);
     }
-  } catch (e) {
-    console.log('Nutrition guess failed:', e);
+
+    setImportUrl('');
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') {
+      setImportError('Request timed out. Please try again.');
+    } else {
+      setImportError('Failed to import recipe. Check the URL and try again.');
+    }
+    console.error('Import error:', err);
+  } finally {
+    setImporting(false);
   }
-}
-if (nutritionData) setNutrition(nutritionData);
-
-      if (data.analyzedInstructions?.[0]?.steps?.length) {
-        setInstructions(
-          data.analyzedInstructions[0].steps.map((s) => `${s.number}. ${s.step}`).join('\n\n')
-        );
-      }
-
-      setImportUrl('');
-    } catch (err) {
-      clearTimeout(timeout);
-      if (err.name === 'AbortError') {
-        setImportError('Request timed out. Please try again.');
-      } else {
-        setImportError('Failed to import recipe. Check the URL and try again.');
-      }
-      console.error('Import error:', err);
-    } finally {
-      setImporting(false);
-    }
-  };
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
