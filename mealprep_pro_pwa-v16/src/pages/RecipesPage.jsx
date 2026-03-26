@@ -164,7 +164,7 @@ export default function RecipesPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {RECIPE_FILTERS.map(({ label, icon: Icon }) => {
           const isActive = selectedTab === label;
           return (
