@@ -7,21 +7,21 @@ import {
   Dumbbell, Croissant, Bookmark, Soup, BookmarkCheck
 } from 'lucide-react';
 
-const RECIPE_FILTERS = [
-  { label: 'All Recipes', icon: UtensilsCrossed },
-  { label: 'Breakfast', icon: Coffee },
-  { label: 'Lunch', icon: Sandwich },
-  { label: 'Dinner', icon: ChefHat },
-  { label: 'Snack', icon: Apple },
-  { label: 'Dessert', icon: ChefHat },
-  { label: 'Sides', icon: Leaf },
-  { label: 'Soups', icon: Soup },
-  { label: 'Vegan', icon: Leaf },
-  { label: 'Vegetarian', icon: Sprout },
-  { label: 'Gluten-Free', icon: Wheat },
-  { label: 'High-Protein', icon: Dumbbell },
-  { label: 'Bread', icon: Croissant },
-  { label: 'Favorites', icon: Bookmark },
+const FILTERS = [
+  { label: 'All Recipes', icon: FiLayout },
+  { label: 'Breakfast', icon: FiSunrise },
+  { label: 'Lunch', icon: FiActivity },
+  { label: 'Dinner', icon: FiSunset },
+  { label: 'Snack', icon: FiZap },
+  { label: 'Dessert', icon: FiTarget },
+  { label: 'Sides', icon: FiLayers },
+  { label: 'Soups', icon: FiBox },
+  { label: 'Vegan', icon: FiWind },
+  { label: 'Vegetarian', icon: FiAperture },
+  { label: 'Gluten-Free', icon: FiDroplet },
+  { label: 'High-Protein', icon: FiDumbbell },
+  { label: 'Bread', icon: FiBox },
+  { label: 'Favorites', icon: FiBookmark },
 ];
 
 function getProxiedImage(url) {
