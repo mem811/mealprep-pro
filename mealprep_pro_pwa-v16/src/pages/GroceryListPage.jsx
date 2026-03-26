@@ -153,15 +153,16 @@ export default function GroceryListPage() {
   const [error, setError] = useState('');
   const [collapsed, setCollapsed] = useState({});
 
-  useEffect(() => {
-    fetchAndAggregate();
-  }, []);
+ useEffect(() => {
+  fetchAndAggregate();
+}, []);
 
+const fetchAndAggregate = async () => {
   const isRefresh = !loading;
-setRefreshing(isRefresh);
-setLoading(true);
-setError('');
-    try {
+  setRefreshing(isRefresh);
+  setLoading(true);
+  setError('');
+  try {
       const { weekStart, weekEnd } = getWeekRange();
       const userId = pb.authStore.model?.id;
 
