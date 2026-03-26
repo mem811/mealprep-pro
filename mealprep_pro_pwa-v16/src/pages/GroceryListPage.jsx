@@ -1,128 +1,20 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import pb from '../lib/pb';
+import * as FiIcons from 'react-icons/fi';
+import SafeIcon from '../common/SafeIcon';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// --- Unit normalization map ---
-const UNIT_NORMALIZE = {
-  teaspoons: 'teaspoon', tsp: 'teaspoon', tsps: 'teaspoon',
-  tablespoons: 'tablespoon', tbsp: 'tablespoon', tbsps: 'tablespoon', tbs: 'tablespoon',
-  cups: 'cup',
-  ounces: 'oz', ounce: 'oz',
-  pounds: 'lb', pound: 'lb',
-  milliliters: 'ml', milliliter: 'ml', mls: 'ml',
-  liters: 'liter', litres: 'liter', l: 'liter',
-  grams: 'g', gram: 'g', grammes: 'g',
-  kilograms: 'kg', kilogram: 'kg',
-  inches: 'inch',
-  cloves: 'clove',
-  slices: 'slice',
-  pieces: 'piece',
-  sprigs: 'sprig',
-};
+const { FiShoppingBag, FiCheckCircle, FiCircle, FiRotateCcw, FiTrash2, FiPrinter, FiChevronDown, FiInfo } = FiIcons;
 
-function normalizeUnit(unit) {
-  if (!unit) return '';
-  const lower = unit.toLowerCase().trim();
-  return UNIT_NORMALIZE[lower] || lower;
-}
-
-function normalizeName(name) {
-  if (!name) return '';
-  let n = name.toLowerCase().trim();
-  if (n.endsWith('es') && n.length > 4) n = n.slice(0, -2);
-  else if (n.endsWith('s') && n.length > 3) n = n.slice(0, -1);
-  return n;
-}
-
-function toTitleCase(str) {
-  return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
-}
-
-function pluralizeUnit(unit, qty) {
-  if (!unit || qty <= 1) return unit;
-  const irregular = { oz: 'oz', lb: 'lb', g: 'g', kg: 'kg', ml: 'ml' };
-  if (irregular[unit]) return unit;
-  if (unit.endsWith('s')) return unit;
-  return unit + 's';
-}
-
-function formatQty(qty) {
-  if (qty === Math.floor(qty)) return String(qty);
-  return parseFloat(qty.toFixed(2)).toString();
-}
-
-// --- Gram conversions (g → cup) for common ingredients ---
-const GRAM_CONVERSIONS = {
-  flour:          { gPerCup: 120,  unit: 'cup' },
-  'all-purpose flour': { gPerCup: 120, unit: 'cup' },
-  'bread flour':  { gPerCup: 120,  unit: 'cup' },
-  'cake flour':   { gPerCup: 100,  unit: 'cup' },
-  sugar:          { gPerCup: 200,  unit: 'cup' },
-  'granulated sugar': { gPerCup: 200, unit: 'cup' },
-  'white sugar':  { gPerCup: 200,  unit: 'cup' },
-  'brown sugar':  { gPerCup: 220,  unit: 'cup' },
-  'powdered sugar': { gPerCup: 120, unit: 'cup' },
-  'icing sugar':  { gPerCup: 120,  unit: 'cup' },
-  'confectioners sugar': { gPerCup: 120, unit: 'cup' },
-  butter:         { gPerCup: 227,  unit: 'cup' },
-  milk:           { gPerCup: 240,  unit: 'cup' },
-  water:          { gPerCup: 240,  unit: 'cup' },
-  cream:          { gPerCup: 240,  unit: 'cup' },
-  'heavy cream':  { gPerCup: 240,  unit: 'cup' },
-  'sour cream':   { gPerCup: 240,  unit: 'cup' },
-  yogurt:         { gPerCup: 240,  unit: 'cup' },
-  oil:            { gPerCup: 218,  unit: 'cup' },
-  'olive oil':    { gPerCup: 218,  unit: 'cup' },
-  'vegetable oil': { gPerCup: 218, unit: 'cup' },
-  honey:          { gPerCup: 340,  unit: 'cup' },
-  'cocoa powder': { gPerCup: 100,  unit: 'cup' },
-  oats:           { gPerCup: 90,   unit: 'cup' },
-  'rolled oats':  { gPerCup: 90,   unit: 'cup' },
-  rice:           { gPerCup: 185,  unit: 'cup' },
-  'white rice':   { gPerCup: 185,  unit: 'cup' },
-  'brown rice':   { gPerCup: 185,  unit: 'cup' },
-};
-
-// ml → cup (liquids sometimes stored as ml)
-const ML_CONVERSIONS = {
-  milk:          240,
-  water:         240,
-  cream:         240,
-  'heavy cream': 240,
-  oil:           240,
-  'olive oil':   240,
-  'vegetable oil': 240,
-  honey:         340,
-};
-
-function tryConvertToUS(name, qty, unit) {
-  const normUnit = normalizeUnit(unit);
-  const lowerName = name.toLowerCase().trim();
-
-  // g → cup conversion
-  if (normUnit === 'g' || normUnit === 'gram') {
-    const conv = GRAM_CONVERSIONS[lowerName];
-    if (conv) {
-      const cups = qty / conv.gPerCup;
-      return { qty: cups, unit: 'cup', converted: true };
-    }
-  }
-
-  // ml → cup conversion
-  if (normUnit === 'ml') {
-    const mlPerCup = ML_CONVERSIONS[lowerName] || 240;
-    const cups = qty / mlPerCup;
-    return { qty: cups, unit: 'cup', converted: true };
-  }
-
-  return { qty, unit: normUnit || unit, converted: false };
-}
-
-// --- Category detection ---
 const CATEGORIES = {
-  Produce: ['tomato', 'onion', 'garlic', 'lettuce', 'spinach', 'carrot', 'celery', 'pepper', 'cucumber', 'broccoli', 'zucchini', 'mushroom', 'potato', 'sweet potato', 'avocado', 'lemon', 'lime', 'apple', 'banana', 'berry', 'strawberry', 'blueberry', 'raspberry', 'orange', 'mango', 'pineapple', 'grape', 'kale', 'cabbage', 'corn', 'pea', 'bean', 'herb', 'basil', 'parsley', 'cilantro', 'mint', 'thyme', 'rosemary', 'ginger', 'scallion', 'leek', 'shallot', 'arugula', 'asparagus', 'beet', 'cauliflower', 'eggplant', 'radish', 'turnip', 'squash', 'pumpkin'],
-  'Dairy & Eggs': ['milk', 'cream', 'butter', 'cheese', 'yogurt', 'egg', 'sour cream', 'heavy cream', 'cream cheese', 'parmesan', 'mozzarella', 'cheddar', 'ricotta', 'cottage cheese', 'half and half', 'ghee'],
-  'Meat & Seafood': ['chicken', 'beef', 'pork', 'turkey', 'lamb', 'salmon', 'tuna', 'shrimp', 'fish', 'bacon', 'sausage', 'ham', 'steak', 'ground beef', 'ground turkey', 'duck', 'crab', 'lobster', 'scallop', 'anchovy', 'sardine', 'tilapia', 'cod', 'halibut'],
-  Pantry: ['flour', 'sugar', 'salt', 'pepper', 'oil', 'vinegar', 'sauce', 'paste', 'stock', 'broth', 'rice', 'pasta', 'bread', 'crumb', 'oat', 'cereal', 'honey', 'syrup', 'cocoa', 'chocolate', 'vanilla', 'baking', 'yeast', 'powder', 'spice', 'cumin', 'paprika', 'turmeric', 'cinnamon', 'oregano', 'soy sauce', 'olive oil', 'coconut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut', 'sesame', 'lentil', 'chickpea', 'quinoa', 'tortilla', 'cracker', 'chip', 'nut', 'seed', 'dried', 'canned', 'tomato paste', 'mustard', 'ketchup', 'mayo', 'worcestershire'],
+  Produce: ['tomato', 'onion', 'garlic', 'lettuce', 'spinach', 'carrot', 'pepper', 'cucumber', 'broccoli', 'kale', 'apple', 'banana', 'lemon', 'lime', 'herb', 'basil', 'parsley', 'cilantro'],
+  Dairy: ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'egg', 'parmesan', 'mozzarella'],
+  'Meat & Seafood': ['chicken', 'beef', 'pork', 'turkey', 'fish', 'salmon', 'shrimp', 'steak', 'bacon'],
+  Bakery: ['bread', 'bun', 'tortilla', 'wrap', 'bagel', 'croissant', 'flour'],
+  Pantry: ['oil', 'vinegar', 'sugar', 'salt', 'spice', 'sauce', 'pasta', 'rice', 'honey', 'syrup', 'canned', 'stock', 'broth'],
+  Frozen: ['frozen', 'ice cream', 'peas', 'corn', 'pizza'],
+  Beverages: ['water', 'soda', 'juice', 'coffee', 'tea', 'wine', 'beer'],
+  Other: []
 };
 
 function categorize(name) {
@@ -133,247 +25,235 @@ function categorize(name) {
   return 'Other';
 }
 
-function getWeekRange() {
-  const today = new Date();
-  const day = today.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const fmt = d => d.toISOString().split('T')[0];
-  return { weekStart: fmt(monday), weekEnd: fmt(sunday) };
-}
-
 export default function GroceryListPage() {
   const [ingredients, setIngredients] = useState([]);
-  const [checked, setChecked] = useState({});
+  const [recipeFrequency, setRecipeFrequency] = useState({});
+  const [checkedItems, setCheckedItems] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [collapsed, setCollapsed] = useState({});
 
   useEffect(() => {
-    fetchAndAggregate();
+    fetchAggregatedList();
   }, []);
 
-  const fetchAndAggregate = async () => {
+  const fetchAggregatedList = async () => {
     setLoading(true);
-    setError('');
     try {
-      const { weekStart, weekEnd } = getWeekRange();
       const userId = pb.authStore.model?.id;
-
-      const result = await pb.collection('meal_slots').getList(1, 200, {
-        filter: `meal_plan.user = "${userId}" && date >= "${weekStart}" && date <= "${weekEnd}"`,
+      if (!userId) return;
+      const res = await pb.collection('meal_slots').getList(1, 200, {
+        filter: `meal_plan.user="${userId}"`,
         expand: 'recipe',
       });
 
-      const allIngredients = [];
+      const aggregated = {};
+      const uniqueRecipes = new Map(); // Track unique recipe info and counts
+      const processedRecipeIds = new Set(); // For Fix 5: Count ingredients once per unique recipe
 
-      for (const slot of result.items) {
+      res.items.forEach(slot => {
         const recipe = slot.expand?.recipe;
-        if (!recipe) continue;
+        if (!recipe) return;
 
-        const multiplier = slot.servings_multiplier || 1;
+        // Track frequency for Fix 5
+        const count = uniqueRecipes.get(recipe.id)?.count || 0;
+        uniqueRecipes.set(recipe.id, { 
+          title: recipe.title, 
+          count: count + 1 
+        });
+
+        // Fix 5: If we've already added this recipe's ingredients, skip
+        if (processedRecipeIds.has(recipe.id)) return;
+        processedRecipeIds.add(recipe.id);
+
         let ingList = [];
+        try {
+          ingList = typeof recipe.ingredients === 'string' ? JSON.parse(recipe.ingredients) : (recipe.ingredients || []);
+        } catch { ingList = []; }
 
-        if (typeof recipe.ingredients === 'string') {
-          try { ingList = JSON.parse(recipe.ingredients); } catch { ingList = []; }
-        } else if (Array.isArray(recipe.ingredients)) {
-          ingList = recipe.ingredients;
-        }
+        ingList.forEach(ing => {
+          const name = (ing.name || '').toLowerCase().trim();
+          if (!name) return; // Fix 1: Skip blank ingredients
 
-        for (const ing of ingList) {
-          if (!ing.name?.trim()) continue;
-          const rawQty = parseFloat(ing.quantity) || 0;
-          const scaledQty = rawQty * multiplier;
+          const unit = (ing.unit || '').toLowerCase().trim() || 'pcs';
+          // Since we count once per recipe, we use the base multiplier (could be 1 or recipe default)
+          const qty = (parseFloat(ing.quantity) || 0); 
+          const key = `${name}-${unit}`;
 
-          // Try best-effort gram/ml → US conversion
-          const { qty, unit } = tryConvertToUS(ing.name, scaledQty, ing.unit || '');
+          if (aggregated[key]) {
+            aggregated[key].quantity += qty;
+          } else {
+            aggregated[key] = { 
+              name: ing.name, 
+              quantity: qty, 
+              unit, 
+              category: categorize(ing.name) 
+            };
+          }
+        });
+      });
 
-          allIngredients.push({
-            name: ing.name.trim(),
-            qty,
-            unit,
-          });
-        }
-      }
-
-      // Merge duplicates
-      const mergeMap = new Map();
-
-      for (const ing of allIngredients) {
-        const normName = normalizeName(ing.name);
-        const normUnit = normalizeUnit(ing.unit);
-        const key = `${normName}||${normUnit}`;
-
-        if (mergeMap.has(key)) {
-          const existing = mergeMap.get(key);
-          existing.qty += ing.qty;
-        } else {
-          mergeMap.set(key, {
-            displayName: toTitleCase(ing.name),
-            normName,
-            qty: ing.qty,
-            unit: ing.unit,
-            normUnit,
-            category: categorize(ing.name),
-          });
-        }
-      }
-
-      // Group same normName with different units
-      const nameGroups = new Map();
-      for (const [, item] of mergeMap) {
-        if (!nameGroups.has(item.normName)) nameGroups.set(item.normName, []);
-        nameGroups.get(item.normName).push(item);
-      }
-
-      const finalList = [];
-      for (const [, variants] of nameGroups) {
-        if (variants.length === 1) {
-          finalList.push({ ...variants[0], hasVariants: false });
-        } else {
-          // Multiple units — keep separate but mark as siblings
-          const displayName = variants[0].displayName;
-          variants.forEach((v, i) => {
-            finalList.push({ ...v, displayName, isVariant: i > 0, hasVariants: true });
-          });
-        }
-      }
-
-      finalList.sort((a, b) => a.displayName.localeCompare(b.displayName));
-      setIngredients(finalList);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load grocery list. Make sure you have a meal plan for this week.');
+      setIngredients(Object.values(aggregated));
+      setRecipeFrequency(Object.fromEntries(uniqueRecipes));
+    } catch (e) {
+      console.error('Grocery error:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleCheck = (key) => setChecked(prev => ({ ...prev, [key]: !prev[key] }));
-  const toggleCollapse = (cat) => setCollapsed(prev => ({ ...prev, [cat]: !prev[cat] }));
+  const toggleItem = (name) => {
+    const newChecked = new Set(checkedItems);
+    if (newChecked.has(name)) newChecked.delete(name);
+    else newChecked.add(name);
+    setCheckedItems(newChecked);
+  };
+
+  const toggleCollapse = (cat) => {
+    setCollapsed(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
 
   const grouped = ingredients.reduce((acc, ing) => {
-    const cat = ing.category;
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(ing);
+    if (!acc[ing.category]) acc[ing.category] = [];
+    acc[ing.category].push(ing);
     return acc;
   }, {});
 
-  const categoryOrder = ['Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Pantry', 'Other'];
-  const checkedCount = Object.values(checked).filter(Boolean).length;
-  const total = ingredients.length;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-      </div>
-    );
-  }
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-2xl mx-auto space-y-8 pb-20 px-4">
+      <style>{`
+        @media print {
+          nav, aside, button, header, .no-print { display: none !important; }
+          body { background: white !important; padding: 0 !important; }
+          .print-list { display: block !important; width: 100% !important; margin: 0 !important; }
+          .category-block { break-inside: avoid; border-bottom: 1px solid #eee; padding: 20px 0; }
+        }
+      `}</style>
+
+      <header className="flex items-center justify-between no-print">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Grocery List</h1>
-          <p className="text-sm text-gray-500 mt-0.5">From this week's meal plan</p>
+          <h1 className="text-3xl font-bold text-gray-900">Grocery List</h1>
+          <p className="text-gray-500">Optimized for your weekly meal plan</p>
         </div>
-        <button
-          onClick={fetchAndAggregate}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handlePrint} className="p-3 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all">
+            <SafeIcon icon={FiPrinter} className="w-5 h-5" />
+          </button>
+          <button onClick={() => setCheckedItems(new Set())} className="p-3 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all">
+            <SafeIcon icon={FiRotateCcw} className="w-5 h-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Fix 5: Recipe Frequency Note */}
+      {Object.keys(recipeFrequency).length > 0 && (
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm no-print">
+          <h4 className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+            <SafeIcon icon={FiInfo} className="text-emerald-500" /> Planned Recipes
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(recipeFrequency).map(([id, info]) => (
+              <span key={id} className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-emerald-100">
+                {info.title} {info.count > 1 ? `(×${info.count} this week)` : ''}
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-4 italic font-medium">
+            * Ingredients are counted once per unique recipe to avoid over-shopping duplicates.
+          </p>
+        </div>
+      )}
+
+      <div className="print-list space-y-4">
+        {loading ? (
+          <div className="p-20 flex justify-center no-print"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>
+        ) : ingredients.length > 0 ? (
+          Object.entries(grouped).map(([cat, items]) => {
+            const checkedCount = items.filter(i => checkedItems.has(i.name)).length;
+            const isCollapsed = collapsed[cat];
+            
+            return (
+              <div key={cat} className="category-block bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+                <button 
+                  onClick={() => toggleCollapse(cat)}
+                  className="w-full flex items-center justify-between p-6 bg-gray-50/50 hover:bg-gray-50 transition-colors no-print"
+                >
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-bold text-gray-900">{cat}</h3>
+                    <span className="text-[10px] font-bold bg-white px-2 py-1 rounded-full text-emerald-600 border border-emerald-100 uppercase tracking-widest">
+                      {checkedCount}/{items.length}
+                    </span>
+                  </div>
+                  <SafeIcon icon={FiChevronDown} className={`w-5 h-5 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
+                </button>
+                
+                <div className="hidden print:block p-4 border-b">
+                  <h3 className="text-xl font-bold uppercase tracking-widest text-emerald-600">{cat}</h3>
+                </div>
+
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.div 
+                      initial={{ height: 0 }}
+                      animate={{ height: 'auto' }}
+                      exit={{ height: 0 }}
+                      className="overflow-hidden divide-y divide-gray-50"
+                    >
+                      {items.map((item, idx) => {
+                        const isChecked = checkedItems.has(item.name);
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`p-5 flex items-center justify-between group cursor-pointer transition-colors ${isChecked ? 'bg-gray-50/50' : 'hover:bg-emerald-50/30'}`} 
+                            onClick={() => toggleItem(item.name)}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className={`transition-colors no-print ${isChecked ? 'text-emerald-500' : 'text-gray-300'}`}>
+                                {isChecked ? <SafeIcon icon={FiCheckCircle} className="w-6 h-6" /> : <SafeIcon icon={FiCircle} className="w-6 h-6" />}
+                              </div>
+                              <div className="print:flex print:items-center print:gap-3">
+                                <div className="hidden print:block w-4 h-4 border border-gray-300 rounded flex-shrink-0" />
+                                <div>
+                                  <span className={`text-lg font-medium transition-all ${isChecked ? 'text-gray-400 line-through' : 'text-gray-900'} print:text-base`}>
+                                    {item.name}
+                                  </span>
+                                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-0.5">
+                                    {parseFloat(item.quantity.toFixed(2))} {item.unit}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })
+        ) : (
+          <div className="p-20 flex flex-col items-center justify-center text-gray-400 text-center no-print">
+            <SafeIcon icon={FiShoppingBag} className="w-16 h-16 mb-4 opacity-20" />
+            <p className="font-medium text-lg">Empty List</p>
+            <p className="text-sm">Assign recipes to your planner to see items</p>
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-sm text-red-600">{error}</div>
-      )}
-
-      {/* Progress bar */}
-      {total > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-5">
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
-            <span>{checkedCount} of {total} items checked</span>
-            <span className="font-medium text-green-600">{Math.round((checkedCount / total) * 100)}%</span>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 rounded-full transition-all duration-300"
-              style={{ width: `${(checkedCount / total) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {ingredients.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
-          <div className="text-5xl mb-3">🛒</div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-1">No items yet</h3>
-          <p className="text-sm text-gray-400">Add recipes to your weekly meal plan to generate a grocery list.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {categoryOrder.filter(cat => grouped[cat]?.length > 0).map(cat => (
-            <div key={cat} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <button
-                onClick={() => toggleCollapse(cat)}
-                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors"
-              >
-                <span className="font-semibold text-gray-800 text-sm">{cat}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{grouped[cat].length} items</span>
-                  <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform ${collapsed[cat] ? '' : 'rotate-180'}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
-
-              {!collapsed[cat] && (
-                <ul className="divide-y divide-gray-50">
-                  {grouped[cat].map((ing, idx) => {
-                    const key = `${ing.normName}||${ing.normUnit}||${idx}`;
-                    const isChecked = checked[key];
-                    const displayQty = formatQty(ing.qty);
-                    const displayUnit = pluralizeUnit(ing.unit || ing.normUnit, ing.qty);
-
-                    return (
-                      <li
-                        key={key}
-                        className={`flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${ing.isVariant ? 'pl-9' : ''}`}
-                        onClick={() => toggleCheck(key)}
-                      >
-                        <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isChecked ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
-                          {isChecked && (
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                        <span className={`flex-1 text-sm transition-colors ${isChecked ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                          {ing.displayName}
-                        </span>
-                        <span className={`text-sm font-medium transition-colors ${isChecked ? 'text-gray-300' : 'text-gray-500'}`}>
-                          {displayQty} {displayUnit}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+      {ingredients.length > 0 && (
+        <button 
+          onClick={() => {
+            if(confirm('Clear all items from your checklist?')) setCheckedItems(new Set());
+          }}
+          className="w-full bg-white border-2 border-gray-100 text-gray-400 py-4 rounded-2xl font-bold hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 transition-all flex items-center justify-center gap-2 no-print"
+        >
+          <SafeIcon icon={FiTrash2} className="w-5 h-5" />
+          Reset Checklist
+        </button>
       )}
     </div>
   );
