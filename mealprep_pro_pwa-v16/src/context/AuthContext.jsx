@@ -8,28 +8,25 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Sync user state with PocketBase auth store
-    const unsubscribe = pb.authStore.onChange((token, model) => {
+    const unsub = pb.authStore.onChange((token, model) => {
       setUser(model);
     });
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
   const login = async (email, password) => {
+    setLoading(true);
     try {
       const authData = await pb.collection('users').authWithPassword(email, password);
-      // setUser is handled by the onChange listener, but we set it here for immediate feedback if needed
       setUser(authData.record);
-      return { error: null, user: authData.record };
-    } catch (error) {
-      console.error('Login error:', error);
-      return { error, user: null };
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async (email, password, name) => {
+    setLoading(true);
     try {
-      // 1. Create the user record
       await pb.collection('users').create({
         email,
         password,
@@ -37,12 +34,10 @@ export function AuthProvider({ children }) {
         name: name.trim(),
         plan: 'free',
       });
-      
-      // 2. Log them in immediately
-      return await login(email, password);
-    } catch (error) {
-      console.error('Registration error:', error);
-      return { error, user: null };
+      const authData = await pb.collection('users').authWithPassword(email, password);
+      setUser(authData.record);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,24 +46,13 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const isPro = user?.plan === 'pro';
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      login, 
-      register, 
-      logout, 
-      isPro: user?.plan === 'pro' 
-    }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, isPro }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
