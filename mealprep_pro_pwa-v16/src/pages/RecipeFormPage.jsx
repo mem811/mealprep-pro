@@ -148,22 +148,23 @@ if (data.nutrition?.nutrients) {
     carbs: Math.round(nutrients.find(n => n.name === 'Carbohydrates')?.amount || 0),
     fat: Math.round(nutrients.find(n => n.name === 'Fat')?.amount || 0)
   });
-} else if (data.id) {
+} else {
   try {
+    const title = data.title || importUrl.trim();
     const nutRes = await fetch(
-      `https://api.spoonacular.com/recipes/${data.id}/nutritionWidget.json?apiKey=${apiKey}`
+      `https://api.spoonacular.com/recipes/guessNutrition?title=${encodeURIComponent(title)}&apiKey=${apiKey}`
     );
     if (nutRes.ok) {
       const nutData = await nutRes.json();
       nutritionData = JSON.stringify({
-        calories: Math.round(nutData.calories || 0),
-        protein: Math.round(parseFloat(nutData.protein) || 0),
-        carbs: Math.round(parseFloat(nutData.carbs) || 0),
-        fat: Math.round(parseFloat(nutData.fat) || 0)
+        calories: Math.round(nutData.calories?.value || 0),
+        protein: Math.round(nutData.protein?.value || 0),
+        carbs: Math.round(nutData.carbs?.value || 0),
+        fat: Math.round(nutData.fat?.value || 0)
       });
     }
   } catch (e) {
-    console.log('Nutrition fetch failed:', e);
+    console.log('Nutrition guess failed:', e);
   }
 }
 if (nutritionData) setNutrition(nutritionData);
