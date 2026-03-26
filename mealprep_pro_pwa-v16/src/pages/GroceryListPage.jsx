@@ -149,6 +149,7 @@ export default function GroceryListPage() {
   const [ingredients, setIngredients] = useState([]);
   const [checked, setChecked] = useState({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [collapsed, setCollapsed] = useState({});
 
@@ -156,9 +157,10 @@ export default function GroceryListPage() {
     fetchAndAggregate();
   }, []);
 
-  const fetchAndAggregate = async () => {
-    setLoading(true);
-    setError('');
+  const isRefresh = !loading;
+setRefreshing(isRefresh);
+setLoading(true);
+setError('');
     try {
       const { weekStart, weekEnd } = getWeekRange();
       const userId = pb.authStore.model?.id;
@@ -248,8 +250,9 @@ export default function GroceryListPage() {
       console.error(err);
       setError('Failed to load grocery list. Make sure you have a meal plan for this week.');
     } finally {
-      setLoading(false);
-    }
+  setLoading(false);
+  setRefreshing(false);
+}
   };
 
   const toggleCheck = (key) => setChecked(prev => ({ ...prev, [key]: !prev[key] }));
@@ -289,7 +292,7 @@ export default function GroceryListPage() {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          Refresh
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
