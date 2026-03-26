@@ -145,14 +145,17 @@ if (data.ingredients?.length) {
     })
   );
 }
-// n8n doesn't return nutrition - user can fetch it from the recipe detail page
+// n8n returns instructions as a newline-separated string
+if (data.instructions) {
+  setInstructions(data.instructions);
+}
 
-  // n8n returns instructions as a newline-separated string
-    if (data.instructions) {
-      setInstructions(data.instructions);
-    }
+// Set nutrition data from n8n
+if (data.nutrition) {
+  setNutrition(JSON.stringify(data.nutrition));
+}
 
-    setImportUrl('');
+setImportUrl('');
   } catch (err) {
     clearTimeout(timeout);
     if (err.name === 'AbortError') {
@@ -165,6 +168,7 @@ if (data.ingredients?.length) {
     setImporting(false);
   }
 };
+ 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
