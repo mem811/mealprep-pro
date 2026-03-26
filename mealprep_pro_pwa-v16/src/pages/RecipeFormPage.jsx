@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+const [nutrition, setNutrition] = useState(null);
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
 import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat } from 'lucide-react';
@@ -135,6 +136,7 @@ export default function RecipeFormPage() {
             unit: ing.unit || 'piece',
           }))
         );
+      }
         // Extract nutrition data
 if (data.nutrition?.nutrients) {
   const nutrients = data.nutrition.nutrients;
@@ -146,7 +148,6 @@ if (data.nutrition?.nutrients) {
   });
   setNutrition(nutritionData);
 }
-      }
 
       if (data.analyzedInstructions?.[0]?.steps?.length) {
         setInstructions(
@@ -195,15 +196,16 @@ if (data.nutrition?.nutrients) {
     setLoading(true);
     try {
       const data = {
-        user: pb.authStore.model.id,
-        title: title.trim(),
-        servings: Number(servings),
-        instructions: instructions.trim(),
-        ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
-        tags: JSON.stringify(tags),
-        ...(imageUrl ? { image_url: imageUrl } : {}),
-        ...(sourceUrl ? { source_url: sourceUrl } : {}),
-      };
+  user: pb.authStore.model.id,
+  title: title.trim(),
+  servings: Number(servings),
+  instructions: instructions.trim(),
+  ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
+  tags: JSON.stringify(tags),
+  ...(imageUrl ? { image_url: imageUrl } : {}),
+  ...(sourceUrl ? { source_url: sourceUrl } : {}),
+  ...(nutrition ? { nutrition } : {}),
+};
 
       console.log('Recipe data being sent:', JSON.stringify(data));
 
