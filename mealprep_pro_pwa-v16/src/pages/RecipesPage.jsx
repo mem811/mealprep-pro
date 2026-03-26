@@ -26,7 +26,7 @@ const RECIPE_FILTERS = [
 
 function getProxiedImage(url) {
   if (!url) return null;
-  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=800&h=600&fit=cover&q=85&v=2`;
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=1200&fit=cover&q=90&n=-1`;
 }
 
 function getSourceSiteName(url) {
