@@ -115,7 +115,7 @@ export default function RecipeFormPage() {
 
     try {
       const res = await fetch(
-        `https://api.spoonacular.com/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(importUrl.trim())}&measurementSystem=us`,
+        `https://api.spoonacular.com/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(importUrl.trim())}&measurementSystem=us&addRecipeNutrition=true`,
         { signal: controller.signal }
       );
       clearTimeout(timeout);
@@ -135,6 +135,17 @@ export default function RecipeFormPage() {
             unit: ing.unit || 'piece',
           }))
         );
+        // Extract nutrition data
+if (data.nutrition?.nutrients) {
+  const nutrients = data.nutrition.nutrients;
+  const nutritionData = JSON.stringify({
+    calories: Math.round(nutrients.find(n => n.name === 'Calories')?.amount || 0),
+    protein: Math.round(nutrients.find(n => n.name === 'Protein')?.amount || 0),
+    carbs: Math.round(nutrients.find(n => n.name === 'Carbohydrates')?.amount || 0),
+    fat: Math.round(nutrients.find(n => n.name === 'Fat')?.amount || 0)
+  });
+  setNutrition(nutritionData);
+}
       }
 
       if (data.analyzedInstructions?.[0]?.steps?.length) {
