@@ -536,7 +536,6 @@ export default function RecipeDetailPage() {
                       <div className="text-xs text-gray-500 mt-0.5">Fat</div>
                     </div>
                   </div>
-                     </div>
     </div>
     {/* Add this re-fetch button */}
     <div className="px-5 pb-4">
