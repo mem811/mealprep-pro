@@ -165,13 +165,9 @@ export default function PlannerPage() {
   console.log('Clicking card! Recipe ID:', recipeId);
   console.log('Full item:', JSON.stringify(item, null, 2));
   if (recipeId) window.location.href = `/recipes/${recipeId}`;
-}
->
-                           <div className="flex items-center gap-2 p-2 relative z-10 cursor-pointer" onClick={() => {
-  const recipeId = item.recipe || item.expand?.recipe?.id;
-  console.log('Recipe ID:', recipeId);
-  if (recipeId) window.location.href = `/recipes/${recipeId}`;
-}}>
+}}
+   >
+                           <div className="flex items-center gap-2 p-2 relative">
                               <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
                                 {item.expand?.recipe?.image_url ? (
                                   <img src={item.expand.recipe.image_url} className="w-full h-full object-cover" loading="lazy" />
@@ -199,7 +195,8 @@ export default function PlannerPage() {
                               </div>
                             </div>
                           </motion.div>
-                        ))}
+                        );
+                        })}
                       </AnimatePresence>
                       <button 
                         onClick={() => { setActiveCell({ date: dateKey, slot }); setModalOpen(true); }} 
