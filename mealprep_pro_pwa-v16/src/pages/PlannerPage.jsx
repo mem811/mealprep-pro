@@ -5,7 +5,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import RecipePickerModal from '../components/RecipePickerModal';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 
 const { FiChevronLeft, FiChevronRight, FiPlus, FiCoffee, FiTrash2, FiUsers } = FiIcons;
@@ -14,6 +14,7 @@ const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
 export default function PlannerPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const navigate = useNavigate();
   // Changed state to flat array to match user's requested delete handler code
   const [mealSlots, setMealSlots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +160,12 @@ export default function PlannerPage() {
   animate= opacity: 1, scale: 1 
   exit= opacity: 0, scale: 0.95, height: 0 
   className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0 cursor-pointer"
-  onClick={() => window.location.href = `/recipes/${item.recipe || item.expand?.recipe?.id}`}
+ onClick={() => {
+  const recipeId = item.recipe || item.expand?.recipe?.id;
+  console.log('Clicking card! Recipe ID:', recipeId);
+  console.log('Full item:', JSON.stringify(item, null, 2));
+  if (recipeId) window.location.href = `/recipes/${recipeId}`;
+}
 >
                             <div className="flex items-center gap-2 p-2 relative z-10">
                               <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
