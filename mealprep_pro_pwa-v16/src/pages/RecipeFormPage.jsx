@@ -230,10 +230,22 @@ if (nutritionData) setNutrition(nutritionData);
       console.log('Recipe data being sent:', JSON.stringify(data));
 
       if (isEdit) {
-        await pb.collection('recipes').update(id, data);
-      } else {
-        await pb.collection('recipes').create(data);
-      }
+  await pb.collection('recipes').update(id, data);
+} else {
+  // Check for duplicate recipe by source URL
+  if (data.source_url) {
+    const userId = pb.authStore.model.id;
+    const existing = await pb.collection('recipes').getList(1, 1, {
+      filter: `user = "${userId}" && source_url = "${data.source_url}"`,
+    });
+    if (existing.items.length > 0) {
+      setSubmitError('This recipe is already in your collection!');
+      setLoading(false);
+      return;
+    }
+  }
+  await pb.collection('recipes').create(data);
+}
 
       navigate('/recipes');
     } catch (err) {
