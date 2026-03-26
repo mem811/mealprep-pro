@@ -150,8 +150,10 @@ export default function PlannerPage() {
                   <div key={day.toString()} className="min-h-[140px] md:h-52 group">
                     <div className="h-full flex flex-col gap-2">
                       <AnimatePresence>
-                        {slots.map(item => (
-                          <motion.div 
+                        {slots.map(item => {
+  console.log('Item data:', { recipe: item.recipe, expand: item.expand });
+  return (
+  <motion.div
                             key={item.id} 
                             initial={{ opacity: 0, scale: 0.95 }} 
                             animate={{ opacity: 1, scale: 1 }} 
