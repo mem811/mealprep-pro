@@ -39,20 +39,20 @@ function getSourceSiteName(url) {
   }
 }
 
-export default function sPage() {
-  const [s, sets] = useState([]);
+export default function RecipesPage() {
+  const const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [selectedTab, setSelectedTab] = useState('All s');
+  const [selectedTab, setSelectedTab] = useState('All Recipes');
   const [togglingFav, setTogglingFav] = useState(null);
 
-  const fetchs = async () => {
+  const fetchRecipes = async () => {
     try {
       setLoading(true);
       setError(null);
       const userId = pb.authStore.model.id;
-      const result = await pb.collection('s').getList(1, 100, {
+      const result = await pb.collection('recipes').getList(1, 100, {
         filter: `user = "${userId}"`,
         sort: '-created',
       });
