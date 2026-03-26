@@ -167,7 +167,11 @@ export default function PlannerPage() {
   if (recipeId) window.location.href = `/recipes/${recipeId}`;
 }
 >
-                            <div className="flex items-center gap-2 p-2 relative z-10">
+                           <div className="flex items-center gap-2 p-2 relative z-10 cursor-pointer" onClick={() => {
+  const recipeId = item.recipe || item.expand?.recipe?.id;
+  console.log('Recipe ID:', recipeId);
+  if (recipeId) window.location.href = `/recipes/${recipeId}`;
+}}>
                               <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
                                 {item.expand?.recipe?.image_url ? (
                                   <img src={item.expand.recipe.image_url} className="w-full h-full object-cover" loading="lazy" />
