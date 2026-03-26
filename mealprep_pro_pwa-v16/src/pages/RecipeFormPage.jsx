@@ -138,16 +138,35 @@ export default function RecipeFormPage() {
           }))
         );
       }
-        // Extract nutrition data
+// Extract nutrition data
+let nutritionData = null;
 if (data.nutrition?.nutrients) {
   const nutrients = data.nutrition.nutrients;
-  const nutritionData = JSON.stringify({
+  nutritionData = JSON.stringify({
     calories: Math.round(nutrients.find(n => n.name === 'Calories')?.amount || 0),
     protein: Math.round(nutrients.find(n => n.name === 'Protein')?.amount || 0),
     carbs: Math.round(nutrients.find(n => n.name === 'Carbohydrates')?.amount || 0),
     fat: Math.round(nutrients.find(n => n.name === 'Fat')?.amount || 0)
   });
-  setNutrition(nutritionData);
+} else if (data.id) {
+  try {
+    const nutRes = await fetch(
+      `https://api.spoonacular.com/recipes/${data.id}/nutritionWidget.json?apiKey=${apiKey}`
+    );
+    if (nutRes.ok) {
+      const nutData = await nutRes.json();
+      nutritionData = JSON.stringify({
+        calories: Math.round(nutData.calories || 0),
+        protein: Math.round(parseFloat(nutData.protein) || 0),
+        carbs: Math.round(parseFloat(nutData.carbs) || 0),
+        fat: Math.round(parseFloat(nutData.fat) || 0)
+      });
+    }
+  } catch (e) {
+    console.log('Nutrition fetch failed:', e);
+  }
+}
+if (nutritionData) setNutrition(nutritionData);
 }
 
       if (data.analyzedInstructions?.[0]?.steps?.length) {
