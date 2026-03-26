@@ -132,6 +132,7 @@ export default function RecipeDetailPage() {
         );
         if (res.ok) {
           const data = await res.json();
+          console.log('Spoonacular response:', data);  // ← add this new line
           if (data.nutrition?.nutrients) {
             const nutrients = data.nutrition.nutrients;
             const n = {
