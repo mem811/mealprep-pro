@@ -147,7 +147,6 @@ if (data.ingredients?.length) {
 }
 // n8n doesn't return nutrition - user can fetch it from the recipe detail page
 
-if (data.instructions) {
   // n8n returns instructions as a newline-separated string
     if (data.instructions) {
       setInstructions(data.instructions);
