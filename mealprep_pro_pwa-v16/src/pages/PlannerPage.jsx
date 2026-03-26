@@ -173,7 +173,7 @@ export default function PlannerPage() {
       )}
     </div>
     <div className="flex-1 min-w-0">
-      <h4 className="font-bold text-[9px] text-gray-900 leading-tight truncate">{item.expand?.recipe?.title}</h4>
+      <a href={`/recipes/${item.recipe}`} className="font-bold text-[9px] text-gray-900 leading-tight truncate block hover:text-emerald-600">{item.expand?.recipe?.title}</a>
       <div className="flex items-center justify-between mt-0.5">
         <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded-sm">{item.servings_multiplier}x</span>
       </div>
