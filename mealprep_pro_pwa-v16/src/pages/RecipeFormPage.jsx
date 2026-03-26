@@ -167,7 +167,6 @@ if (data.nutrition?.nutrients) {
   }
 }
 if (nutritionData) setNutrition(nutritionData);
-}
 
       if (data.analyzedInstructions?.[0]?.steps?.length) {
         setInstructions(
