@@ -1,194 +1,310 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import pb from '../lib/pb';
-import * as FiIcons from 'react-icons/fi';
-import SafeIcon from '../common/SafeIcon';
-import StarRating from '../components/StarRating';
+import {
+  Plus, Search, ChefHat, Edit, Trash2, Clock, Filter, ListFilter,
+  UtensilsCrossed, Coffee, Sandwich, Apple, Leaf, Sprout, Wheat,
+  Dumbbell, Croissant, Bookmark, Soup, BookmarkCheck
+} from 'lucide-react';
 
-const { 
-  FiPlus, FiSearch, FiCoffee, FiClock, FiUsers, FiHeart, 
-  FiLayers, FiSunrise, FiSunset, FiTarget, FiZap, FiBox, 
-  FiBookmark, FiLayout, FiActivity, FiBriefcase, FiAperture,
-  FiWind, FiTarget: FiDumbbell, FiCloud, FiDroplet
-} = FiIcons;
-
-const FILTERS = [
-  { label: 'All Recipes', icon: FiLayout },
-  { label: 'Breakfast', icon: FiSunrise },
-  { label: 'Lunch', icon: FiActivity },
-  { label: 'Dinner', icon: FiSunset },
-  { label: 'Snack', icon: FiZap },
-  { label: 'Dessert', icon: FiTarget },
-  { label: 'Sides', icon: FiLayers },
-  { label: 'Soups', icon: FiBox },
-  { label: 'Vegan', icon: FiWind },
-  { label: 'Vegetarian', icon: FiAperture },
-  { label: 'Gluten-Free', icon: FiDroplet },
-  { label: 'High-Protein', icon: FiDumbbell },
-  { label: 'Bread', icon: FiBox },
-  { label: 'Favorites', icon: FiBookmark },
+const RECIPE_FILTERS = [
+  { label: 'All Recipes', icon: UtensilsCrossed },
+  { label: 'Breakfast', icon: Coffee },
+  { label: 'Lunch', icon: Sandwich },
+  { label: 'Dinner', icon: ChefHat },
+  { label: 'Snack', icon: Apple },
+  { label: 'Dessert', icon: ChefHat },
+  { label: 'Sides', icon: Leaf },
+  { label: 'Soups', icon: Soup },
+  { label: 'Vegan', icon: Leaf },
+  { label: 'Vegetarian', icon: Sprout },
+  { label: 'Gluten-Free', icon: Wheat },
+  { label: 'High-Protein', icon: Dumbbell },
+  { label: 'Bread', icon: Croissant },
+  { label: 'Favorites', icon: Bookmark },
 ];
+
+function getProxiedImage(url) {
+  if (!url) return null;
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=400&h=300&fit=cover&q=80`;
+}
+
+function getSourceSiteName(url) {
+  if (!url) return '';
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace('www.', '').split('.')[0];
+  } catch (e) {
+    return '';
+  }
+}
 
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All Recipes');
+  const [selectedTab, setSelectedTab] = useState('All Recipes');
+  const [togglingFav, setTogglingFav] = useState(null);
+
+  const fetchRecipes = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const userId = pb.authStore.model.id;
+      const result = await pb.collection('recipes').getList(1, 100, {
+        filter: `user = "${userId}"`,
+        sort: '-created',
+      });
+      setRecipes(result.items);
+    } catch (err) {
+      console.error('Error fetching recipes:', err);
+      setError('Failed to load recipes.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchRecipes();
   }, []);
 
-  const fetchRecipes = async () => {
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this recipe?')) return;
     try {
-      const userId = pb.authStore.model?.id;
-      if (!userId) return;
-
-      const res = await pb.collection('recipes').getList(1, 100, {
-        filter: `user="${userId}"`,
-        sort: '-created',
-      });
-      setRecipes(res.items);
-    } catch (e) {
-      console.error('Fetch recipes error:', e);
-    } finally {
-      setLoading(false);
+      await pb.collection('recipes').delete(id);
+      setRecipes((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      console.error('Error deleting recipe:', err);
+      alert('Failed to delete recipe.');
     }
   };
 
   const handleToggleFavorite = async (e, recipe) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    const newStatus = !recipe.favorited;
-    
-    setRecipes(prev => prev.map(r => 
-      r.id === recipe.id ? { ...r, favorited: newStatus } : r
-    ));
-
+    if (togglingFav === recipe.id) return;
+    setTogglingFav(recipe.id);
     try {
-      await pb.collection('recipes').update(recipe.id, { 
-        favorited: newStatus 
+      const updated = await pb.collection('recipes').update(recipe.id, {
+        favorited: !recipe.favorited,
       });
+      setRecipes((prev) =>
+        prev.map((r) => (r.id === updated.id ? { ...r, favorited: updated.favorited } : r))
+      );
     } catch (err) {
-      console.error('Favorite toggle failed:', err);
-      setRecipes(prev => prev.map(r => 
-        r.id === recipe.id ? { ...r, favorited: !newStatus } : r
-      ));
+      console.error('Error toggling favorite:', err);
+    } finally {
+      setTogglingFav(null);
     }
   };
 
-  const filtered = recipes.filter(r => {
+  const filteredRecipes = recipes.filter((r) => {
     const matchesSearch = r.title?.toLowerCase().includes(search.toLowerCase());
-    if (activeFilter === 'All Recipes') return matchesSearch;
-    if (activeFilter === 'Favorites') return matchesSearch && r.favorited;
-    
-    let tags = [];
-    try {
-      tags = typeof r.tags === 'string' ? JSON.parse(r.tags) : (r.tags || []);
-    } catch { tags = []; }
-    
-    return matchesSearch && tags.some(t => t.toLowerCase() === activeFilter.toLowerCase());
+    if (selectedTab === 'All Recipes') return matchesSearch;
+    if (selectedTab === 'Favorites') return matchesSearch && !!r.favorited;
+
+    let recipeTags = [];
+    if (typeof r.tags === 'string') {
+      try { recipeTags = JSON.parse(r.tags); } catch { recipeTags = []; }
+    } else if (Array.isArray(r.tags)) {
+      recipeTags = r.tags;
+    }
+    const matchesTag = recipeTags.some(
+      (tag) => tag.toLowerCase() === selectedTab.toLowerCase()
+    );
+    return matchesSearch && matchesTag;
   });
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 pb-10">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Your Library</h1>
-          <p className="text-gray-500 font-medium">{recipes.length} culinary masterpieces</p>
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-4">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">My Recipes</h1>
+          <span className="text-gray-400 text-sm font-medium">· {filteredRecipes.length} recipes</span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <SafeIcon icon={FiSearch} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input 
-              type="text" 
-              placeholder="Search recipes..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-12 pr-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-emerald-500/20 outline-none w-full md:w-64"
-            />
-          </div>
-          <Link to="/recipes/new" className="bg-emerald-500 text-white p-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all">
-            <SafeIcon icon={FiPlus} className="w-5 h-5" />
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
+            <ListFilter size={15} />
+            Sort
+          </button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
+            <Filter size={15} />
+            Filter
+          </button>
+          <Link
+            to="/recipes/new"
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
+          >
+            <Plus size={16} />
+            Add Recipe
           </Link>
         </div>
-      </header>
-
-      {/* Filter Tabs - WRAPPING ENABLED */}
-      <div className="flex flex-wrap gap-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f.label}
-            onClick={() => setActiveFilter(f.label)}
-            className={`flex flex-col items-center justify-center min-w-[100px] p-4 rounded-[1.5rem] transition-all border ${
-              activeFilter === f.label 
-                ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20 scale-105 z-10' 
-                : 'bg-white text-gray-400 border-gray-100 hover:border-emerald-200'
-            }`}
-          >
-            <SafeIcon icon={f.icon} className={`w-6 h-6 mb-2 ${activeFilter === f.label ? 'text-white' : 'text-emerald-500'}`} />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-center">{f.label}</span>
-          </button>
-        ))}
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
+      {/* Search Bar */}
+      <div className="relative mb-5">
+        <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search recipes..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-sm"
+        />
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+        {RECIPE_FILTERS.map(({ label, icon: Icon }) => {
+          const isActive = selectedTab === label;
+          return (
+            <button
+              key={label}
+              onClick={() => setSelectedTab(label)}
+              className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+                isActive
+                  ? 'bg-green-500 text-white shadow-md shadow-green-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">
+          {error}
+        </div>
+      )}
+
+      {filteredRecipes.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            {selectedTab === 'Favorites'
+              ? <Bookmark size={36} className="text-green-500" />
+              : <ChefHat size={36} className="text-green-500" />}
+          </div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-1">
+            {selectedTab === 'Favorites' ? 'No favorites yet' : 'No recipes found'}
+          </h3>
+          <p className="text-gray-400 mb-6 text-sm">
+            {selectedTab === 'Favorites'
+              ? 'Bookmark recipes to find them here quickly'
+              : selectedTab === 'All Recipes'
+              ? 'Start building your recipe library'
+              : `No recipes tagged "${selectedTab}"`}
+          </p>
+          {selectedTab !== 'All Recipes' && (
+            <button
+              onClick={() => setSelectedTab('All Recipes')}
+              className="inline-flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-600 px-4 py-2.5 rounded-xl font-medium transition-colors text-sm"
+            >
+              View All Recipes
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.length === 0 ? (
-            <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-gray-100">
-              <div className="bg-emerald-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <SafeIcon icon={FiCoffee} className="w-10 h-10 text-emerald-500" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">No matches found</h3>
-              <p className="text-gray-500 mt-2">Try a different filter or search term</p>
-            </div>
-          ) : (
-            filtered.map(recipe => (
-              <Link key={recipe.id} to={`/recipes/${recipe.id}`} className="group bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500">
-                <div className="relative h-56 bg-emerald-50 overflow-hidden">
-                  {recipe.image_url ? (
-                    <img src={recipe.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-emerald-50">
-                      <SafeIcon icon={FiCoffee} className="w-14 h-14 text-emerald-100" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredRecipes.map((recipe) => {
+            const proxiedImg = getProxiedImage(recipe.image_url);
+            const sourceSite = getSourceSiteName(recipe.source_url);
+            const isFav = !!recipe.favorited;
+            return (
+              <div
+                key={recipe.id}
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group"
+              >
+                <Link to={`/recipes/${recipe.id}`}>
+                  <div className="relative h-36 sm:h-44 bg-green-50">
+                    {proxiedImg ? (
+                      <>
+                        <img
+                          src={proxiedImg}
+                          alt={recipe.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const placeholder = e.target.parentElement.querySelector('.placeholder');
+                            if (placeholder) placeholder.style.display = 'flex';
+                          }}
+                        />
+                        <div
+                          className="placeholder absolute inset-0 items-center justify-center bg-green-50"
+                          style={{ display: 'none' }}
+                        >
+                          <ChefHat size={40} className="text-green-300" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ChefHat size={40} className="text-green-300" />
+                      </div>
+                    )}
+
+                    {/* Cook Time Badge */}
+                    <div className="absolute bottom-2 left-2 bg-black/55 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1">
+                      <Clock size={11} />
+                      30 min
                     </div>
+
+                    {/* Bookmark Button */}
+                    <button
+                      onClick={(e) => handleToggleFavorite(e, recipe)}
+                      disabled={togglingFav === recipe.id}
+                      className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm ${
+                        isFav
+                          ? 'bg-green-500 text-white'
+                          : 'bg-white/80 backdrop-blur-sm text-gray-500 opacity-0 group-hover:opacity-100'
+                      } hover:scale-110`}
+                      title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      {isFav
+                        ? <BookmarkCheck size={16} strokeWidth={2.5} />
+                        : <Bookmark size={15} strokeWidth={2} />}
+                    </button>
+                  </div>
+                </Link>
+
+                <div className="p-3">
+                  <Link to={`/recipes/${recipe.id}`}>
+                    <h3 className="font-semibold text-gray-800 mb-0.5 hover:text-green-600 transition-colors line-clamp-1 text-sm">
+                      {recipe.title}
+                    </h3>
+                  </Link>
+                  {sourceSite && (
+                    <p className="text-xs text-gray-400 mb-2 capitalize">{sourceSite}</p>
                   )}
-                  
-                  <button 
-                    onClick={(e) => handleToggleFavorite(e, recipe)}
-                    className="absolute top-4 right-4 z-10 p-2.5 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg hover:scale-110 active:scale-95 transition-all"
-                  >
-                    <SafeIcon 
-                      icon={FiHeart} 
-                      className={`w-5 h-5 transition-colors ${recipe.favorited ? 'text-rose-500 fill-rose-500' : 'text-gray-400'}`} 
-                    />
-                  </button>
-
-                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
-                    <div className="flex items-center gap-1.5 font-bold text-[10px] text-emerald-600 uppercase tracking-widest">
-                      <SafeIcon icon={FiClock} className="w-3 h-3" /> 30m
-                    </div>
+                  <div className="flex items-center justify-end gap-1">
+                    <Link
+                      to={`/recipes/${recipe.id}/edit`}
+                      className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    >
+                      <Edit size={14} />
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(recipe.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-
-                <div className="p-7">
-                  <h3 className="font-bold text-gray-900 mb-4 line-clamp-1 group-hover:text-emerald-600 transition-colors uppercase tracking-tight text-sm">{recipe.title}</h3>
-                  
-                  <div className="flex items-center justify-between">
-                    <StarRating rating={recipe.rating || 0} readonly size="sm" />
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      <SafeIcon icon={FiUsers} className="w-4 h-4 text-emerald-500" /> {recipe.servings}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))
-          )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
