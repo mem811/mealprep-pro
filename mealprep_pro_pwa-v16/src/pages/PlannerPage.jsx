@@ -154,47 +154,42 @@ export default function PlannerPage() {
                         {slots.map(item => {
   console.log('Item data:', { recipe: item.recipe, expand: item.expand });
   return (
- <motion.div
+<motion.div
   key={item.id}
   initial= opacity: 0, scale: 0.95 
   animate= opacity: 1, scale: 1 
   exit= opacity: 0, scale: 0.95, height: 0 
-  className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0 cursor-pointer"
- onClick={() => {
-  const recipeId = item.recipe || item.expand?.recipe?.id;
-  console.log('Clicking card! Recipe ID:', recipeId);
-  console.log('Full item:', JSON.stringify(item, null, 2));
-  if (recipeId) window.location.href = `/recipes/${recipeId}`;
-}}
-   >
-                           <div className="flex items-center gap-2 p-2 relative">
-                              <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
-                                {item.expand?.recipe?.image_url ? (
-                                  <img src={item.expand.recipe.image_url} className="w-full h-full object-cover" loading="lazy" />
-                                ) : (
-                                  <SafeIcon icon={FiCoffee} className="w-4 h-4 text-emerald-200" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-[9px] text-gray-900 leading-tight truncate">{item.expand?.recipe?.title}</h4>
-                                <div className="flex items-center justify-between mt-0.5">
-                                  <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded-sm">{item.servings_multiplier}x</span>
-                                  {/* CALL DELETE HANDLER WITH STOP PROPAGATION */}
-                                  <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      console.log('slot data:', item); // DEBUG LOG AS REQUESTED
-                                      handleDeleteSlot(item.id);
-                                    }} 
-                                    className="p-1 text-red-400 hover:bg-red-50 rounded-md opacity-0 group-hover/card:opacity-100 transition-opacity"
-                                  >
-                                    <SafeIcon icon={FiTrash2} className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
+  className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0"
+>
+  <Link
+    to={`/recipes/${item.recipe || item.expand?.recipe?.id}`}
+    className="flex items-center gap-2 p-2 no-underline"
+  >
+    <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
+      {item.expand?.recipe?.image_url ? (
+        <img src={item.expand.recipe.image_url} className="w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <SafeIcon icon={FiCoffee} className="w-4 h-4 text-emerald-200" />
+      )}
+    </div>
+    <div className="flex-1 min-w-0">
+      <h4 className="font-bold text-[9px] text-gray-900 leading-tight truncate">{item.expand?.recipe?.title}</h4>
+      <div className="flex items-center justify-between mt-0.5">
+        <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded-sm">{item.servings_multiplier}x</span>
+      </div>
+    </div>
+  </Link>
+  <button
+    onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleDeleteSlot(item.id);
+    }}
+    className="absolute top-1 right-1 p-1 text-red-400 hover:bg-red-50 rounded-md opacity-0 group-hover/card:opacity-100 transition-opacity"
+  >
+    <SafeIcon icon={FiTrash2} className="w-3.5 h-3.5" />
+  </button>
+</motion.div>
                         );
                         })}
                       </AnimatePresence>
