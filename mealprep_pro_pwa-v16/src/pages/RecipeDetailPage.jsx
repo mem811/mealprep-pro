@@ -6,10 +6,10 @@ import {
   Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save
 } from 'lucide-react';
 
-const getProxiedImage = (url) => {
+function getProxiedImage(url) {
   if (!url) return null;
-  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=1200&h=600&fit=cover&q=85`;
-};
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=1200&fit=cover&q=90&n=-1`;
+}
 
 const toTitleCase = (str) => {
   if (!str) return '';
