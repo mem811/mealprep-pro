@@ -7,7 +7,7 @@ import {
   Dumbbell, Croissant, Bookmark, Soup, BookmarkCheck, LayoutDashboard
 } from 'lucide-react';
 
-const FILTERS = [
+const RECIPE_FILTERS = [
   { label: 'All Recipes', icon: LayoutDashboard },
   { label: 'Breakfast', icon: Coffee },
   { label: 'Lunch', icon: Sandwich },
@@ -39,20 +39,20 @@ function getSourceSiteName(url) {
   }
 }
 
-export default function RecipesPage() {
-  const [recipes, setRecipes] = useState([]);
+export default function sPage() {
+  const [s, sets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [selectedTab, setSelectedTab] = useState('All Recipes');
+  const [selectedTab, setSelectedTab] = useState('All s');
   const [togglingFav, setTogglingFav] = useState(null);
 
-  const fetchRecipes = async () => {
+  const fetchs = async () => {
     try {
       setLoading(true);
       setError(null);
       const userId = pb.authStore.model.id;
-      const result = await pb.collection('recipes').getList(1, 100, {
+      const result = await pb.collection('s').getList(1, 100, {
         filter: `user = "${userId}"`,
         sort: '-created',
       });
