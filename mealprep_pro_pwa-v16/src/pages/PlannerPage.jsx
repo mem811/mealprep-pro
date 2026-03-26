@@ -161,10 +161,14 @@ export default function PlannerPage() {
   exit= opacity: 0, scale: 0.95, height: 0 
   className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0"
 >
-  <a
-    href={`/recipes/${item.recipe}`}
-    className="flex items-center gap-2 p-2 no-underline"
-  >
+ <div
+  className="flex items-center gap-2 p-2 cursor-pointer"
+  onClick={(e) => {
+    e.stopPropagation();
+    const recipeId = item.recipe || item.expand?.recipe?.id;
+    if (recipeId) navigate(`/recipes/${recipeId}`);
+  }}
+>
     <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
       {item.expand?.recipe?.image_url ? (
         <img src={item.expand.recipe.image_url} className="w-full h-full object-cover" loading="lazy" />
