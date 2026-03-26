@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-const [nutrition, setNutrition] = useState(null);
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
 import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat } from 'lucide-react';
@@ -34,6 +33,7 @@ export default function RecipeFormPage() {
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState(null);
+  const [nutrition, setNutrition] = useState(null);
 
   const userPlan = pb.authStore.model?.plan || 'free';
   const isPro = userPlan === 'pro';
