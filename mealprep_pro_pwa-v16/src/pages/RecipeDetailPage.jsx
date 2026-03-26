@@ -638,8 +638,8 @@ export default function RecipeDetailPage() {
                   <span className="text-lg">✨</span> Chef's Note
                 </h3>
                 <p className="text-sm leading-relaxed opacity-95 italic">
-                  "This recipe works best with fresh seasonal ingredients. Don't be afraid to adjust the seasoning to your liking!"
-                </p>
+  {recipe.chef_note || "No chef's note yet. Add one by editing this recipe!"}
+</p>
               </div>
 
             </div>
