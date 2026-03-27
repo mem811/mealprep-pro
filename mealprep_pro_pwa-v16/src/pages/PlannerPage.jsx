@@ -171,7 +171,8 @@ export default function PlannerPage() {
                           initial= opacity: 0, scale: 0.95 
                           animate= opacity: 1, scale: 1 
                           exit= opacity: 0, scale: 0.95, height: 0 
-                          className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0 w-full"
+                          className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0 w-full max-w-[180px]"
+                          
                         >
                           <div
                             className="flex items-center gap-2 p-2 cursor-pointer"
