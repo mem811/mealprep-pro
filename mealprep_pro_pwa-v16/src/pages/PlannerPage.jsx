@@ -95,7 +95,6 @@ export default function PlannerPage() {
     }
   };
 
-  // Today's meals for the summary card
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const todayMeals = MEAL_SLOTS.map(slot => ({
     slot,
@@ -141,7 +140,7 @@ export default function PlannerPage() {
               >
                 <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">{slot}</p>
                 {items.length === 0 ? (
-                  <p style= color: 'rgba(255,255,255,0.5)'  className="text-xs italic">Nothing planned</p>
+                  <p className="text-xs italic" style= color: 'rgba(255,255,255,0.5)' >Nothing planned</p>
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     {items.map(item => (
