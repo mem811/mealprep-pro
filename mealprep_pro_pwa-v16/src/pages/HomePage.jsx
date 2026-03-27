@@ -480,7 +480,6 @@ useEffect(() => {
 
 </div>  {/* closes flex gap-6 wrapper */}
 
-<RecipePickerModal   {/* ← already there, don't add again */}
       )}
 
       <RecipePickerModal
