@@ -346,6 +346,6 @@ const confirmDelete = async () => {
         </div>
       )}
 
-    </div>   {/* ← closes the max-w-6xl wrapper - THIS is the last closing div */}
+    </div> 
   );
 }
