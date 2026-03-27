@@ -216,6 +216,50 @@ export default function HomePage() {
     </div>
   </div>
 </div>
+
+{/* TODAY SUMMARY CARD */}
+<div className="rounded-3xl p-5 text-white shadow-lg mb-5" style={todayCardStyle}>
+  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+    <div className="flex-shrink-0">
+      <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-0.5">Today</p>
+      <h2 className="text-xl font-bold">
+        {weekDays.find(d => fmt(d) === today)?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) || 'Today'}
+      </h2>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full md:w-auto">
+      {todayMeals.map(({ meal, items }) => (
+        <div key={meal} className="rounded-2xl p-3" style={slotCardStyle}>
+          <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">
+            {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+          </p>
+          {items.length === 0 ? (
+            <p className="text-xs italic" style={nothingTextStyle}>Nothing planned</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {items.map(({ slotId, recipe }) => (
+                <div key={slotId} className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0" style={recipeThumbStyle}>
+                    {recipe?.image_url ? (
+                      <img src={recipe.image_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Utensils size={12} className="text-white opacity-60" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">
+                    {recipe?.title}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+</div>
+
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <div className="w-9 h-9 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
