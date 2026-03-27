@@ -131,13 +131,14 @@ export default function PlannerPage() {
     <div className="grid grid-cols-7 gap-2 md:gap-4">
       {days.map((day) => (
         <div
-          key={day.toString()}
-          className={`flex flex-col items-center min-w-[3.5rem] p-3 rounded-2xl transition-all ${
-            isSameDay(day, new Date())
-              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm'
-              : 'bg-white text-gray-600 border border-gray-100'
-          }`}
-        >
+  key={day.toString()}
+  className="flex flex-col items-center min-w-[3.5rem] p-3 rounded-2xl transition-all border"
+  style={
+    isSameDay(day, new Date())
+      ? { backgroundColor: '#d1fae5', color: '#065f46', borderColor: '#6ee7b7' }
+      : { backgroundColor: '#ffffff', color: '#4b5563', borderColor: '#f3f4f6' }
+  }
+>
           <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{format(day, 'EEE')}</span>
           <span className="text-lg font-bold">{format(day, 'd')}</span>
         </div>
@@ -158,9 +159,10 @@ export default function PlannerPage() {
               const slots = mealPlan[`${dateKey}__${slot}`] || [];
               return (
                 <div
-                  key={day.toString()}
-                  className={`min-h-[140px] md:h-52 group rounded-xl ${isSameDay(day, new Date()) ? 'bg-emerald-50/60' : ''}`}
-                >
+  key={day.toString()}
+  className="min-h-[140px] md:h-52 group rounded-xl"
+  style={isSameDay(day, new Date()) ? { backgroundColor: 'rgba(209, 250, 229, 0.4)' } : {}}
+>
                   <div className="h-full flex flex-col gap-2">
                     <AnimatePresence>
                       {slots.map(item => (
