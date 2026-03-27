@@ -484,7 +484,7 @@ useEffect(() => {
 
       <RecipePickerModal
         isOpen={modalOpen}
-        onClose={() => { setModalOpen(false); setActiveCell(null); }}
+        onClose={() => { setModalOpen(false); setActiveCell(null);
         onSelect={handleRecipeSelect}
       />
     </div>
