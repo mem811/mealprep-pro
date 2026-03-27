@@ -317,7 +317,6 @@ const confirmDelete = async () => {
                     )}
       </div> 
 
-      {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
