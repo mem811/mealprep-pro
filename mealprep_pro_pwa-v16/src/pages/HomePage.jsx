@@ -505,7 +505,6 @@ useEffect(() => {
 
 </div>  {/* closes flex gap-6 wrapper */}
 
-      )}
 
       <RecipePickerModal
         isOpen={modalOpen}
