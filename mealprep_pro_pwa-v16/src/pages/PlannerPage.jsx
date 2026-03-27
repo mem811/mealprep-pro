@@ -129,7 +129,7 @@ export default function PlannerPage() {
 
       <div className="grid grid-cols-7 gap-2 md:gap-4 overflow-x-auto pb-2 scrollbar-hide">
         {days.map((day) => (
-          <div key={day.toString()} className={`flex flex-col items-center min-w-[3.5rem] p-3 rounded-2xl transition-all ${isSameDay(day, new Date()) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white text-gray-600 border border-gray-100'}`}>
+          <div key={day.toString()} className={`flex flex-col items-center min-w-[3.5rem] p-3 rounded-2xl transition-all $isSameDay(day, new Date()) ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm' : 'bg-white text-gray-600 border border-gray-100'
             <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{format(day, 'EEE')}</span>
             <span className="text-lg font-bold">{format(day, 'd')}</span>
           </div>
@@ -148,7 +148,7 @@ export default function PlannerPage() {
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const slots = mealPlan[`${dateKey}__${slot}`] || [];
                 return (
-                  <div key={day.toString()} className="min-h-[140px] md:h-52 group">
+                  <div key={day.toString()} className={`min-h-[140px] md:h-52 group rounded-xl ${isSameDay(day, new Date()) ? 'bg-emerald-50/60' : ''}`}>
                     <div className="h-full flex flex-col gap-2">
                       <AnimatePresence>
                         {slots.map(item => {
@@ -159,7 +159,7 @@ export default function PlannerPage() {
   initial= opacity: 0, scale: 0.95 
   animate= opacity: 1, scale: 1 
   exit= opacity: 0, scale: 0.95, height: 0 
-  className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0"
+  className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden relative group/card flex-shrink-0 w-full max-w-[160px]"
 >
  <div
   className="flex items-center gap-2 p-2 cursor-pointer"
@@ -182,7 +182,6 @@ export default function PlannerPage() {
         <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded-sm">{item.servings_multiplier}x</span>
       </div>
     </div>
-  </a>
   <button
     onClick={(e) => {
       e.preventDefault();
