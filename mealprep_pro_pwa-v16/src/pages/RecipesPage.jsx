@@ -39,13 +39,14 @@ function getSourceSiteName(url) {
   }
 }
 
-export default function RecipesPage() {
+  export default function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedTab, setSelectedTab] = useState('All Recipes');
   const [togglingFav, setTogglingFav] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const fetchRecipes = async () => {
     try {
@@ -69,18 +70,20 @@ export default function RecipesPage() {
     fetchRecipes();
   }, []);
 
-  const handleDelete = async (recipeId) => {
-  if (!window.confirm('Are you sure you want to delete this recipe?')) {
-    return;
-  }
+  const handleDeleteClick = (id) => {
+  setDeleteTarget(id);
+};
 
+const confirmDelete = async () => {
+  if (!deleteTarget) return;
   try {
-    await pb.collection('recipes').delete(recipeId);
-    // Remove from local state so the UI updates immediately
-    setRecipes((prev) => prev.filter((r) => r.id !== recipeId));
+    await pb.collection('recipes').delete(deleteTarget);
+    setRecipes((prev) => prev.filter((r) => r.id !== deleteTarget));
   } catch (err) {
     console.error('Delete error:', err);
     alert('Failed to delete recipe.');
+  } finally {
+    setDeleteTarget(null);
   }
 };
 
@@ -299,12 +302,12 @@ export default function RecipesPage() {
                     >
                       <Edit size={14} />
                     </Link>
-                    <button
-                      onClick={() => handleDelete(recipe.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                   <button
+                  onClick={() => handleDeleteClick(recipe.id)}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+  <Trash2 size={14} />
+</button>
                   </div>
                 </div>
               </div>
@@ -313,5 +316,38 @@ export default function RecipesPage() {
         </div>
       )}
     </div>
+    </div>  {/* line 318 - already there */}
+
+    {/* Delete Confirmation Modal */}
+    {deleteTarget && (
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+        <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Trash2 size={24} className="text-red-500" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Delete Recipe?</h3>
+          <p className="text-sm text-gray-500 mb-6">
+            This can't be undone. Are you sure you want to remove this recipe?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+  );  {/* line 319 - already there */}
+}
   );
 }
