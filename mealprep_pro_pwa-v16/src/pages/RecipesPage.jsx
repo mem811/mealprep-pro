@@ -314,8 +314,8 @@ const confirmDelete = async () => {
             );
           })}
         </div>
-             )}
-      </div>
+                    )}
+      </div>   {/* ← closes the grid/empty-state */}
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
@@ -345,6 +345,7 @@ const confirmDelete = async () => {
           </div>
         </div>
       )}
-    </div>
+
+    </div>   {/* ← closes the max-w-6xl wrapper - THIS is the last closing div */}
   );
 }
