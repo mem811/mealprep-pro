@@ -412,7 +412,7 @@ useEffect(() => {
   </div>  {/* closes flex-1 main column */}
 
   {/* Sidebar */}
-  <div className="hidden lg:flex flex-col gap-4 w-72 flex-shrink-0">
+  <div className="hidden lg:flex flex-col gap-4 w-72 flex-shrink-0 sticky top-4 self-start">
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
         <h3 className="font-bold text-gray-800 text-sm">🛒 This Week's Shopping</h3>
