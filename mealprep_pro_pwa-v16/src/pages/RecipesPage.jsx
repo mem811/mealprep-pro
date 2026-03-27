@@ -317,7 +317,6 @@ const confirmDelete = async () => {
                     )}
 
             </div>
-      )}
 
      {/* Delete Confirmation Modal */}
 {deleteTarget && (
