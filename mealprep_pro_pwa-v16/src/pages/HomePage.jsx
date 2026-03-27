@@ -287,7 +287,7 @@ useEffect(() => {
         /* DESKTOP: full weekly grid */
         <>
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full border-separate border-spacing-1.5">
+           <table className="w-full border-separate border-spacing-1.5 table-fixed">
               <thead>
                 <tr>
                   <th className="w-24" />
@@ -532,7 +532,7 @@ function DesktopRecipeCard({ recipe, servings, onRemove }) {
           <Utensils size={12} className="text-green-500" />
         </div>
       )}
-      <span className="text-xs text-gray-700 font-medium leading-tight flex-1 truncate" title={recipe.title}>
+     <span className="text-xs text-gray-700 font-medium leading-tight flex-1 line-clamp-2" title={recipe.title}>
         {recipe.title}
       </span>
       {servings > 1 && (
