@@ -315,7 +315,7 @@ const confirmDelete = async () => {
           })}
         </div>
                     )}
-      </div>   {/* ← closes the grid/empty-state */}
+      </div> 
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
