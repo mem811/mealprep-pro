@@ -502,7 +502,6 @@ useEffect(() => {
         ))}
       </div>
     </div>
-  </div>
 
 </div>  {/* closes flex gap-6 wrapper */}
 
