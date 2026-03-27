@@ -314,40 +314,37 @@ const confirmDelete = async () => {
             );
           })}
         </div>
-      )}
-    </div>
-    </div>
+             )}
+      </div>
 
-    {/* Delete Confirmation Modal */}
-    {deleteTarget && (
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
-          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Trash2 size={24} className="text-red-500" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">Delete Recipe?</h3>
-          <p className="text-sm text-gray-500 mb-6">
-            This can't be undone. Are you sure you want to remove this recipe?
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setDeleteTarget(null)}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={confirmDelete}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
-            >
-              Delete
-            </button>
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Delete Recipe?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              This can't be undone. Are you sure you want to remove this recipe?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
-
-  );  {/* line 319 - already there */}
-}
+      )}
+    </div>
   );
 }
