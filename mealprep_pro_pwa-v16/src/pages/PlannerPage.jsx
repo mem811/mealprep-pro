@@ -22,6 +22,11 @@ export default function PlannerPage() {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
 
+  const todayCardStyle = { background: 'linear-gradient(135deg, #10b981, #059669)' };
+  const slotCardStyle = { backgroundColor: 'rgba(255,255,255,0.15)' };
+  const nothingTextStyle = { color: 'rgba(255,255,255,0.5)' };
+  const recipeThumbStyle = { backgroundColor: 'rgba(255,255,255,0.2)' };
+
   const mealPlan = useMemo(() => {
     const map = {};
     mealSlots.forEach(slot => {
@@ -121,61 +126,51 @@ export default function PlannerPage() {
         </div>
       </header>
 
-      {/* TODAY SUMMARY CARD */}
-      <div
-        className="rounded-3xl p-6 text-white shadow-lg"
-        style= background: 'linear-gradient(135deg, #10b981, #059669)' 
-      >
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div className="flex-shrink-0">
-            <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-1">Today</p>
-            <h2 className="text-2xl font-bold">{format(new Date(), 'EEEE, MMMM d')}</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full md:w-auto">
-            {todayMeals.map(({ slot, items }) => (
-              <div
-                key={slot}
-                className="rounded-2xl p-3"
-                style= backgroundColor: 'rgba(255,255,255,0.15)' 
-              >
-                <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">{slot}</p>
-                {items.length === 0 ? (
-                  <p className="text-xs italic" style= color: 'rgba(255,255,255,0.5)' >Nothing planned</p>
-                ) : (
-                  <div className="flex flex-col gap-1.5">
-                    {items.map(item => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => {
-                          const recipeId = item.recipe || item.expand?.recipe?.id;
-                          if (recipeId) navigate(`/recipes/${recipeId}`);
-                        }}
-                      >
-                        <div
-                          className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0"
-                          style= backgroundColor: 'rgba(255,255,255,0.2)' 
-                        >
-                          {item.expand?.recipe?.image_url ? (
-                            <img src={item.expand.recipe.image_url} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <SafeIcon icon={FiCoffee} className="w-3 h-3" style= color: 'rgba(255,255,255,0.6)'  />
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">
-                          {item.expand?.recipe?.title}
-                        </p>
+    {/* TODAY SUMMARY CARD */}
+<div className="rounded-3xl p-6 text-white shadow-lg" style={todayCardStyle}>
+  <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+    <div className="flex-shrink-0">
+      <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-1">Today</p>
+      <h2 className="text-2xl font-bold">{format(new Date(), 'EEEE, MMMM d')}</h2>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full md:w-auto">
+      {todayMeals.map(({ slot, items }) => (
+        <div key={slot} className="rounded-2xl p-3" style={slotCardStyle}>
+          <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">{slot}</p>
+          {items.length === 0 ? (
+            <p className="text-xs italic" style={nothingTextStyle}>Nothing planned</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {items.map(item => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={() => {
+                    const recipeId = item.recipe || item.expand?.recipe?.id;
+                    if (recipeId) navigate(`/recipes/${recipeId}`);
+                  }}
+                >
+                  <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0" style={recipeThumbStyle}>
+                    {item.expand?.recipe?.image_url ? (
+                      <img src={item.expand.recipe.image_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <SafeIcon icon={FiCoffee} className="w-3 h-3 text-white opacity-60" />
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  <p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">
+                    {item.expand?.recipe?.title}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      ))}
+    </div>
+  </div>
+</div>
 
       {/* Date header row */}
       <div className="grid grid-cols-7 gap-2 md:gap-4">
