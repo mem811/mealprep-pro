@@ -312,7 +312,7 @@ useEffect(() => {
                     <td className="pr-2 py-1 align-top">
                       <div className="text-right">
                         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                          {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+                          {MEAL_LABELS[meal]}
                         </span>
                       </div>
                     </td>
@@ -379,7 +379,7 @@ useEffect(() => {
                   <div key={meal} className={`bg-gradient-to-r ${MEAL_COLORS[meal]} border rounded-2xl p-3`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold text-gray-700">
-                        {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+                        {MEAL_LABELS[meal]}
                       </span>
                       <button
                         onClick={() => openModal(selectedDay, meal)}
