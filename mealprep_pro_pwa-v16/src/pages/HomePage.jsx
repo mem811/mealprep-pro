@@ -449,9 +449,35 @@ useEffect(() => {
       )}
     </div>
 
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-        <h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
+  </div>
+      {/* Recent Recipes - horizontal */}
+<div className="mt-6">
+  <div className="flex items-center justify-between mb-3">
+    <h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
+    <a href="/recipes" className="text-xs text-green-600 font-medium hover:underline">See all</a>
+  </div>
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    {featuredRecipes.map(recipe => (
+      <a
+        key={recipe.id}
+        href={`/recipes/${recipe.id}`}
+        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 hover:shadow-md transition-shadow group"
+      >
+        <div className="w-full aspect-square rounded-xl overflow-hidden bg-emerald-50 mb-2">
+          {recipe.image_url ? (
+            <img src={recipe.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={recipe.title} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Utensils size={24} className="text-emerald-300" />
+            </div>
+          )}
+        </div>
+        <p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
+        <p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
+      </a>
+    ))}
+  </div>
+</div>
         <a href="/recipes" className="text-xs text-green-600 font-medium hover:underline">See all</a>
       </div>
       <div className="divide-y divide-gray-50">
