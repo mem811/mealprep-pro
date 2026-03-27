@@ -13,6 +13,7 @@ const MEAL_COLORS = {
 };
 const MEAL_ICONS = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' };
 
+
 function getWeekDays(baseDate) {
   const day = baseDate.getDay();
   const monday = new Date(baseDate);
@@ -42,6 +43,10 @@ export default function HomePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [activeCell, setActiveCell] = useState(null); // { date, mealType }
   const [saving, setSaving] = useState(false);
+
+  const [featuredRecipes, setFeaturedRecipes] = useState([]);
+  const [groceryItems, setGroceryItems] = useState([]);
+  const [checkedItems, setCheckedItems] = useState({});
 
   const today = fmt(new Date());
   const baseDate = new Date();
@@ -78,6 +83,62 @@ export default function HomePage() {
   }, [weekStart, weekEnd]);
 
   useEffect(() => { fetchSlots(); }, [fetchSlots]);
+
+useEffect(() => {
+  const fetchRecipes = async () => {
+    try {
+      const userId = pb.authStore.model?.id;
+      if (!userId) return;
+      const res = await pb.collection('recipes').getList(1, 6, {
+        filter: `user = "${userId}"`,
+        sort: '-created',
+      });
+      setFeaturedRecipes(res.items);
+    } catch (e) {
+      console.error('Fetch recipes error:', e);
+    }
+  };
+  fetchRecipes();
+}, []);
+
+useEffect(() => {
+  const fetchGrocery = async () => {
+    try {
+      const userId = pb.authStore.model?.id;
+      if (!userId) return;
+      const res = await pb.collection('meal_slots').getList(1, 200, {
+        filter: `meal_plan.user = "${userId}" && date >= "${weekStart}" && date <= "${weekEnd}"`,
+        expand: 'recipe',
+      });
+      const itemMap = new Map();
+      for (const slot of res.items) {
+        const recipe = slot.expand?.recipe;
+        if (!recipe) continue;
+        const multiplier = slot.servings_multiplier || 1;
+        let ingList = [];
+        if (typeof recipe.ingredients === 'string') {
+          try { ingList = JSON.parse(recipe.ingredients); } catch { ingList = []; }
+        } else if (Array.isArray(recipe.ingredients)) {
+          ingList = recipe.ingredients;
+        }
+        for (const ing of ingList) {
+          if (!ing.name?.trim()) continue;
+          const key = ing.name.toLowerCase().trim();
+          const qty = (parseFloat(ing.quantity) || 0) * multiplier;
+          if (itemMap.has(key)) {
+            itemMap.get(key).qty += qty;
+          } else {
+            itemMap.set(key, { name: ing.name.trim(), qty, unit: ing.unit || '' });
+          }
+        }
+      }
+      setGroceryItems(Array.from(itemMap.values()).slice(0, 12));
+    } catch (e) {
+      console.error('Fetch grocery error:', e);
+    }
+  };
+  fetchGrocery();
+}, [weekStart, weekEnd]);
 
   const openModal = (date, mealType) => {
     setActiveCell({ date, mealType });
