@@ -248,7 +248,7 @@ useEffect(() => {
       {todayMeals.map(({ meal, items }) => (
         <div key={meal} className="rounded-2xl p-3" style={slotCardStyle}>
           <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">
-            {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+            { {MEAL_LABELS[meal]}
           </p>
           {items.length === 0 ? (
             <p className="text-xs italic" style={nothingTextStyle}>Nothing planned</p>
