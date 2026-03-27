@@ -411,109 +411,82 @@ useEffect(() => {
     )}
   </div>  {/* closes flex-1 main column */}
 
-  {/* Sidebar */}
-  <div className="hidden lg:flex flex-col gap-4 w-72 flex-shrink-0 sticky top-4 self-start">
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-        <h3 className="font-bold text-gray-800 text-sm">🛒 This Week's Shopping</h3>
-        <a href="/grocery-list" className="text-xs text-green-600 font-medium hover:underline">See all</a>
-      </div>
-      {groceryItems.length === 0 ? (
-        <p className="text-xs text-gray-400 italic p-4">Add meals to generate your list</p>
-      ) : (
-        <ul className="divide-y divide-gray-50">
-          {groceryItems.map((item, i) => (
-            <li
-              key={i}
-              className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }))}
-            >
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${checkedItems[i] ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
-                {checkedItems[i] && (
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <span className={`flex-1 text-xs transition-colors ${checkedItems[i] ? 'line-through text-gray-300' : 'text-gray-700'}`}>
-                {item.name}
-              </span>
-              {item.qty > 0 && (
-                <span className={`text-xs flex-shrink-0 ${checkedItems[i] ? 'text-gray-300' : 'text-gray-400'}`}>
-                  {parseFloat(item.qty.toFixed(1))} {item.unit}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-
-  </div>
-      </div>
-      {/* Recent Recipes - horizontal */}
-<div className="mt-6">
-  <div className="flex items-center justify-between mb-3">
-    <h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
-    <a href="/recipes" className="text-xs text-green-600 font-medium hover:underline">See all</a>
-  </div>
-  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-    {featuredRecipes.map(recipe => (
-      <a
-        key={recipe.id}
-        href={`/recipes/${recipe.id}`}
-        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 hover:shadow-md transition-shadow group"
-      >
-        <div className="w-full aspect-square rounded-xl overflow-hidden bg-emerald-50 mb-2">
-          {recipe.image_url ? (
-            <img src={recipe.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={recipe.title} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Utensils size={24} className="text-emerald-300" />
-            </div>
-          )}
+      {/* Sidebar */}
+    <div className="hidden lg:flex flex-col gap-4 w-72 flex-shrink-0 sticky top-4 self-start">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+          <h3 className="font-bold text-gray-800 text-sm">🛒 This Week's Shopping</h3>
+          <a href="/grocery-list" className="text-xs text-green-600 font-medium hover:underline">See all</a>
         </div>
-        <p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
-        <p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
-      </a>
-    ))}
+        {groceryItems.length === 0 ? (
+          <p className="text-xs text-gray-400 italic p-4">Add meals to generate your list</p>
+        ) : (
+          <ul className="divide-y divide-gray-50">
+            {groceryItems.map((item, i) => (
+              <li
+                key={i}
+                className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }))}
+              >
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${checkedItems[i] ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
+                  {checkedItems[i] && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className={`flex-1 text-xs transition-colors ${checkedItems[i] ? 'line-through text-gray-300' : 'text-gray-700'}`}>
+                  {item.name}
+                </span>
+                {item.qty > 0 && (
+                  <span className={`text-xs flex-shrink-0 ${checkedItems[i] ? 'text-gray-300' : 'text-gray-400'}`}>
+                    {parseFloat(item.qty.toFixed(1))} {item.unit}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  </div>  {/* closes flex gap-6 wrapper */}
+
+  {/* Recent Recipes - horizontal */}
+  <div className="mt-6">
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
+      <a href="/recipes" className="text-xs text-green-600 font-medium hover:underline">See all</a>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {featuredRecipes.map(recipe => (
+        <a
+          key={recipe.id}
+          href={`/recipes/${recipe.id}`}
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 hover:shadow-md transition-shadow group"
+        >
+          <div className="w-full aspect-square rounded-xl overflow-hidden bg-emerald-50 mb-2">
+            {recipe.image_url ? (
+              <img src={recipe.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={recipe.title} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Utensils size={24} className="text-emerald-300" />
+              </div>
+            )}
+          </div>
+          <p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
+        </a>
+      ))}
+    </div>
   </div>
+
+  <RecipePickerModal
+    isOpen={modalOpen}
+    onClose={() => { setModalOpen(false); setActiveCell(null); }}
+    onSelect={handleRecipeSelect}
+  />
 </div>
-        <a href="/recipes" className="text-xs text-green-600 font-medium hover:underline">See all</a>
-      </div>
-      <div className="divide-y divide-gray-50">
-        {featuredRecipes.map(recipe => (
-          <a
-            key={recipe.id}
-            href={`/recipes/${recipe.id}`}
-            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center">
-              {recipe.image_url ? (
-                <img src={recipe.image_url} className="w-full h-full object-cover" alt={recipe.title} />
-              ) : (
-                <Utensils size={14} className="text-emerald-400" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-800 truncate">{recipe.title}</p>
-              <p className="text-[10px] text-gray-400">{recipe.servings} servings</p>
-            </div>
-          </a>
-        ))}
-      </div>
-    </div>
-
-</div>  {/* closes flex gap-6 wrapper */}
-
-
-      <RecipePickerModal
-        isOpen={modalOpen}
-       onClose={() => { setModalOpen(false); setActiveCell(null); }}
-        onSelect={handleRecipeSelect}
-      />
-    </div>
-  );
+);
 }
 
 function MealCell({ date, meal, cellSlots, onAdd, onRemove, saving }) {
