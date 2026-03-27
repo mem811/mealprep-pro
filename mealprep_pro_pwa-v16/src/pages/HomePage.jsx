@@ -11,7 +11,7 @@ const MEAL_COLORS = {
   dinner:    'from-blue-50 to-indigo-50 border-blue-200',
   snack:     'from-purple-50 to-pink-50 border-purple-200',
 };
-const MEAL_ICONS = { breakfast: '🍳', lunch: '🥗', dinner: '🍽️', snack: '🍎' };
+const MEAL_ICONS = { breakfast: '', lunch: '', dinner: '', snack: '' };
 
 
 function getWeekDays(baseDate) {
