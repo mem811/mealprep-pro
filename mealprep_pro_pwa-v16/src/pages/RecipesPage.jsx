@@ -316,7 +316,7 @@ const confirmDelete = async () => {
         </div>
       )}
     </div>
-    </div>  {/* line 318 - already there */}
+    </div>
 
     {/* Delete Confirmation Modal */}
     {deleteTarget && (
