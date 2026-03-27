@@ -493,7 +493,7 @@ useEffect(() => {
 
 function MealCell({ date, meal, cellSlots, onAdd, onRemove, saving }) {
   return (
-    <div className="min-h-[90px] bg-white border border-gray-100 rounded-xl p-1.5 flex flex-col gap-1 group hover:border-green-200 transition-colors">
+    <div className="min-h-[70px] bg-white border border-gray-100 rounded-xl p-1.5 flex flex-col gap-1 group hover:border-green-200 transition-colors">
       {cellSlots.map(({ slotId, recipe, servings_multiplier }) => (
         <DesktopRecipeCard
           key={slotId}
