@@ -517,7 +517,7 @@ function DesktopRecipeCard({ recipe, servings, onRemove }) {
   const proxied = !imgError && recipe.image_url ? getProxiedImage(recipe.image_url) : null;
 
   return (
-    <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-1.5 py-1 group/card relative">
+    <a href={`/recipes/${recipe.id}`} className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-1.5 py-1 group/card relative hover:bg-green-50 transition-colors">
       {proxied ? (
         <img
           src={proxied}
@@ -530,19 +530,19 @@ function DesktopRecipeCard({ recipe, servings, onRemove }) {
           <Utensils size={12} className="text-green-500" />
         </div>
       )}
-     <span className="text-xs text-gray-700 font-medium leading-tight flex-1 line-clamp-2" title={recipe.title}>
+      <span className="text-xs text-gray-700 font-medium leading-tight flex-1 line-clamp-2" title={recipe.title}>
         {recipe.title}
       </span>
       {servings > 1 && (
         <span className="text-[10px] text-green-600 font-semibold flex-shrink-0">{servings}x</span>
       )}
       <button
-        onClick={onRemove}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
         className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white hidden group-hover/card:flex items-center justify-center shadow-sm"
       >
         <X size={9} strokeWidth={3} />
       </button>
-    </div>
+    </a>
   );
 }
 
@@ -552,7 +552,7 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
   const proxied = !imgError && recipe.image_url ? getProxiedImage(recipe.image_url) : null;
 
   return (
-    <div className="flex items-center gap-2 bg-white rounded-xl px-2.5 py-2 shadow-sm">
+    <a href={`/recipes/${recipe.id}`} className="flex items-center gap-2 bg-white rounded-xl px-2.5 py-2 shadow-sm hover:bg-green-50 transition-colors">
       {proxied ? (
         <img
           src={proxied}
@@ -572,11 +572,11 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
         )}
       </div>
       <button
-        onClick={onRemove}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
         className="w-6 h-6 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors flex-shrink-0"
       >
         <X size={13} className="text-red-400" />
       </button>
-    </div>
+    </a>
   );
 }
