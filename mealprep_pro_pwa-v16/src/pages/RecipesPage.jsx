@@ -319,34 +319,36 @@ const confirmDelete = async () => {
             </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
-            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Delete Recipe?</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              This can't be undone. Are you sure you want to remove this recipe?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+     {/* Delete Confirmation Modal */}
+{deleteTarget && (
+  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+    <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center">
+      <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Recipe?</h3>
+      <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+        Are you sure you want to delete this recipe?<br />
+        You won't be able to recover it.
+      </p>
+      <div className="flex gap-3">
+        <button
+          onClick={() => setDeleteTarget(null)}
+          className="flex-1 px-4 py-3 rounded-2xl bg-gray-100 text-gray-600 font-semibold text-sm hover:bg-gray-200 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmDelete}
+          className="flex-1 px-4 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors"
+        >
+          Delete
+        </button>
+      </div>
     </div>
-  );
-}
+  </div>
+)}
