@@ -295,7 +295,7 @@ useEffect(() => {
                     const isToday = fmt(d) === today;
                     return (
                       <th key={i} className="text-center pb-1">
-                        <div className={`inline-flex flex-col items-center px-3 py-1.5 rounded-xl ${isToday ? 'bg-green-500 text-white' : 'text-gray-500'}`}>
+                        <div className={`inline-flex flex-col items-center px-3 py-1.5 rounded-xl ${isToday ? 'bg-green-100 text-green-700 border border-green-300' : 'text-gray-500'}
                           <span className="text-xs font-medium">{DAY_NAMES[i]}</span>
                           <span className={`text-base font-bold ${isToday ? '' : 'text-gray-800'}`}>
                             {d.getDate()}
