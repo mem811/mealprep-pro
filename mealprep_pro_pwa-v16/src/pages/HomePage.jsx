@@ -450,6 +450,7 @@ useEffect(() => {
     </div>
 
   </div>
+      </div>
       {/* Recent Recipes - horizontal */}
 <div className="mt-6">
   <div className="flex items-center justify-between mb-3">
