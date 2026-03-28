@@ -181,10 +181,10 @@ export default function RecipeDetailPage() {
         });
 
         n = {
-          calories: Math.round(totalCal),
-          protein: Math.round(totalPro),
-          carbs: Math.round(totalCarb),
-          fat: Math.round(totalFat),
+          calories: Math.round(totalCal / servingCount),
+          protein: Math.round(totalPro / servingCount),
+        carbs: Math.round(totalCarb / servingCount),
+        fat: Math.round(totalFat / servingCount),
         };
       }
     }
