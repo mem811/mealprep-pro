@@ -800,9 +800,9 @@ export default function GroceryListPage() {
   var [loading, setLoading] = useState(true);
   var [collapsedCats, setCollapsedCats] = useState({});
 
-  var weekRange = useMemo(function() { return getWeekRange(); }, []);
-  var weekStart = weekRange.weekStart;
-  var weekEnd = weekRange.weekEnd;
+  var weekDays = useMemo(function() { return getWeekDays(new Date()); }, []);
+ var weekStart = fmt(weekDays[0]);
+ var weekEnd = fmt(weekDays[6]);
 
   async function fetchGrocery() {
     try {
