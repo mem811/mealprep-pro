@@ -146,8 +146,7 @@ export default function RecipeDetailPage() {
 
    if (result.nutrition) {
       const raw = typeof result.nutrition === 'string' ? JSON.parse(result.nutrition) : result.nutrition;
-      if (result.nutrition) {
-  const raw = typeof result.nutrition === 'string' ? JSON.parse(result.nutrition) : result.nutrition;
+   
   const n = {
     calories: Math.round(raw.calories || 0),
     protein: Math.round(raw.protein || 0),
@@ -159,10 +158,7 @@ export default function RecipeDetailPage() {
   setNutrition(n);
 } else {
 
-      await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
-      setNutrition(n);
-    } else {
-      setNutritionError('No nutrition found. Use manual entry below.');
+    
     }
   } catch (err) {
     console.error('Nutrition fetch error:', err);
