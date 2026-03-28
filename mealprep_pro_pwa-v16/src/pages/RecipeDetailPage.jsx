@@ -119,12 +119,13 @@ export default function RecipeDetailPage() {
     window.print();
   };
 
- const handleFetchNutrition = async () => {
+  const handleFetchNutrition = async () => {
   if (!recipe) return;
   setFetchingNutrition(true);
   setNutritionError('');
   const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
   let n = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  const servingCount = recipe.servings || 1;
   console.log('Ingredients:', recipe.ingredients);
   console.log('Ingredients type:', typeof recipe.ingredients);
   console.log('Source URL:', recipe.source_url);
@@ -138,7 +139,7 @@ export default function RecipeDetailPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.nutrition?.nutrients) {
-          const nutrients = data.nutrition.nutrients;
+         
           const servingCount = recipe.servings || 1;
           n = {
             calories: Math.round(nutrients.find(x => x.name === 'Calories')?.amount || 0),
@@ -184,8 +185,8 @@ export default function RecipeDetailPage() {
         n = {
           calories: Math.round(totalCal / servingCount),
           protein: Math.round(totalPro / servingCount),
-        carbs: Math.round(totalCarb / servingCount),
-        fat: Math.round(totalFat / servingCount),
+          carbs: Math.round(totalCarb / servingCount),
+          fat: Math.round(totalFat / servingCount),
         };
       }
     }
