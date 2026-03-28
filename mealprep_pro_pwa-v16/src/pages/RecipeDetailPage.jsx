@@ -142,15 +142,22 @@ export default function RecipeDetailPage() {
 
     if (!res.ok) throw new Error(`Fetch error: ${res.status}`);
     const data = await res.json();
+    const result = Array.isArray(data) ? data[0] : data;
 
-    if (data.nutrition) {
-      const raw = typeof data.nutrition === 'string' ? JSON.parse(data.nutrition) : data.nutrition;
-      const n = {
-        calories: Math.round(raw.calories || 0),
-        protein: Math.round(raw.protein || 0),
-        carbs: Math.round(raw.carbs || 0),
-        fat: Math.round(raw.fat || 0),
-      };
+   if (result.nutrition) {
+      const raw = typeof result.nutrition === 'string' ? JSON.parse(result.nutrition) : result.nutrition;
+      if (result.nutrition) {
+  const raw = typeof result.nutrition === 'string' ? JSON.parse(result.nutrition) : result.nutrition;
+  const n = {
+    calories: Math.round(raw.calories || 0),
+    protein: Math.round(raw.protein || 0),
+    carbs: Math.round(raw.carbs || 0),
+    fat: Math.round(raw.fat || 0),
+  };
+
+  await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
+  setNutrition(n);
+} else {
 
       await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
       setNutrition(n);
