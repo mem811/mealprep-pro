@@ -45,85 +45,53 @@ export default function RecipeDetailPage() {
     }
   };
 
-  const handleFetchNutrition = async () => {
-    if (!recipe.source_url && !recipe.ingredients) {
-      setNutError('Nutrition fetch requires a recipe URL or ingredients.');
+const handleFetchNutrition = async () => {
+  if (!recipe) return;
+  setFetchingNutrition(true);
+  setNutError(null);
+
+  try {
+    if (!recipe.source_url) {
+      setNutError('No source URL. Use manual entry below.');
+      setFetchingNutrition(false);
       return;
     }
 
-    setFetchingNutrition(true);
-    setNutError(null);
-    const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
-
-    try {
-      let nutritionData = null;
-      
-      // 1. Try Extraction API
-      if (recipe.source_url) {
-        const extractUrl = `https://api.spoonacular.com/recipes/extract?url=${encodeURIComponent(recipe.source_url)}&addRecipeNutrition=true&apiKey=${apiKey}`;
-        const response = await fetch(extractUrl);
-        
-        // TEMPORARY DEBUG CODE AS REQUESTED
-        console.log('Status:', response.status);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Has nutrition:', !!data.nutrition);
-          console.log('Nutrients array:', data.nutrition?.nutrients?.slice(0, 3));
-
-          if (data.nutrition?.nutrients) {
-            nutritionData = data.nutrition.nutrients;
-          }
-        }
+    const res = await fetch(
+      'https://n8n.srv1052955.hstgr.cloud/webhook/5ea8e8c8-94bf-41e7-8ffa-5dd843cdfe13',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: recipe.source_url }),
       }
+    );
 
-      // 2. FALLBACK: Analyze Nutrition Endpoint (POST)
-      if (!nutritionData && recipe.ingredients) {
-        console.log('Extraction failed or no nutrition found. Calling Analyze endpoint...');
-        const ingredients = typeof recipe.ingredients === 'string' ? JSON.parse(recipe.ingredients) : recipe.ingredients;
-        const ingredientLines = ingredients.map(i => `${i.quantity} ${i.unit} ${i.name}`);
+    if (!res.ok) throw new Error(`Fetch error: ${res.status}`);
+    const data = await res.json();
+    const result = Array.isArray(data) ? data[0] : data;
 
-        const analyzeRes = await fetch(`https://api.spoonacular.com/recipes/analyze?apiKey=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: recipe.title,
-            ingredients: ingredientLines
-          })
-        });
+    if (result.nutrition) {
+      const raw = typeof result.nutrition === 'string' ? JSON.parse(result.nutrition) : result.nutrition;
+      const n = {
+        calories: Math.round(raw.calories || 0),
+        protein: Math.round(raw.protein || 0),
+        carbs: Math.round(raw.carbs || 0),
+        fat: Math.round(raw.fat || 0),
+      };
 
-        console.log('Analyze Status:', analyzeRes.status);
-        if (analyzeRes.ok) {
-          const data = await analyzeRes.json();
-          console.log('Analyze Has nutrition:', !!data.nutrition);
-          if (data.nutrition?.nutrients) {
-            nutritionData = data.nutrition.nutrients;
-          }
-        }
-      }
-
-      if (nutritionData) {
-        const nutrition = {
-          calories: Math.round(nutritionData.find(x => x.name === 'Calories')?.amount || 0),
-          protein: Math.round(nutritionData.find(x => x.name === 'Protein')?.amount || 0),
-          carbs: Math.round(nutritionData.find(x => x.name === 'Carbohydrates')?.amount || 0),
-          fat: Math.round(nutritionData.find(x => x.name === 'Fat')?.amount || 0),
-        };
-
-        const updated = await pb.collection('recipes').update(id, { nutrition });
-        setRecipe(updated);
-        setManualNut(nutrition);
-        setNutError(null);
-      } else {
-        throw new Error('No nutrition data found after trying all endpoints.');
-      }
-    } catch (err) {
-      console.error('Nutrition Fetch Error:', err);
-      setNutError(err.message || 'Could not fetch nutrition data.');
-    } finally {
-      setFetchingNutrition(false);
+      const updated = await pb.collection('recipes').update(id, { nutrition: n });
+      setRecipe(updated);
+      setManualNut(n);
+    } else {
+      setNutError('No nutrition found. Use manual entry below.');
     }
-  };
+  } catch (err) {
+    console.error('Nutrition fetch error:', err);
+    setNutError('Failed to fetch nutrition. Try manual entry.');
+  } finally {
+    setFetchingNutrition(false);
+  }
+};
 
   const handleSaveManualNutrition = async () => {
     setSavingManual(true);
