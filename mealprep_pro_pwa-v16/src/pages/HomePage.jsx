@@ -576,7 +576,7 @@ export default function HomePage() {
                       </div>
                       <ul className="divide-y divide-gray-50">
                         {group.items.map(function(item, i) {
-                          var checkKey = group.category + '_' + i;
+                          var checkKey = item.name.toLowerCase().trim();
                           return (
                             <li
                               key={i}
