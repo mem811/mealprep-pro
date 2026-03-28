@@ -1,380 +1,276 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import pb from '../lib/pb';
 
-// --- Unit normalization map ---
-const UNIT_NORMALIZE = {
-  teaspoons: 'teaspoon', tsp: 'teaspoon', tsps: 'teaspoon',
-  tablespoons: 'tablespoon', tbsp: 'tablespoon', tbsps: 'tablespoon', tbs: 'tablespoon',
-  cups: 'cup',
-  ounces: 'oz', ounce: 'oz',
-  pounds: 'lb', pound: 'lb',
-  milliliters: 'ml', milliliter: 'ml', mls: 'ml',
-  liters: 'liter', litres: 'liter', l: 'liter',
-  grams: 'g', gram: 'g', grammes: 'g',
-  kilograms: 'kg', kilogram: 'kg',
-  inches: 'inch',
-  cloves: 'clove',
-  slices: 'slice',
-  pieces: 'piece',
-  sprigs: 'sprig',
+var CATEGORY_MAP = {
+  'Produce': ['lettuce','tomato','onion','garlic','pepper','carrot','celery','potato','broccoli','spinach','kale','cucumber','avocado','lemon','lime','ginger','cilantro','parsley','basil','thyme','rosemary','mint','dill','scallion','shallot','mushroom','zucchini','squash','corn','pea','bean','cabbage','beet','radish','turnip','leek','chive','jalapeño','serrano','poblano','bell pepper','green bean','asparagus','artichoke','eggplant','cauliflower','sweet potato','fruit','apple','banana','berry','blueberry','strawberry','raspberry','orange','grape','mango','pineapple','peach','pear','melon','watermelon','cherry','plum','fig','date','cranberry','pomegranate','kiwi','papaya','coconut','apricot','nectarine','arugula','romaine','watercress','endive','fennel','chard','collard','okra','plantain','yam','jicama','celeriac','kohlrabi','parsnip','rutabaga','sprout','microgreen','snap pea','snow pea','edamame','lemongrass','tamarind','turmeric root','horseradish'],
+  'Protein': ['chicken','beef','pork','turkey','salmon','shrimp','tuna','cod','tilapia','lamb','bacon','sausage','ham','steak','ground','tofu','tempeh','seitan','egg','fish','crab','lobster','scallop','mussel','clam','oyster','anchovy','sardine','duck','veal','bison','venison','prosciutto','pancetta','chorizo','pepperoni','salami','hot dog','meatball','jerky'],
+  'Dairy': ['milk','cheese','yogurt','cream','butter','sour cream','cream cheese','cottage cheese','ricotta','mozzarella','parmesan','cheddar','gouda','brie','feta','goat cheese','mascarpone','whipping cream','half and half','ghee','kefir','queso','gruyere','provolone','swiss','colby','jack cheese','american cheese','velveeta','whey','custard'],
+  'Baking': ['flour','sugar','baking soda','baking powder','vanilla','cocoa','chocolate','yeast','cornstarch','powdered sugar','brown sugar','maple syrup','honey','molasses','agave','corn syrup','gelatin','food coloring','sprinkles','frosting','cake mix','brownie mix','pie crust','puff pastry','phyllo','shortening','lard','almond extract','peppermint extract','cream of tartar','meringue powder','fondant','confectioners'],
+  'Spices': ['salt','pepper','cumin','paprika','oregano','cinnamon','chili','cayenne','nutmeg','clove','coriander','turmeric','curry','bay leaf','red pepper flake','garlic powder','onion powder','smoked paprika','allspice','cardamom','fennel seed','mustard seed','celery seed','dill weed','sage','tarragon','marjoram','saffron','sumac','za\'atar','five spice','garam masala','herbes de provence','italian seasoning','old bay','everything bagel','ranch seasoning','taco seasoning','blackening seasoning','cajun','creole','sesame seed','poppy seed','caraway','anise','star anise','white pepper','szechuan','chipotle','adobo'],
+  'Pantry': ['rice','pasta','bread','oil','vinegar','soy sauce','broth','stock','tomato sauce','tomato paste','can','bean','lentil','chickpea','oat','cereal','granola','nut','peanut butter','almond butter','jam','jelly','mustard','ketchup','mayo','hot sauce','worcestershire','sriracha','hoisin','teriyaki','bbq sauce','salsa','tortilla','wrap','pita','naan','cracker','chip','pretzel','popcorn','breadcrumb','panko','crouton','noodle','ramen','couscous','quinoa','barley','farro','bulgur','polenta','grits','cornmeal','taco shell','dried fruit','raisin','coconut milk','coconut cream','condensed milk','evaporated milk','powdered milk','bouillon','miso','tahini','hummus','olive','pickle','caper','sun-dried tomato','artichoke heart','roasted pepper','anchovy paste','fish sauce','oyster sauce','chili paste','sambal','gochujang','harissa','pesto','marinara','alfredo','curry paste']
 };
 
-function normalizeUnit(unit) {
-  if (!unit) return '';
-  const lower = unit.toLowerCase().trim();
-  return UNIT_NORMALIZE[lower] || lower;
-}
-
-function normalizeName(name) {
-  if (!name) return '';
-  let n = name.toLowerCase().trim();
-  if (n.endsWith('es') && n.length > 4) n = n.slice(0, -2);
-  else if (n.endsWith('s') && n.length > 3) n = n.slice(0, -1);
-  return n;
-}
-
-function toTitleCase(str) {
-  return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
-}
-
-function pluralizeUnit(unit, qty) {
-  if (!unit || qty <= 1) return unit;
-  const irregular = { oz: 'oz', lb: 'lb', g: 'g', kg: 'kg', ml: 'ml' };
-  if (irregular[unit]) return unit;
-  if (unit.endsWith('s')) return unit;
-  return unit + 's';
-}
-
-function formatQty(qty) {
-  if (qty === Math.floor(qty)) return String(qty);
-  return parseFloat(qty.toFixed(2)).toString();
-}
-
-// --- Gram conversions (g → cup) for common ingredients ---
-const GRAM_CONVERSIONS = {
-  flour:          { gPerCup: 120,  unit: 'cup' },
-  'all-purpose flour': { gPerCup: 120, unit: 'cup' },
-  'bread flour':  { gPerCup: 120,  unit: 'cup' },
-  'cake flour':   { gPerCup: 100,  unit: 'cup' },
-  sugar:          { gPerCup: 200,  unit: 'cup' },
-  'granulated sugar': { gPerCup: 200, unit: 'cup' },
-  'white sugar':  { gPerCup: 200,  unit: 'cup' },
-  'brown sugar':  { gPerCup: 220,  unit: 'cup' },
-  'powdered sugar': { gPerCup: 120, unit: 'cup' },
-  'icing sugar':  { gPerCup: 120,  unit: 'cup' },
-  'confectioners sugar': { gPerCup: 120, unit: 'cup' },
-  butter:         { gPerCup: 227,  unit: 'cup' },
-  milk:           { gPerCup: 240,  unit: 'cup' },
-  water:          { gPerCup: 240,  unit: 'cup' },
-  cream:          { gPerCup: 240,  unit: 'cup' },
-  'heavy cream':  { gPerCup: 240,  unit: 'cup' },
-  'sour cream':   { gPerCup: 240,  unit: 'cup' },
-  yogurt:         { gPerCup: 240,  unit: 'cup' },
-  oil:            { gPerCup: 218,  unit: 'cup' },
-  'olive oil':    { gPerCup: 218,  unit: 'cup' },
-  'vegetable oil': { gPerCup: 218, unit: 'cup' },
-  honey:          { gPerCup: 340,  unit: 'cup' },
-  'cocoa powder': { gPerCup: 100,  unit: 'cup' },
-  oats:           { gPerCup: 90,   unit: 'cup' },
-  'rolled oats':  { gPerCup: 90,   unit: 'cup' },
-  rice:           { gPerCup: 185,  unit: 'cup' },
-  'white rice':   { gPerCup: 185,  unit: 'cup' },
-  'brown rice':   { gPerCup: 185,  unit: 'cup' },
+var CATEGORY_ORDER = ['Produce','Protein','Dairy','Baking','Spices','Pantry','Other'];
+var CATEGORY_ICONS = {
+  'Produce': '🥬',
+  'Protein': '🥩',
+  'Dairy': '🥛',
+  'Baking': '🧁',
+  'Spices': '🧂',
+  'Pantry': '🫙',
+  'Other': '📦'
 };
 
-// ml → cup (liquids sometimes stored as ml)
-const ML_CONVERSIONS = {
-  milk:          240,
-  water:         240,
-  cream:         240,
-  'heavy cream': 240,
-  oil:           240,
-  'olive oil':   240,
-  'vegetable oil': 240,
-  honey:         340,
-};
-
-function tryConvertToUS(name, qty, unit) {
-  const normUnit = normalizeUnit(unit);
-  const lowerName = name.toLowerCase().trim();
-
-  // g → cup conversion
-  if (normUnit === 'g' || normUnit === 'gram') {
-    const conv = GRAM_CONVERSIONS[lowerName];
-    if (conv) {
-      const cups = qty / conv.gPerCup;
-      return { qty: cups, unit: 'cup', converted: true };
+function categorizeItem(name) {
+  var lower = (name || '').toLowerCase();
+  for (var cat of Object.keys(CATEGORY_MAP)) {
+    for (var keyword of CATEGORY_MAP[cat]) {
+      if (lower.includes(keyword)) return cat;
     }
-  }
-
-  // ml → cup conversion
-  if (normUnit === 'ml') {
-    const mlPerCup = ML_CONVERSIONS[lowerName] || 240;
-    const cups = qty / mlPerCup;
-    return { qty: cups, unit: 'cup', converted: true };
-  }
-
-  return { qty, unit: normUnit || unit, converted: false };
-}
-
-// --- Category detection ---
-const CATEGORIES = {
-  Produce: ['tomato', 'onion', 'garlic', 'lettuce', 'spinach', 'carrot', 'celery', 'pepper', 'cucumber', 'broccoli', 'zucchini', 'mushroom', 'potato', 'sweet potato', 'avocado', 'lemon', 'lime', 'apple', 'banana', 'berry', 'strawberry', 'blueberry', 'raspberry', 'orange', 'mango', 'pineapple', 'grape', 'kale', 'cabbage', 'corn', 'pea', 'bean', 'herb', 'basil', 'parsley', 'cilantro', 'mint', 'thyme', 'rosemary', 'ginger', 'scallion', 'leek', 'shallot', 'arugula', 'asparagus', 'beet', 'cauliflower', 'eggplant', 'radish', 'turnip', 'squash', 'pumpkin'],
-  'Dairy & Eggs': ['milk', 'cream', 'butter', 'cheese', 'yogurt', 'egg', 'sour cream', 'heavy cream', 'cream cheese', 'parmesan', 'mozzarella', 'cheddar', 'ricotta', 'cottage cheese', 'half and half', 'ghee'],
-  'Meat & Seafood': ['chicken', 'beef', 'pork', 'turkey', 'lamb', 'salmon', 'tuna', 'shrimp', 'fish', 'bacon', 'sausage', 'ham', 'steak', 'ground beef', 'ground turkey', 'duck', 'crab', 'lobster', 'scallop', 'anchovy', 'sardine', 'tilapia', 'cod', 'halibut'],
-  Pantry: ['flour', 'sugar', 'salt', 'pepper', 'oil', 'vinegar', 'sauce', 'paste', 'stock', 'broth', 'rice', 'pasta', 'bread', 'crumb', 'oat', 'cereal', 'honey', 'syrup', 'cocoa', 'chocolate', 'vanilla', 'baking', 'yeast', 'powder', 'spice', 'cumin', 'paprika', 'turmeric', 'cinnamon', 'oregano', 'soy sauce', 'olive oil', 'coconut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut', 'sesame', 'lentil', 'chickpea', 'quinoa', 'tortilla', 'cracker', 'chip', 'nut', 'seed', 'dried', 'canned', 'tomato paste', 'mustard', 'ketchup', 'mayo', 'worcestershire'],
-};
-
-function categorize(name) {
-  const lower = name.toLowerCase();
-  for (const [cat, keywords] of Object.entries(CATEGORIES)) {
-    if (keywords.some(k => lower.includes(k))) return cat;
   }
   return 'Other';
 }
 
 function getWeekRange() {
-  const today = new Date();
-  const day = today.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  const sunday = new Date(monday);
+  var now = new Date();
+  var day = now.getDay();
+  var diff = day === 0 ? -6 : 1 - day;
+  var monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+  var sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  const fmt = d => d.toISOString().split('T')[0];
-  return { weekStart: fmt(monday), weekEnd: fmt(sunday) };
+  var weekStart = monday.toISOString().split('T')[0];
+  var weekEnd = sunday.toISOString().split('T')[0];
+  return { weekStart: weekStart, weekEnd: weekEnd };
 }
 
 export default function GroceryListPage() {
-  const [ingredients, setIngredients] = useState([]);
-  const [checked, setChecked] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [collapsed, setCollapsed] = useState({});
+  var [groceryGroups, setGroceryGroups] = useState([]);
+  var [checkedItems, setCheckedItems] = useState({});
+  var [loading, setLoading] = useState(true);
+  var [collapsedCats, setCollapsedCats] = useState({});
 
-  useEffect(() => {
-    fetchAndAggregate();
-  }, []);
+  var weekRange = useMemo(function() { return getWeekRange(); }, []);
+  var weekStart = weekRange.weekStart;
+  var weekEnd = weekRange.weekEnd;
 
-  const fetchAndAggregate = async () => {
-    setLoading(true);
-    setError('');
+  async function fetchGrocery() {
     try {
-      const { weekStart, weekEnd } = getWeekRange();
-      const userId = pb.authStore.model?.id;
+      setLoading(true);
+      var userId = pb.authStore.model?.id;
+      if (!userId) return;
 
-      const result = await pb.collection('meal_slots').getList(1, 200, {
-        filter: `meal_plan.user = "${userId}" && date >= "${weekStart}" && date <= "${weekEnd}"`,
-        expand: 'recipe',
+      var res = await pb.collection('meal_slots').getList(1, 200, {
+        filter: 'meal_plan.user = "' + userId + '" && date >= "' + weekStart + '" && date <= "' + weekEnd + '"',
+        expand: 'recipe'
       });
 
-      const allIngredients = [];
-
-      for (const slot of result.items) {
-        const recipe = slot.expand?.recipe;
+      var itemMap = new Map();
+      for (var slot of res.items) {
+        var recipe = slot.expand?.recipe;
         if (!recipe) continue;
-
-        const multiplier = slot.servings_multiplier || 1;
-        let ingList = [];
-
+        var multiplier = slot.servings_multiplier || 1;
+        var ingList = [];
         if (typeof recipe.ingredients === 'string') {
-          try { ingList = JSON.parse(recipe.ingredients); } catch { ingList = []; }
+          try { ingList = JSON.parse(recipe.ingredients); } catch (err) { ingList = []; }
         } else if (Array.isArray(recipe.ingredients)) {
           ingList = recipe.ingredients;
         }
-
-        for (const ing of ingList) {
+        for (var ing of ingList) {
           if (!ing.name?.trim()) continue;
-          const rawQty = parseFloat(ing.quantity) || 0;
-          const scaledQty = rawQty * multiplier;
-
-          // Try best-effort gram/ml → US conversion
-          const { qty, unit } = tryConvertToUS(ing.name, scaledQty, ing.unit || '');
-
-          allIngredients.push({
-            name: ing.name.trim(),
-            qty,
-            unit,
-          });
+          var ingKey = ing.name.toLowerCase().trim();
+          var qty = (parseFloat(ing.quantity) || 0) * multiplier;
+          if (itemMap.has(ingKey)) {
+            itemMap.get(ingKey).qty += qty;
+          } else {
+            itemMap.set(ingKey, {
+              name: ing.name.trim(),
+              qty: qty,
+              unit: ing.unit || '',
+              category: categorizeItem(ing.name)
+            });
+          }
         }
       }
 
-      // Merge duplicates
-      const mergeMap = new Map();
+      // Load saved grocery checks
+      try {
+        var checksRes = await pb.collection('grocery_checks').getList(1, 200, {
+          filter: 'user = "' + userId + '" && week_start = "' + weekStart + '"'
+        });
+        var savedChecks = {};
+        for (var c of checksRes.items) {
+          savedChecks[c.item_key] = c.checked;
+        }
+        setCheckedItems(savedChecks);
+      } catch (err) {
+        console.log('No saved checks found');
+      }
 
-      for (const ing of allIngredients) {
-        const normName = normalizeName(ing.name);
-        const normUnit = normalizeUnit(ing.unit);
-        const key = `${normName}||${normUnit}`;
-
-        if (mergeMap.has(key)) {
-          const existing = mergeMap.get(key);
-          existing.qty += ing.qty;
-        } else {
-          mergeMap.set(key, {
-            displayName: toTitleCase(ing.name),
-            normName,
-            qty: ing.qty,
-            unit: ing.unit,
-            normUnit,
-            category: categorize(ing.name),
-          });
+      // Group by category
+      var allItems = Array.from(itemMap.values());
+      var grouped = {};
+      for (var item of allItems) {
+        if (!grouped[item.category]) grouped[item.category] = [];
+        grouped[item.category].push(item);
+      }
+      var sorted = [];
+      for (var cat of CATEGORY_ORDER) {
+        if (grouped[cat]) {
+          grouped[cat].sort(function(a, b) { return a.name.localeCompare(b.name); });
+          sorted.push({ category: cat, icon: CATEGORY_ICONS[cat], items: grouped[cat] });
         }
       }
-
-      // Group same normName with different units
-      const nameGroups = new Map();
-      for (const [, item] of mergeMap) {
-        if (!nameGroups.has(item.normName)) nameGroups.set(item.normName, []);
-        nameGroups.get(item.normName).push(item);
-      }
-
-      const finalList = [];
-      for (const [, variants] of nameGroups) {
-        if (variants.length === 1) {
-          finalList.push({ ...variants[0], hasVariants: false });
-        } else {
-          // Multiple units — keep separate but mark as siblings
-          const displayName = variants[0].displayName;
-          variants.forEach((v, i) => {
-            finalList.push({ ...v, displayName, isVariant: i > 0, hasVariants: true });
-          });
-        }
-      }
-
-      finalList.sort((a, b) => a.displayName.localeCompare(b.displayName));
-      setIngredients(finalList);
+      setGroceryGroups(sorted);
     } catch (err) {
-      console.error(err);
-      setError('Failed to load grocery list. Make sure you have a meal plan for this week.');
+      console.error('Grocery fetch error:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const toggleCheck = (key) => setChecked(prev => ({ ...prev, [key]: !prev[key] }));
-  const toggleCollapse = (cat) => setCollapsed(prev => ({ ...prev, [cat]: !prev[cat] }));
+  useEffect(function() {
+    fetchGrocery();
+  }, [weekStart, weekEnd]);
 
-  const grouped = ingredients.reduce((acc, ing) => {
-    const cat = ing.category;
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(ing);
-    return acc;
-  }, {});
+  async function toggleCheck(itemKey) {
+    var next = !checkedItems[itemKey];
+    setCheckedItems(function(prev) {
+      var copy = Object.assign({}, prev);
+      copy[itemKey] = next;
+      return copy;
+    });
+    try {
+      var userId = pb.authStore.model?.id;
+      var existing = await pb.collection('grocery_checks').getList(1, 1, {
+        filter: 'user = "' + userId + '" && week_start = "' + weekStart + '" && item_key = "' + itemKey + '"'
+      });
+      if (existing.items.length > 0) {
+        await pb.collection('grocery_checks').update(existing.items[0].id, { checked: next });
+      } else {
+        await pb.collection('grocery_checks').create({
+          user: userId,
+          week_start: weekStart,
+          item_key: itemKey,
+          checked: next
+        });
+      }
+    } catch (err) {
+      console.log('Error saving check: ' + err);
+    }
+  }
 
-  const categoryOrder = ['Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Pantry', 'Other'];
-  const checkedCount = Object.values(checked).filter(Boolean).length;
-  const total = ingredients.length;
+  function toggleCategory(cat) {
+    setCollapsedCats(function(prev) {
+      var copy = Object.assign({}, prev);
+      copy[cat] = !prev[cat];
+      return copy;
+    });
+  }
+
+  var totalItems = 0;
+  var totalChecked = 0;
+  for (var g of groceryGroups) {
+    for (var item of g.items) {
+      totalItems++;
+      var ck = item.name.toLowerCase().trim();
+      if (checkedItems[ck]) totalChecked++;
+    }
+  }
+  var pct = totalItems > 0 ? Math.round((totalChecked / totalItems) * 100) : 0;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
       </div>
     );
   }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Grocery List</h1>
-          <p className="text-sm text-gray-500 mt-0.5">From this week's meal plan</p>
-        </div>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-2xl font-bold text-gray-800">Grocery List</h1>
         <button
-          onClick={fetchAndAggregate}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
+          onClick={fetchGrocery}
+          className="flex items-center gap-1 px-3 py-1.5 text-sm border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
+          🔄 Refresh
         </button>
       </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-sm text-red-600">{error}</div>
-      )}
+      <p className="text-sm text-gray-500 mb-6">From this week's meal plan</p>
 
       {/* Progress bar */}
-      {total > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-5">
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
-            <span>{checkedCount} of {total} items checked</span>
-            <span className="font-medium text-green-600">{Math.round((checkedCount / total) * 100)}%</span>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className="border border-gray-200 rounded-lg p-4 mb-6">
+        <div className="flex justify-between text-sm mb-2">
+          <span className="text-gray-600">{totalChecked + ' of ' + totalItems + ' items checked'}</span>
+          <span className="text-green-600 font-medium">{pct + '%'}</span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2">
+          <div
+            className="bg-green-500 h-2 rounded-full transition-all"
+            style= width: pct + '%' 
+          ></div>
+        </div>
+      </div>
+
+      {groceryGroups.length === 0 && (
+        <div className="text-center py-12 text-gray-400">
+          <p className="text-lg mb-1">No items yet</p>
+          <p className="text-sm">Add meals to your planner to generate a grocery list</p>
+        </div>
+      )}
+
+      {/* Category groups */}
+      {groceryGroups.map(function(group) {
+        var isCollapsed = collapsedCats[group.category];
+        return (
+          <div key={group.category} className="border border-gray-200 rounded-lg mb-4 overflow-hidden">
             <div
-              className="h-full bg-green-500 rounded-full transition-all duration-300"
-              style={{ width: `${(checkedCount / total) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {ingredients.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
-          <div className="text-5xl mb-3">🛒</div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-1">No items yet</h3>
-          <p className="text-sm text-gray-400">Add recipes to your weekly meal plan to generate a grocery list.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {categoryOrder.filter(cat => grouped[cat]?.length > 0).map(cat => (
-            <div key={cat} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <button
-                onClick={() => toggleCollapse(cat)}
-                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors"
-              >
-                <span className="font-semibold text-gray-800 text-sm">{cat}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{grouped[cat].length} items</span>
-                  <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform ${collapsed[cat] ? '' : 'rotate-180'}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
-
-              {!collapsed[cat] && (
-                <ul className="divide-y divide-gray-50">
-                  {grouped[cat].map((ing, idx) => {
-                    const key = `${ing.normName}||${ing.normUnit}||${idx}`;
-                    const isChecked = checked[key];
-                    const displayQty = formatQty(ing.qty);
-                    const displayUnit = pluralizeUnit(ing.unit || ing.normUnit, ing.qty);
-
-                    return (
-                      <li
-                        key={key}
-                        className={`flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${ing.isVariant ? 'pl-9' : ''}`}
-                        onClick={() => toggleCheck(key)}
-                      >
-                        <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isChecked ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
-                          {isChecked && (
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                        <span className={`flex-1 text-sm transition-colors ${isChecked ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                          {ing.displayName}
-                        </span>
-                        <span className={`text-sm font-medium transition-colors ${isChecked ? 'text-gray-300' : 'text-gray-500'}`}>
-                          {displayQty} {displayUnit}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              className="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition"
+              onClick={function() { toggleCategory(group.category); }}
+            >
+              <span className="font-bold text-gray-700">{group.icon + ' ' + group.category}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-green-600">{group.items.length + ' items'}</span>
+                <span className="text-gray-400">{isCollapsed ? '▸' : '▾'}</span>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+            {!isCollapsed && (
+              <ul className="divide-y divide-gray-100">
+                {group.items.map(function(item, i) {
+                  var checkKey = item.name.toLowerCase().trim();
+                  var isChecked = !!checkedItems[checkKey];
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={function() { toggleCheck(checkKey); }}
+                    >
+                      <div className={'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ' + (isChecked ? 'bg-green-500 border-green-500' : 'border-gray-300')}>
+                        {isChecked && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={'flex-1 text-sm transition-colors ' + (isChecked ? 'line-through text-gray-300' : 'text-gray-700')}>
+                        {item.name}
+                      </span>
+                      {item.qty > 0 && (
+                        <span className={'text-xs flex-shrink-0 ' + (isChecked ? 'text-gray-300' : 'text-gray-500')}>
+                          {parseFloat(item.qty.toFixed(1))} {item.unit}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
