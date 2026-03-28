@@ -177,6 +177,20 @@ export default function HomePage() {
             }
           }
         }
+
+      try {
+      var checksRes = await pb.collection('grocery_checks').getList(1, 200, {
+        filter: 'user = "' + userId + '" && week_start = "' + weekStart + '"'
+        });
+      var savedChecks = {};
+      for (var c of checksRes.items) {
+      savedChecks[c.item_key] = c.checked;
+      }
+        setCheckedItems(savedChecks);
+        } catch (err) {
+        console.log('No saved checks found');
+        }
+
         var allItems = Array.from(itemMap.values());
         var grouped = {};
         for (var item of allItems) {
@@ -237,7 +251,32 @@ export default function HomePage() {
       setActiveCell(null);
     }
   };
-
+  async function toggleCheck(itemKey) {
+  var next = !checkedItems[itemKey];
+  setCheckedItems(function(prev) {
+    var copy = Object.assign({}, prev);
+    copy[itemKey] = next;
+    return copy;
+  });
+  try {
+    var userId = pb.authStore.model?.id;
+    var existing = await pb.collection('grocery_checks').getList(1, 1, {
+      filter: 'user = "' + userId + '" && week_start = "' + weekStart + '" && item_key = "' + itemKey + '"'
+    });
+    if (existing.items.length > 0) {
+      await pb.collection('grocery_checks').update(existing.items[0].id, { checked: next });
+    } else {
+      await pb.collection('grocery_checks').create({
+        user: userId,
+        week_start: weekStart,
+        item_key: itemKey,
+        checked: next
+      });
+    }
+  } catch (err) {
+    console.log('Error saving check: ' + err);
+  }
+}
   var removeSlot = async function(slotId) {
     try {
       await pb.collection('meal_slots').delete(slotId);
@@ -542,7 +581,7 @@ export default function HomePage() {
                             <li
                               key={i}
                               className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
-                              onClick={function() { setCheckedItems(function(prev) { var next = Object.assign({}, prev); next[checkKey] = !prev[checkKey]; return next; }); }}
+                              onClick={function() { toggleCheck(checkKey); }}
                             >
                               <div className={'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ' + (checkedItems[checkKey] ? 'bg-green-500 border-green-500' : 'border-gray-300')}>
                                 {checkedItems[checkKey] && (
