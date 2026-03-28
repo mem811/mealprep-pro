@@ -677,7 +677,7 @@ function DesktopRecipeCard({ recipe, servings, onRemove }) {
       {servings > 1 && (
         <span className="text-[9px] text-green-600 font-semibold">{servings}x</span>
       )}
-      <button
+      <button 
         onClick={function(e) { e.preventDefault(); e.stopPropagation(); onRemove(); }}
         className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white hidden group-hover/card:flex items-center justify-center shadow-sm"
       >
