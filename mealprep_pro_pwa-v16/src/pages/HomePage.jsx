@@ -101,43 +101,105 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const fetchGrocery = async () => {
-      try {
-        const userId = pb.authStore.model?.id;
-        if (!userId) return;
-        const res = await pb.collection('meal_slots').getList(1, 200, {
-          filter: 'meal_plan.user = "' + userId + '" && date >= "' + weekStart + '" && date <= "' + weekEnd + '"',
-          expand: 'recipe',
-        });
-        const itemMap = new Map();
-        for (const slot of res.items) {
-          const recipe = slot.expand?.recipe;
-          if (!recipe) continue;
-          const multiplier = slot.servings_multiplier || 1;
-          let ingList = [];
-          if (typeof recipe.ingredients === 'string') {
-            try { ingList = JSON.parse(recipe.ingredients); } catch(err) { ingList = []; }
-          } else if (Array.isArray(recipe.ingredients)) {
-            ingList = recipe.ingredients;
-          }
-          for (const ing of ingList) {
-            if (!ing.name?.trim()) continue;
-            const key = ing.name.toLowerCase().trim();
-            const qty = (parseFloat(ing.quantity) || 0) * multiplier;
-            if (itemMap.has(key)) {
-              itemMap.get(key).qty += qty;
-            } else {
-              itemMap.set(key, { name: ing.name.trim(), qty, unit: ing.unit || '' });
-            }
+  const CATEGORY_MAP = {
+    'flour': 'Baking', 'sugar': 'Baking', 'granulated sugar': 'Baking', 'powdered sugar': 'Baking',
+    'brown sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'cornstarch': 'Baking',
+    'vanilla extract': 'Baking', 'cocoa powder': 'Baking', 'chocolate chips': 'Baking', 'yeast': 'Baking',
+    'butter': 'Dairy', 'milk': 'Dairy', 'cream': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy',
+    'sour cream': 'Dairy', 'cream cheese': 'Dairy', 'buttermilk': 'Dairy', 'heavy cream': 'Dairy',
+    'egg': 'Dairy', 'eggs': 'Dairy',
+    'chicken': 'Protein', 'beef': 'Protein', 'pork': 'Protein', 'shrimp': 'Protein', 'fish': 'Protein',
+    'salmon': 'Protein', 'turkey': 'Protein', 'bacon': 'Protein', 'sausage': 'Protein', 'tofu': 'Protein',
+    'onion': 'Produce', 'garlic': 'Produce', 'tomato': 'Produce', 'tomatoes': 'Produce',
+    'lettuce': 'Produce', 'spinach': 'Produce', 'carrot': 'Produce', 'carrots': 'Produce',
+    'potato': 'Produce', 'potatoes': 'Produce', 'avocado': 'Produce', 'lemon': 'Produce',
+    'lime': 'Produce', 'bell pepper': 'Produce', 'celery': 'Produce', 'cucumber': 'Produce',
+    'broccoli': 'Produce', 'mushrooms': 'Produce', 'ginger': 'Produce', 'cilantro': 'Produce',
+    'parsley': 'Produce', 'basil': 'Produce', 'green onion': 'Produce', 'jalapeño': 'Produce',
+    'salt': 'Spices', 'pepper': 'Spices', 'cinnamon': 'Spices', 'paprika': 'Spices',
+    'cumin': 'Spices', 'oregano': 'Spices', 'thyme': 'Spices', 'nutmeg': 'Spices',
+    'chili powder': 'Spices', 'cayenne': 'Spices', 'turmeric': 'Spices', 'bay leaf': 'Spices',
+    'ground cinnamon': 'Spices', 'ground nutmeg': 'Spices', 'garlic powder': 'Spices',
+    'onion powder': 'Spices', 'red pepper flakes': 'Spices', 'black pepper': 'Spices',
+    'olive oil': 'Pantry', 'vegetable oil': 'Pantry', 'soy sauce': 'Pantry', 'vinegar': 'Pantry',
+    'honey': 'Pantry', 'maple syrup': 'Pantry', 'rice': 'Pantry', 'pasta': 'Pantry',
+    'bread': 'Pantry', 'tortillas': 'Pantry', 'broth': 'Pantry', 'stock': 'Pantry',
+    'coconut milk': 'Pantry', 'canned tomatoes': 'Pantry', 'tomato paste': 'Pantry',
+    'peanut butter': 'Pantry', 'almond butter': 'Pantry',
+  };
+
+  const CATEGORY_ICONS = {
+    'Produce': '🥬', 'Protein': '🥩', 'Dairy': '🥛', 'Baking': '🧁',
+    'Spices': '🧂', 'Pantry': '🫙', 'Other': '📦',
+  };
+
+  const categorizeItem = (name) => {
+    const lower = name.toLowerCase().trim();
+    if (CATEGORY_MAP[lower]) return CATEGORY_MAP[lower];
+    for (const [keyword, category] of Object.entries(CATEGORY_MAP)) {
+      if (lower.includes(keyword) || keyword.includes(lower)) return category;
+    }
+    return 'Other';
+  };
+
+  const fetchGrocery = async () => {
+    try {
+      const userId = pb.authStore.model?.id;
+      if (!userId) return;
+      const res = await pb.collection('meal_slots').getList(1, 200, {
+        filter: 'meal_plan.user = "' + userId + '" && date >= "' + weekStart + '" && date <= "' + weekEnd + '"',
+        expand: 'recipe',
+      });
+      const itemMap = new Map();
+      for (const slot of res.items) {
+        const recipe = slot.expand?.recipe;
+        if (!recipe) continue;
+        const multiplier = slot.servings_multiplier || 1;
+        let ingList = [];
+        if (typeof recipe.ingredients === 'string') {
+          try { ingList = JSON.parse(recipe.ingredients); } catch(err) { ingList = []; }
+        } else if (Array.isArray(recipe.ingredients)) {
+          ingList = recipe.ingredients;
+        }
+        for (const ing of ingList) {
+          if (!ing.name?.trim()) continue;
+          const key = ing.name.toLowerCase().trim();
+          const qty = (parseFloat(ing.quantity) || 0) * multiplier;
+          if (itemMap.has(key)) {
+            itemMap.get(key).qty += qty;
+          } else {
+            itemMap.set(key, {
+              name: ing.name.trim(),
+              qty,
+              unit: ing.unit || '',
+              category: categorizeItem(ing.name),
+            });
           }
         }
-        setGroceryItems(Array.from(itemMap.values()).slice(0, 12));
-      } catch (e) {
-        console.error('Fetch grocery error:', e);
       }
-    };
-    fetchGrocery();
-  }, [weekStart, weekEnd]);
+
+      const allItems = Array.from(itemMap.values());
+      const grouped = {};
+      for (const item of allItems) {
+        if (!grouped[item.category]) grouped[item.category] = [];
+        grouped[item.category].push(item);
+      }
+
+      const categoryOrder = ['Produce', 'Protein', 'Dairy', 'Baking', 'Spices', 'Pantry', 'Other'];
+      const sorted = [];
+      for (const cat of categoryOrder) {
+        if (grouped[cat]) {
+          sorted.push({ category: cat, icon: CATEGORY_ICONS[cat], items: grouped[cat] });
+        }
+      }
+
+      setGroceryItems(sorted);
+    } catch (e) {
+      console.error('Fetch grocery error:', e);
+    }
+  };
+  fetchGrocery();
+}, [weekStart, weekEnd]);
 
   const openModal = (date, mealType) => {
     setActiveCell({ date, mealType });
@@ -466,34 +528,49 @@ export default function HomePage() {
               <p className="text-xs text-gray-400 italic p-4">Add meals to generate your list</p>
             ) : (
               <ul className="divide-y divide-gray-50">
-                {groceryItems.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }))}
-                  >
-                    <div className={'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ' + (checkedItems[i] ? 'bg-green-500 border-green-500' : 'border-gray-300')}>
-                      {checkedItems[i] && (
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className={'flex-1 text-xs transition-colors ' + (checkedItems[i] ? 'line-through text-gray-300' : 'text-gray-700')}>
-                      {item.name}
-                    </span>
-                    {item.qty > 0 && (
-                      <span className={'text-xs flex-shrink-0 ' + (checkedItems[i] ? 'text-gray-300' : 'text-gray-400')}>
-                        {parseFloat(item.qty.toFixed(1))} {item.unit}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                {groceryItems.length === 0 ? (
+  <p className="text-xs text-gray-400 italic p-4">Add meals to generate your list</p>
+) : (
+  <div className="max-h-[500px] overflow-y-auto">
+    {groceryItems.map((group, gi) => (
+      <div key={gi}>
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+            {group.icon} {group.category}
+          </span>
         </div>
+        <ul className="divide-y divide-gray-50">
+          {group.items.map((item, i) => {
+            const checkKey = group.category + '_' + i;
+            return (
+              <li
+                key={i}
+                className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => setCheckedItems(prev => ({ ...prev, [checkKey]: !prev[checkKey] }))}
+              >
+                <div className={'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ' + (checkedItems[checkKey] ? 'bg-green-500 border-green-500' : 'border-gray-300')}>
+                  {checkedItems[checkKey] && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className={'flex-1 text-xs transition-colors ' + (checkedItems[checkKey] ? 'line-through text-gray-300' : 'text-gray-700')}>
+                  {item.name}
+                </span>
+                {item.qty > 0 && (
+                  <span className={'text-xs flex-shrink-0 ' + (checkedItems[checkKey] ? 'text-gray-300' : 'text-gray-400')}>
+                    {parseFloat(item.qty.toFixed(1))} {item.unit}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </div>
+    ))}
+  </div>
+)}
 
       {/* Recent Recipes */}
       <div className="mt-6">
