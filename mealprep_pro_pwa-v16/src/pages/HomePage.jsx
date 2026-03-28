@@ -285,7 +285,7 @@ export default function HomePage() {
           </div>
         </div>
         {todayNutrition.calories > 0 && (
-          <div className="flex items-center gap-4 mt-3 text-emerald-100 text-xs font-bold">
+         <div className="flex items-center justify-end gap-4 mt-3 text-emerald-100 text-xs font-bold">
             <span>🔥 {todayNutrition.calories} cal</span>
             <span>P {todayNutrition.protein}g</span>
             <span>C {todayNutrition.carbs}g</span>
