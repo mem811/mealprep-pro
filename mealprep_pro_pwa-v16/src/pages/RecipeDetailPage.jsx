@@ -144,28 +144,21 @@ export default function RecipeDetailPage() {
     const data = await res.json();
     const result = Array.isArray(data) ? data[0] : data;
 
-   if (result.nutrition) {
+       if (result.nutrition) {
       const raw = typeof result.nutrition === 'string' ? JSON.parse(result.nutrition) : result.nutrition;
-   
-  const n = {
-    calories: Math.round(raw.calories || 0),
-    protein: Math.round(raw.protein || 0),
-    carbs: Math.round(raw.carbs || 0),
-    fat: Math.round(raw.fat || 0),
-  };
+      console.log('Parsed nutrition:', raw);
+      const n = {
+        calories: Math.round(raw.calories || 0),
+        protein: Math.round(raw.protein || 0),
+        carbs: Math.round(raw.carbs || 0),
+        fat: Math.round(raw.fat || 0),
+      };
 
-        await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
+      await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
       setNutrition(n);
     } else {
       setNutritionError('No nutrition found. Use manual entry below.');
     }
-  } catch (err) {
-    console.error('Nutrition fetch error:', err);
-    setNutritionError('Failed to fetch nutrition. Try manual entry.');
-  } finally {
-    setFetchingNutrition(false);
-  }
-};
   } catch (err) {
     console.error('Nutrition fetch error:', err);
     setNutritionError('Failed to fetch nutrition. Try manual entry.');
