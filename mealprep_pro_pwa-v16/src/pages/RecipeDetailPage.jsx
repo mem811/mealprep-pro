@@ -119,85 +119,44 @@ export default function RecipeDetailPage() {
     window.print();
   };
 
-  const handleFetchNutrition = async () => {
+ const handleFetchNutrition = async () => {
   if (!recipe) return;
   setFetchingNutrition(true);
   setNutritionError('');
-  const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
-  let n = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  const servingCount = recipe.servings || 1;
-  console.log('Ingredients:', recipe.ingredients);
-  console.log('Ingredients type:', typeof recipe.ingredients);
-  console.log('Source URL:', recipe.source_url);
 
   try {
-    // Method 1: Try URL extraction first
-    if (recipe.source_url) {
-      const res = await fetch(
-        `https://api.spoonacular.com/recipes/extract?url=${encodeURIComponent(recipe.source_url)}&addRecipeNutrition=true&apiKey=${apiKey}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.nutrition?.nutrients) {
-         
-          const servingCount = recipe.servings || 1;
-          n = {
-            calories: Math.round(nutrients.find(x => x.name === 'Calories')?.amount || 0),
-            protein: Math.round(nutrients.find(x => x.name === 'Protein')?.amount || 0),
-            carbs: Math.round(nutrients.find(x => x.name === 'Carbohydrates')?.amount || 0),
-            fat: Math.round(nutrients.find(x => x.name === 'Fat')?.amount || 0),
-          };
-        }
+    if (!recipe.source_url) {
+      setNutritionError('No source URL. Use manual entry below.');
+      setFetchingNutrition(false);
+      return;
+    }
+
+    const res = await fetch(
+      'https://n8n.srv1052955.hstgr.cloud/webhook/5ea8e8c8-94bf-41e7-8ffa-5dd843cdfe13',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: recipe.source_url }),
       }
+    );
+
+    if (!res.ok) throw new Error(`Fetch error: ${res.status}`);
+    const data = await res.json();
+
+    if (data.nutrition) {
+      const raw = typeof data.nutrition === 'string' ? JSON.parse(data.nutrition) : data.nutrition;
+      const n = {
+        calories: Math.round(raw.calories || 0),
+        protein: Math.round(raw.protein || 0),
+        carbs: Math.round(raw.carbs || 0),
+        fat: Math.round(raw.fat || 0),
+      };
+
+      await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
+      setNutrition(n);
+    } else {
+      setNutritionError('No nutrition found. Use manual entry below.');
     }
-
-    // Method 2: If URL extraction returned zeros, try parsing ingredients
-    if (n.calories === 0 && n.protein === 0 && recipe.ingredients?.length) {
-      const ingredientList = Array.isArray(recipe.ingredients)
-  ? recipe.ingredients.map(i =>
-      typeof i === 'object'
-        ? `${i.quantity || ''} ${i.unit || ''} ${i.name || ''}`.trim()
-        : i
-    ).join('\n')
-  : recipe.ingredients;
-
-      const res2 = await fetch(
-        `https://api.spoonacular.com/recipes/parseIngredients?apiKey=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `ingredientList=${encodeURIComponent(ingredientList)}&servings=${recipe.servings || 1}&includeNutrition=true`,
-        }
-      );
-
-      if (res2.ok) {
-        const parsed = await res2.json();
-        let totalCal = 0, totalPro = 0, totalCarb = 0, totalFat = 0;
-
-        parsed.forEach(item => {
-          const nuts = item.nutrition?.nutrients || [];
-          totalCal += nuts.find(x => x.name === 'Calories')?.amount || 0;
-          totalPro += nuts.find(x => x.name === 'Protein')?.amount || 0;
-          totalCarb += nuts.find(x => x.name === 'Carbohydrates')?.amount || 0;
-          totalFat += nuts.find(x => x.name === 'Fat')?.amount || 0;
-        });
-
-        n = {
-          calories: Math.round(totalCal / servingCount),
-          protein: Math.round(totalPro / servingCount),
-          carbs: Math.round(totalCarb / servingCount),
-          fat: Math.round(totalFat / servingCount),
-        };
-      }
-    }
-
-    // If still zeros after both methods, show a message
-    if (n.calories === 0 && n.protein === 0 && n.carbs === 0 && n.fat === 0) {
-      setNutritionError('Could not auto-detect nutrition. Use manual entry below.');
-    }
-
-    await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
-    setNutrition(n);
   } catch (err) {
     console.error('Nutrition fetch error:', err);
     setNutritionError('Failed to fetch nutrition. Try manual entry.');
