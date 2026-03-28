@@ -33,7 +33,6 @@ function getProxiedImage(url) {
   if (!url) return null;
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=80&h=80&fit=cover&q=80`;
 }
-
 export default function HomePage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(fmt(new Date()));
@@ -184,4 +183,4 @@ export default function HomePage() {
 
   const removeSlot = async (slotId) => {
     try {
-      await pb.collection('meal_slots').
+      await pb.collection('meal_slots').delete(slotId);
