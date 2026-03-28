@@ -3,16 +3,16 @@ import pb from '../lib/pb';
 import RecipePickerModal from '../components/RecipePickerModal';
 import { Plus, ChevronLeft, ChevronRight, X, Utensils } from 'lucide-react';
 
-const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
-const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
-const MEAL_COLORS = {
+var MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+var MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+var MEAL_COLORS = {
   breakfast: 'from-amber-50 to-orange-50 border-amber-200',
   lunch: 'from-green-50 to-emerald-50 border-green-200',
   dinner: 'from-blue-50 to-indigo-50 border-blue-200',
   snack: 'from-purple-50 to-pink-50 border-purple-200',
 };
 
-const CATEGORY_MAP = {
+var CATEGORY_MAP = {
   'flour': 'Baking', 'sugar': 'Baking', 'granulated sugar': 'Baking', 'powdered sugar': 'Baking',
   'brown sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'cornstarch': 'Baking',
   'vanilla extract': 'Baking', 'cocoa powder': 'Baking', 'chocolate chips': 'Baking', 'yeast': 'Baking',
@@ -579,13 +579,18 @@ export default function HomePage() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {featuredRecipes.map(function(recipe) {
+            var nut = null;
+            if (recipe.nutrition) {
+              nut = typeof recipe.nutrition === 'string' ? JSON.parse(recipe.nutrition) : recipe.nutrition;
+            }
             return (
               <a
                 key={recipe.id}
                 href={'/recipes/' + recipe.id}
                 className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 hover:shadow-md transition-shadow group"
+                title={recipe.title}
               >
-                <div className="w-full aspect-square rounded-xl overflow-hidden bg-emerald-50 mb-2">
+                <div className="w-full aspect-square rounded-xl overflow-hidden bg-emerald-50 mb-2 relative">
                   {recipe.image_url ? (
                     <img src={recipe.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={recipe.title} />
                   ) : (
@@ -593,6 +598,18 @@ export default function HomePage() {
                       <Utensils size={24} className="text-emerald-300" />
                     </div>
                   )}
+                  <div className="absolute bottom-1.5 left-1.5 flex gap-1">
+                    {nut && nut.calories > 0 && (
+                      <span className="bg-white/90 backdrop-blur-sm text-[9px] font-bold text-emerald-700 px-1.5 py-0.5 rounded-full">
+                        🔥 {nut.calories}
+                      </span>
+                    )}
+                    {recipe.cook_time && (
+                      <span className="bg-white/90 backdrop-blur-sm text-[9px] font-bold text-gray-600 px-1.5 py-0.5 rounded-full">
+                        ⏱ {recipe.cook_time}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
@@ -641,24 +658,24 @@ function DesktopRecipeCard({ recipe, servings, onRemove }) {
   var proxied = !imgError && recipe.image_url ? getProxiedImage(recipe.image_url) : null;
 
   return (
-    <a href={'/recipes/' + recipe.id} className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-1.5 py-1 group/card relative hover:bg-green-50 transition-colors">
+    <a href={'/recipes/' + recipe.id} className="flex flex-col items-center gap-1 bg-gray-50 rounded-lg p-1.5 group/card relative hover:bg-green-50 transition-colors" title={recipe.title}>
       {proxied ? (
         <img
           src={proxied}
           alt={recipe.title}
-          className="w-7 h-7 rounded-md object-cover flex-shrink-0"
+          className="w-full h-12 rounded-md object-cover"
           onError={function() { setImgError(true); }}
         />
       ) : (
-        <div className="w-7 h-7 rounded-md bg-green-100 flex items-center justify-center flex-shrink-0">
-          <Utensils size={12} className="text-green-500" />
+        <div className="w-full h-12 rounded-md bg-green-100 flex items-center justify-center">
+          <Utensils size={16} className="text-green-500" />
         </div>
       )}
-      <span className="text-xs text-gray-700 font-medium leading-tight flex-1 line-clamp-2" title={recipe.title}>
+      <span className="text-[10px] text-gray-700 font-medium leading-tight text-center line-clamp-1 w-full">
         {recipe.title}
       </span>
       {servings > 1 && (
-        <span className="text-[10px] text-green-600 font-semibold flex-shrink-0">{servings}x</span>
+        <span className="text-[9px] text-green-600 font-semibold">{servings}x</span>
       )}
       <button
         onClick={function(e) { e.preventDefault(); e.stopPropagation(); onRemove(); }}
