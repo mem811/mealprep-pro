@@ -139,6 +139,7 @@ export default function RecipeDetailPage() {
         const data = await res.json();
         if (data.nutrition?.nutrients) {
           const nutrients = data.nutrition.nutrients;
+          const servingCount = recipe.servings || 1;
           n = {
             calories: Math.round(nutrients.find(x => x.name === 'Calories')?.amount || 0),
             protein: Math.round(nutrients.find(x => x.name === 'Protein')?.amount || 0),
