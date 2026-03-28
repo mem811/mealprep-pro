@@ -154,12 +154,18 @@ export default function RecipeDetailPage() {
     fat: Math.round(raw.fat || 0),
   };
 
-  await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
-  setNutrition(n);
-} else {
-
-    
+        await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
+      setNutrition(n);
+    } else {
+      setNutritionError('No nutrition found. Use manual entry below.');
     }
+  } catch (err) {
+    console.error('Nutrition fetch error:', err);
+    setNutritionError('Failed to fetch nutrition. Try manual entry.');
+  } finally {
+    setFetchingNutrition(false);
+  }
+};
   } catch (err) {
     console.error('Nutrition fetch error:', err);
     setNutritionError('Failed to fetch nutrition. Try manual entry.');
