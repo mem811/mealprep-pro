@@ -4,8 +4,8 @@ import pb from "./pb";
 export async function listFoodLogsByDate(dateStr) {
   return pb.collection("food_log").getFullList({
     filter: `date = "${dateStr}"`,
-    sort: "created",            // timeline order (oldest -> newest)
-    expand: "recipe",           // optional, if you want recipe details later
+    sort: "created",
+    expand: "recipe",
   });
 }
 
