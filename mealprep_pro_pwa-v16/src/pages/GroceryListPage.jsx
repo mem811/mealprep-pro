@@ -224,10 +224,10 @@ export default function GroceryListPage() {
           <span className="text-green-600 font-medium">{pct + '%'}</span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-2">
-          <div
-            className="bg-green-500 h-2 rounded-full transition-all"
-            style= width: pct + '%'  
-          ></div>
+        <div
+          className="bg-green-500 h-2 rounded-full transition-all"
+          style={ { width: pct + '%' } }
+        ></div>
         </div>
       </div>
 
