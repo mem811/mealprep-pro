@@ -9,7 +9,7 @@ import RecipeFormPage from './pages/RecipeFormPage';
 import RecipeDetailPage from './pages/RecipeDetailPage';
 import GroceryListPage from './pages/GroceryListPage';
 import ProfilePage from './pages/ProfilePage';
-import FoodLogPage from './pages/FoodLogPage';
+import FoodLogPage from './pages/FoodLogPage.jsx';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
