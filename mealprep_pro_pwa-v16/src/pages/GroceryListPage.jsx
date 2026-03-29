@@ -29,13 +29,13 @@ var CATEGORY_MAP = {
 };
 
 var CATEGORY_ICONS = {
-  'Produce': '\u{1F96C}',
-  'Protein': '\u{1F969}',
-  'Dairy': '\u{1F95B}',
-  'Baking': '\u{1F9C1}',
-  'Spices': '\u{1F9C2}',
-  'Pantry': '\u{1FAD9}',
-  'Other': '\u{1F4E6}'
+  'Produce': '🥬',
+  'Protein': '🥩',
+  'Dairy': '🥛',
+  'Baking': '🧁',
+  'Spices': '🧂',
+  'Pantry': '🫙',
+  'Other': '📦'
 };
 
 var CATEGORY_ORDER = ['Produce', 'Protein', 'Dairy', 'Baking', 'Spices', 'Pantry', 'Other'];
