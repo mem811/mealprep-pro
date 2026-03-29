@@ -9,6 +9,7 @@ import RecipeFormPage from './pages/RecipeFormPage';
 import RecipeDetailPage from './pages/RecipeDetailPage';
 import GroceryListPage from './pages/GroceryListPage';
 import ProfilePage from './pages/ProfilePage';
+import FoodLogPage from './pages/FoodLogPage';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ function AppRoutes() {
         <Route path="recipes/:id" element={<RecipeDetailPage />} />
         <Route path="grocery-list" element={<GroceryListPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="food-log" element={<FoodLogPage />} />
       </Route>
     </Routes>
   );
