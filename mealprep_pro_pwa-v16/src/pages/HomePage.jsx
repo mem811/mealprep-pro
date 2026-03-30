@@ -233,7 +233,48 @@ export default function HomePage() {
     }
     fetchRecipes();
   }, []);
+  useEffect(
+  function () {
+    async function fetchLoggedForWeek() {
+      try {
+        var userId = pb.authStore.model?.id;
+        if (!userId) return;
 
+        // Pull logs for the visible week and map source_slot_id -> logged
+        var res = await pb.collection("food_log").getList(1, 500, {
+          filter:
+            'user = "' +
+            userId +
+            '" && date >= "' +
+            weekStart +
+            '" && date <= "' +
+            weekEnd +
+            '" && source_slot_id != ""',
+        });
+
+        var nextLogged = {};
+        for (var log of res.items) {
+          if (!log.source_slot_id) continue;
+
+          // We don't know mealType/date from the log reliably here,
+          // so we mark by slotId across the UI using a wildcard key format.
+          // We'll store "slotId-only" keys and check them in the button.
+          nextLogged["SLOT**" + log.source_slot_id] = true;
+        }
+
+        setLoggedSlots(function (prev) {
+          // merge (keep any optimistic locks too)
+          return Object.assign({}, prev, nextLogged);
+        });
+      } catch (e) {
+        console.error("Fetch logged food logs error:", e);
+      }
+    }
+
+    fetchLoggedForWeek();
+  },
+  [weekStart, weekEnd]
+);
   useEffect(
     function () {
       async function fetchGrocery() {
@@ -409,7 +450,7 @@ export default function HomePage() {
     var slotKey = date + "**" + mealType + "**" + slotId;
 
     // front-end lock (prevents double-click spam)
-    if (loggedSlots[slotKey]) return;
+    if (loggedSlots[slotKey] || loggedSlots["SLOT**" + slotId]) return;
 
     setLoggedSlots(function (prev) {
       var copy = Object.assign({}, prev);
@@ -427,7 +468,7 @@ export default function HomePage() {
       // Permanent guard: check DB for existing log from this slotId
       // NOTE: PB filter strings must use double quotes.
       var existing = await pb.collection("food_log").getList(1, 1, {
-        filter: `source_slot_id = "${slotId}"`,
+       filter: `source_slot_id = "${slotId}"`,
       });
 
       if (existing.items.length > 0) {
