@@ -16,7 +16,9 @@ export default function FoodLogPage() {
   const [entries, setEntries] = useState([]); // ALWAYS array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const [deletingId, setDeletingId] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null); // { id, name } | null
 
   useEffect(() => {
     let alive = true;
@@ -58,14 +60,20 @@ export default function FoodLogPage() {
     );
   }, [entries]);
 
-  async function handleDelete(id) {
-    if (!id) return;
-    if (!confirm("Delete this entry?")) return;
+  function requestDelete(entry) {
+    setConfirmDelete({ id: entry.id, name: entry.name });
+  }
+
+  async function confirmDeleteNow() {
+    if (!confirmDelete?.id) return;
 
     try {
-      setDeletingId(id);
-      await deleteFoodLogEntry(id);
-      setEntries((prev) => prev.filter((e) => e.id !== id));
+      setDeletingId(confirmDelete.id);
+      await deleteFoodLogEntry(confirmDelete.id);
+
+      // remove from UI immediately
+      setEntries((prev) => prev.filter((e) => e.id !== confirmDelete.id));
+      setConfirmDelete(null);
     } catch (err) {
       alert(err?.message || "Failed to delete entry.");
     } finally {
@@ -142,7 +150,7 @@ export default function FoodLogPage() {
                     </div>
 
                     <button
-                      onClick={() => handleDelete(e.id)}
+                      onClick={() => requestDelete(e)}
                       disabled={deletingId === e.id}
                       className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
                     >
@@ -163,6 +171,42 @@ export default function FoodLogPage() {
           </ul>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => (deletingId ? null : setConfirmDelete(null))}
+          />
+
+          <div className="relative w-[92%] max-w-sm rounded-2xl bg-white shadow-xl border border-gray-100 p-4">
+            <div className="text-sm font-semibold text-gray-900">Delete entry?</div>
+            <div className="mt-1 text-sm text-gray-600">
+              This will permanently delete{" "}
+              <span className="font-medium">{confirmDelete.name || "this entry"}</span>.
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 disabled:opacity-50"
+                onClick={() => setConfirmDelete(null)}
+                disabled={!!deletingId}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                onClick={confirmDeleteNow}
+                disabled={!!deletingId}
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
