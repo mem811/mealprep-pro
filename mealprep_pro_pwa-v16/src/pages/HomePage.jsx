@@ -166,6 +166,7 @@ export default function HomePage() {
 	const [featuredRecipes, setFeaturedRecipes] = useState([]);
 	const [groceryGroups, setGroceryGroups] = useState([]);
 	const [checkedItems, setCheckedItems] = useState({});
+	const [loggedSlots, setLoggedSlots] = useState({});
 
 	const today = fmt(new Date());
 	var baseDate = new Date();
@@ -424,6 +425,30 @@ export default function HomePage() {
 
 	// ✅ Ate this handler
 	var handleAteThis = async function (date, mealType, item) {
+  var slotKey = date + "**" + mealType + "**" + item?.slotId;
+
+  if (!item?.slotId) return;
+  if (loggedSlots[slotKey]) return; // already logged, block duplicates
+
+  setLoggedSlots(function(prev) {
+    var copy = Object.assign({}, prev);
+    copy[slotKey] = true;
+    return copy;
+  });
+
+  try {
+    // ... your existing code stays here ...
+  } catch (e) {
+    // if it failed, unlock the button again
+    setLoggedSlots(function(prev) {
+      var copy = Object.assign({}, prev);
+      copy[slotKey] = false;
+      return copy;
+    });
+
+    console.error("Ate this error:", e);
+  }
+};
 		try {
 			var userId = pb.authStore.model?.id;
 			if (!userId) return;
@@ -771,6 +796,7 @@ export default function HomePage() {
 												) : (
 													<div className="space-y-2">
 														{cellSlots.map(function (cs) {
+														var slotKey = selectedDay + "**" + meal + "**" + cs.slotId;
 															return (
 																<div key={cs.slotId} className="space-y-1">
 																	<MobileRecipeCard
