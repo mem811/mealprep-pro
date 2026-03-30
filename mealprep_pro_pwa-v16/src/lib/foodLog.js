@@ -1,7 +1,15 @@
 import pb from "./pb";
 
+/**
+ * List food log entries for a given day.
+ * IMPORTANT: This uses UTC day boundaries so it matches the PocketBase admin UI
+ * while you're manually creating test records there.
+ *
+ * @param {string} dateStr - "YYYY-MM-DD"
+ * @returns PocketBase list result { page, perPage, totalItems, items: [...] }
+ */
 export async function listFoodLogsByDate(dateStr) {
-  // dateStr like "2026-03-30"
+  // Build a UTC day range: [start, nextDayStart)
   const start = new Date(`${dateStr}T00:00:00.000Z`);
   const end = new Date(`${dateStr}T00:00:00.000Z`);
   end.setUTCDate(end.getUTCDate() + 1);
@@ -13,17 +21,26 @@ export async function listFoodLogsByDate(dateStr) {
   });
 }
 
+/**
+ * Create a food log entry.
+ * For later (when you add an in-app entry form):
+ * - pass dateStr: "YYYY-MM-DD"
+ * - we store it at UTC noon so it never shifts days across timezones
+ */
 export async function createFoodLogEntry(data) {
-  // Expect data.dateStr like "YYYY-MM-DD"
-  // Store as local noon to avoid timezone day-shifts
-  const dateStr = data.dateStr || data.date; // depending on what you’re currently sending
-  const localNoon = new Date(`${dateStr}T12:00:00`); // LOCAL 12:00
+  // allow either { dateStr } or { date }
+  const dateStr = data.dateStr || data.date;
+
+  // store at UTC noon for stability across timezones
+  const utcNoonIso = new Date(`${dateStr}T12:00:00.000Z`).toISOString();
+
   const payload = {
     ...data,
-    date: localNoon.toISOString(),
+    date: utcNoonIso,
   };
 
-  delete payload.dateStr; // keep only "date" for PB
+  delete payload.dateStr;
+
   return pb.collection("food_log").create(payload);
 }
 
