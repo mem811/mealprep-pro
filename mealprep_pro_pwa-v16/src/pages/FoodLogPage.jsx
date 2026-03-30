@@ -1,22 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { listFoodLogsByDate } from "../lib/foodLog";
 
-function toDateOnlyLocal(date = new Date()) {
-  // local date -> YYYY-MM-DD
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function addDays(dateStr, deltaDays) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + deltaDays);
-  return toDateOnlyLocal(d);
-}
 
 export default function FoodLogPage() {
-  const [dateStr, setDateStr] = useState(toDateOnlyLocal());
+  const [dateStr, setDateStr] = useState(toDateOnlyUTC());
   const [entries, setEntries] = useState([]); // ALWAYS an array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -69,7 +56,7 @@ export default function FoodLogPage() {
       <div className="flex items-center justify-between gap-3">
         <button
           className="px-3 py-2 rounded bg-gray-100"
-          onClick={() => setDateStr(addDays(dateStr, -1))}
+          onClick={() => setDateStr(addDaysUTC(dateStr, -1))}
         >
           Prev
         </button>
@@ -78,7 +65,7 @@ export default function FoodLogPage() {
 
         <button
           className="px-3 py-2 rounded bg-gray-100"
-          onClick={() => setDateStr(addDays(dateStr, 1))}
+          onClick={() => setDateStr(addDaysUTC(dateStr, 1))}
         >
           Next
         </button>
