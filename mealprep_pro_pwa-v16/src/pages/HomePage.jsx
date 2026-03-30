@@ -5,12 +5,7 @@ import { createFoodLogEntry } from "../lib/foodLog";
 import { Plus, ChevronLeft, ChevronRight, X, Utensils } from "lucide-react";
 
 var MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"];
-var MEAL_LABELS = {
-	breakfast: "Breakfast",
-	lunch: "Lunch",
-	dinner: "Dinner",
-	snack: "Snack",
-};
+var MEAL_LABELS = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack" };
 
 var MEAL_COLORS = {
 	breakfast: "from-amber-50/80 to-orange-50/80 border-amber-200/60",
@@ -118,16 +113,7 @@ var CATEGORY_MAP = {
 	"almond butter": "Pantry",
 };
 
-var CATEGORY_ICONS = {
-	Produce: "🥬",
-	Protein: "🥩",
-	Dairy: "🥛",
-	Baking: "🧁",
-	Spices: "🧂",
-	Pantry: "🫙",
-	Other: "📦",
-};
-
+var CATEGORY_ICONS = { Produce: "🥬", Protein: "🥩", Dairy: "🥛", Baking: "🧁", Spices: "🧂", Pantry: "🫙", Other: "📦" };
 var CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Baking", "Spices", "Pantry", "Other"];
 
 function categorizeItem(name) {
@@ -144,7 +130,6 @@ function getWeekDays(baseDate) {
 	var monday = new Date(baseDate);
 	monday.setDate(baseDate.getDate() - ((day + 6) % 7));
 	monday.setHours(0, 0, 0, 0);
-
 	return Array.from({ length: 7 }, function (_, i) {
 		var d = new Date(monday);
 		d.setDate(monday.getDate() + i);
@@ -158,7 +143,7 @@ function fmt(d) {
 
 function getProxiedImage(url) {
 	if (!url) return null;
-	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=120&h=120&fit=cover&q=80";
+	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=200&h=200&fit=cover&q=85";
 }
 
 export default function HomePage() {
@@ -172,9 +157,7 @@ export default function HomePage() {
 	const [featuredRecipes, setFeaturedRecipes] = useState([]);
 	const [groceryGroups, setGroceryGroups] = useState([]);
 	const [checkedItems, setCheckedItems] = useState({});
-
-	// persisted + optimistic "Logged"
-	const [loggedSlots, setLoggedSlots] = useState({});
+	const [loggedSlots, setLoggedSlots] = useState({}); // "SLOT**<slotId>" and "<date>**<mealType>**<slotId>"
 
 	var today = fmt(new Date());
 	var baseDate = new Date();
@@ -228,7 +211,6 @@ export default function HomePage() {
 		[fetchSlots]
 	);
 
-	// Persist Logged for visible week
 	useEffect(
 		function () {
 			async function fetchLoggedForWeek() {
@@ -265,7 +247,7 @@ export default function HomePage() {
 				var userId = pb.authStore.model?.id;
 				if (!userId) return;
 
-				var res = await pb.collection("recipes").getList(1, 6, {
+				var res = await pb.collection("recipes").getList(1, 12, {
 					filter: `user = "${userId}"`,
 					sort: "-created",
 				});
@@ -336,9 +318,7 @@ export default function HomePage() {
 							savedChecks[c.item_key] = c.checked;
 						}
 						setCheckedItems(savedChecks);
-					} catch {
-						// no saved checks
-					}
+					} catch {}
 
 					var allItems = Array.from(itemMap.values());
 					var grouped = {};
@@ -453,14 +433,12 @@ export default function HomePage() {
 		}
 	};
 
-	// ✅ Ate this: permanent guard + create
 	var handleAteThis = async function (date, mealType, item) {
 		var slotId = item?.slotId;
 		if (!slotId) return;
-
 		if (isLogged(date, mealType, slotId)) return;
 
-		// Optimistic lock
+		// optimistic lock
 		setLoggedSlots(function (prev) {
 			var copy = Object.assign({}, prev);
 			copy["SLOT**" + slotId] = true;
@@ -475,7 +453,6 @@ export default function HomePage() {
 			var existing = await pb.collection("food_log").getList(1, 1, {
 				filter: `source_slot_id = "${slotId}"`,
 			});
-
 			if (existing.items.length > 0) return;
 
 			var recipe = item?.recipe;
@@ -509,7 +486,6 @@ export default function HomePage() {
 				delete copy[date + "**" + mealType + "**" + slotId];
 				return copy;
 			});
-
 			console.error("Ate this error:", e);
 			alert(e?.message || "Failed to log food.");
 		}
@@ -517,9 +493,10 @@ export default function HomePage() {
 
 	var DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-	// Dribbble-ish wrapper styles
+	// Style wrappers
 	var pageBg = "min-h-screen bg-gradient-to-b from-emerald-50/70 via-teal-50/30 to-white";
-	var shellCard = "bg-white/80 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-xl shadow-emerald-100/50";
+	var shellCard =
+		"bg-white/80 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-xl shadow-emerald-100/50";
 	var softBtn =
 		"px-3 py-2 rounded-2xl bg-white/90 border border-emerald-100 text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors";
 
@@ -596,7 +573,7 @@ export default function HomePage() {
 					</div>
 
 					{/* Today hero */}
-					<div className="rounded-[28px] p-5 text-white shadow-lg shadow-emerald-200/40 mb-6" style={todayCardStyle}>
+					<div className="rounded-[28px] p-5 text-white shadow-lg shadow-emerald-200/40 mb-5" style={todayCardStyle}>
 						<div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
 							<div className="flex-shrink-0">
 								<p className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-0.5">Today</p>
@@ -623,7 +600,6 @@ export default function HomePage() {
 												<div className="flex flex-col gap-2">
 													{tm.items.map(function (item) {
 														var disabled = isLogged(today, tm.meal, item.slotId);
-
 														return (
 															<div key={item.slotId} className="flex items-start gap-2">
 																<div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0" style={recipeThumbStyle}>
@@ -637,7 +613,9 @@ export default function HomePage() {
 																</div>
 
 																<div className="flex-1 min-w-0">
-																	<p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">{item.recipe?.title}</p>
+																	<p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">
+																		{item.recipe?.title}
+																	</p>
 
 																	<button
 																		disabled={disabled}
@@ -648,9 +626,7 @@ export default function HomePage() {
 																		}}
 																		className={
 																			"mt-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-colors " +
-																			(disabled
-																				? "bg-white/10 text-white/60 cursor-not-allowed"
-																				: "bg-white/20 hover:bg-white/25")
+																			(disabled ? "bg-white/10 text-white/60 cursor-not-allowed" : "bg-white/20 hover:bg-white/25")
 																		}
 																	>
 																		{disabled ? "Logged" : "✅ Ate this"}
@@ -677,8 +653,59 @@ export default function HomePage() {
 						)}
 					</div>
 
+					{/* Recent recipes (compact row) */}
+					<div className="bg-white/60 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4 mb-6">
+						<div className="flex items-center justify-between mb-3">
+							<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
+							<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
+								See all
+							</a>
+						</div>
+
+						<div className="flex gap-3 overflow-x-auto pb-2">
+							{featuredRecipes.map(function (recipe) {
+								var nut = null;
+								if (recipe.nutrition) {
+									nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
+								}
+
+								return (
+									<a
+										key={recipe.id}
+										href={"/recipes/" + recipe.id}
+										className="flex-shrink-0 w-44 bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
+										title={recipe.title}
+									>
+										<div className="w-full aspect-square rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
+											{recipe.image_url ? (
+												<img
+													src={recipe.image_url}
+													className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+													alt={recipe.title}
+												/>
+											) : (
+												<div className="w-full h-full flex items-center justify-center">
+													<Utensils size={24} className="text-emerald-300" />
+												</div>
+											)}
+
+											{nut && nut.calories > 0 && (
+												<span className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
+													🔥 {nut.calories}
+												</span>
+											)}
+										</div>
+
+										<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
+										<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
+									</a>
+								);
+							})}
+						</div>
+					</div>
+
+					{/* Planner + sidebar */}
 					<div className="flex gap-6 items-start">
-						{/* Main */}
 						<div className="flex-1 min-w-0">
 							{loading ? (
 								<div className="flex items-center justify-center py-24">
@@ -699,12 +726,10 @@ export default function HomePage() {
 																<div
 																	className={
 																		"inline-flex flex-col items-center px-3 py-1.5 rounded-2xl border " +
-																		(isToday
-																			? "bg-emerald-50 text-emerald-700 border-emerald-200"
-																			: "bg-white/70 text-gray-600 border-gray-100")
+																		(isToday ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-white/70 text-gray-600 border-gray-100")
 																	}
 																>
-																	<span className="text-xs font-medium">{DAY_NAMES[i]}</span>
+																	<span className="text-xs font-medium">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}</span>
 																	<span className={"text-base font-bold " + (isToday ? "" : "text-gray-800")}>{d.getDate()}</span>
 																</div>
 															</th>
@@ -733,9 +758,7 @@ export default function HomePage() {
 																			date={date}
 																			meal={meal}
 																			cellSlots={cellSlots}
-																			onAdd={function () {
-																				openModal(date, meal);
-																			}}
+																			onAdd={function () { openModal(date, meal); }}
 																			onRemove={removeSlot}
 																			onAteThis={handleAteThis}
 																			isLogged={isLogged}
@@ -791,9 +814,7 @@ export default function HomePage() {
 														<div className="flex items-center justify-between mb-2">
 															<span className="text-sm font-semibold text-gray-700">{MEAL_LABELS[meal]}</span>
 															<button
-																onClick={function () {
-																	openModal(selectedDay, meal);
-																}}
+																onClick={function () { openModal(selectedDay, meal); }}
 																className="w-8 h-8 rounded-2xl bg-white/80 border border-white/60 shadow-sm flex items-center justify-center hover:bg-white transition-colors"
 															>
 																<Plus size={14} className="text-emerald-600" />
@@ -806,15 +827,12 @@ export default function HomePage() {
 															<div className="space-y-2">
 																{cellSlots.map(function (cs) {
 																	var disabled = isLogged(selectedDay, meal, cs.slotId);
-
 																	return (
 																		<div key={cs.slotId} className="space-y-1">
 																			<MobileRecipeCard
 																				recipe={cs.recipe}
 																				servings={cs.servings_multiplier}
-																				onRemove={function () {
-																					removeSlot(cs.slotId);
-																				}}
+																				onRemove={function () { removeSlot(cs.slotId); }}
 																			/>
 
 																			<button
@@ -826,9 +844,7 @@ export default function HomePage() {
 																				}}
 																				className={
 																					"w-full text-xs font-semibold py-2 rounded-2xl transition-colors " +
-																					(disabled
-																						? "bg-gray-200/70 text-gray-500 cursor-not-allowed"
-																						: "bg-emerald-600 text-white hover:bg-emerald-700")
+																					(disabled ? "bg-gray-200/70 text-gray-500 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700")
 																				}
 																			>
 																				{disabled ? "Logged" : "✅ Ate this"}
@@ -846,62 +862,8 @@ export default function HomePage() {
 								</>
 							)}
 						</div>
-							{/* Recent recipes */}
-							<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4">
-								<div className="flex items-center justify-between mb-3">
-									<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
-									<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
-										See all
-									</a>
-								</div>
 
-								<div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-									{featuredRecipes.map(function (recipe) {
-										var nut = null;
-										if (recipe.nutrition) {
-											nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
-										}
-
-										return (
-											<a
-												key={recipe.id}
-												href={"/recipes/" + recipe.id}
-												className="bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
-												title={recipe.title}
-											>
-												<div className="w-full aspect-square rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
-													{recipe.image_url ? (
-														<img
-															src={recipe.image_url}
-															className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-															alt={recipe.title}
-														/>
-													) : (
-														<div className="w-full h-full flex items-center justify-center">
-															<Utensils size={24} className="text-emerald-300" />
-														</div>
-													)}
-
-													<div className="absolute bottom-2 left-2 flex gap-1">
-														{nut && nut.calories > 0 && (
-															<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
-																🔥 {nut.calories}
-															</span>
-														)}
-													</div>
-												</div>
-
-												<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
-												<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
-											</a>
-										);
-									})}
-								</div>
-							</div>
-						</div>
-					</div>
-
-						{/* Sidebar */}
+						{/* Shopping sidebar */}
 						<div className="hidden lg:flex flex-col gap-4 w-80 flex-shrink-0 sticky top-6 self-start">
 							<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 overflow-hidden">
 								<div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100/60 bg-white/40">
@@ -931,9 +893,7 @@ export default function HomePage() {
 																<li
 																	key={i}
 																	className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-emerald-50/40 transition-colors"
-																	onClick={function () {
-																		toggleCheck(checkKey);
-																	}}
+																	onClick={function () { toggleCheck(checkKey); }}
 																>
 																	<div
 																		className={
@@ -950,8 +910,7 @@ export default function HomePage() {
 
 																	<span
 																		className={
-																			"flex-1 text-xs transition-colors " +
-																			(checkedItems[checkKey] ? "line-through text-gray-300" : "text-gray-700")
+																			"flex-1 text-xs transition-colors " + (checkedItems[checkKey] ? "line-through text-gray-300" : "text-gray-700")
 																		}
 																	>
 																		{item.name}
@@ -972,6 +931,8 @@ export default function HomePage() {
 									</div>
 								)}
 							</div>
+						</div>
+					</div>
 
 					<RecipePickerModal
 						isOpen={modalOpen}
@@ -996,12 +957,8 @@ function MealCell({ date, meal, cellSlots, onAdd, onRemove, onAteThis, isLogged,
 						key={cs.slotId}
 						recipe={cs.recipe}
 						servings={cs.servings_multiplier}
-						onRemove={function () {
-							onRemove(cs.slotId);
-						}}
-						onAteThis={function () {
-							onAteThis(date, meal, cs);
-						}}
+						onRemove={function () { onRemove(cs.slotId); }}
+						onAteThis={function () { onAteThis(date, meal, cs); }}
 						ateDisabled={isLogged(date, meal, cs.slotId)}
 					/>
 				);
@@ -1035,9 +992,7 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 					src={proxied}
 					alt={recipe.title}
 					className="w-full h-14 rounded-xl object-cover"
-					onError={function () {
-						setImgError(true);
-					}}
+					onError={function () { setImgError(true); }}
 				/>
 			) : (
 				<div className="w-full h-14 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -1094,9 +1049,7 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
 					src={proxied}
 					alt={recipe.title}
 					className="w-10 h-10 rounded-2xl object-cover flex-shrink-0"
-					onError={function () {
-						setImgError(true);
-					}}
+					onError={function () { setImgError(true); }}
 				/>
 			) : (
 				<div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
