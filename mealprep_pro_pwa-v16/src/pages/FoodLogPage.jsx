@@ -7,7 +7,15 @@ export default function FoodLogPage() {
   const [entries, setEntries] = useState([]); // ALWAYS an array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+function toDateOnlyUTC(date = new Date()) {
+  // UTC date -> YYYY-MM-DD
+  return date.toISOString().slice(0, 10);
+}
+function addDaysUTC(dateStr, deltaDays) {
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}  
   useEffect(() => {
     let alive = true;
 
