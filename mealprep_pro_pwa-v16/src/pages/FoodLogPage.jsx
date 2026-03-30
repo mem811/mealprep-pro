@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listFoodLogsByDate, deleteFoodLogEntry } from "../lib/foodLog";
+import { listFoodLogsByDate, deleteFoodLogEntry, updateFoodLogEntry } from "../lib/foodLog";
 
 function toDateOnlyUTC(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -11,6 +11,20 @@ function addDaysUTC(dateStr, deltaDays) {
   return d.toISOString().slice(0, 10);
 }
 
+function mealPillClass(mealType) {
+  const t = (mealType || "").toLowerCase();
+  if (t.includes("breakfast")) return "bg-amber-50 text-amber-700 border-amber-200";
+  if (t.includes("lunch")) return "bg-green-50 text-green-700 border-green-200";
+  if (t.includes("dinner")) return "bg-blue-50 text-blue-700 border-blue-200";
+  if (t.includes("snack")) return "bg-purple-50 text-purple-700 border-purple-200";
+  return "bg-gray-50 text-gray-700 border-gray-200";
+}
+
+function n0(v) {
+  const num = Number(v);
+  return Number.isFinite(num) ? num : 0;
+}
+
 export default function FoodLogPage() {
   const [dateStr, setDateStr] = useState(toDateOnlyUTC());
   const [entries, setEntries] = useState([]); // ALWAYS array
@@ -19,6 +33,9 @@ export default function FoodLogPage() {
 
   const [deletingId, setDeletingId] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null); // { id, name } | null
+
+  const [editing, setEditing] = useState(null); // { id, meal_type, name, calories, protein, carbs, fat, servings, notes }
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -50,10 +67,10 @@ export default function FoodLogPage() {
   const totals = useMemo(() => {
     return entries.reduce(
       (acc, e) => {
-        acc.calories += Number(e?.calories || 0);
-        acc.protein += Number(e?.protein || 0);
-        acc.carbs += Number(e?.carbs || 0);
-        acc.fat += Number(e?.fat || 0);
+        acc.calories += n0(e?.calories);
+        acc.protein += n0(e?.protein);
+        acc.carbs += n0(e?.carbs);
+        acc.fat += n0(e?.fat);
         return acc;
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
@@ -70,8 +87,6 @@ export default function FoodLogPage() {
     try {
       setDeletingId(confirmDelete.id);
       await deleteFoodLogEntry(confirmDelete.id);
-
-      // remove from UI immediately
       setEntries((prev) => prev.filter((e) => e.id !== confirmDelete.id));
       setConfirmDelete(null);
     } catch (err) {
@@ -81,48 +96,101 @@ export default function FoodLogPage() {
     }
   }
 
+  function requestEdit(entry) {
+    setEditing({
+      id: entry.id,
+      meal_type: entry.meal_type || "",
+      name: entry.name || "",
+      calories: n0(entry.calories),
+      protein: n0(entry.protein),
+      carbs: n0(entry.carbs),
+      fat: n0(entry.fat),
+      servings: entry.servings ?? "",
+      notes: entry.notes || "",
+    });
+  }
+
+  async function saveEdit() {
+    if (!editing?.id) return;
+
+    try {
+      setSavingEdit(true);
+
+      const payload = {
+        meal_type: editing.meal_type,
+        name: editing.name,
+        calories: n0(editing.calories),
+        protein: n0(editing.protein),
+        carbs: n0(editing.carbs),
+        fat: n0(editing.fat),
+        // servings is optional in your schema, keep it null/"" friendly
+        servings: editing.servings === "" ? null : n0(editing.servings),
+        notes: editing.notes || "",
+      };
+
+      await updateFoodLogEntry(editing.id, payload);
+
+      setEntries((prev) =>
+        prev.map((e) => (e.id === editing.id ? { ...e, ...payload } : e))
+      );
+
+      setEditing(null);
+    } catch (err) {
+      alert(err?.message || "Failed to save changes.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div className="p-4 max-w-3xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <button
-          className="px-3 py-2 rounded bg-gray-100"
+          className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors font-semibold"
           onClick={() => setDateStr(addDaysUTC(dateStr, -1))}
         >
           Prev
         </button>
 
-        <div className="font-semibold">{dateStr}</div>
+        <div className="text-sm text-gray-500">Food Log</div>
 
         <button
-          className="px-3 py-2 rounded bg-gray-100"
+          className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors font-semibold"
           onClick={() => setDateStr(addDaysUTC(dateStr, 1))}
         >
           Next
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-4 gap-2 text-sm">
-        <div className="p-2 rounded bg-gray-50">
-          <div className="text-gray-500">Calories</div>
-          <div className="font-semibold">{Math.round(totals.calories)}</div>
+      <div className="mt-2 flex items-center justify-center">
+        <div className="text-lg font-bold text-gray-900">{dateStr}</div>
+      </div>
+
+      {/* Totals */}
+      <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        <div className="p-3 rounded-2xl bg-white border border-gray-100 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase tracking-wide">Calories</div>
+          <div className="mt-1 text-xl font-bold text-gray-900">{Math.round(totals.calories)}</div>
         </div>
 
-        <div className="p-2 rounded bg-gray-50">
-          <div className="text-gray-500">Protein</div>
-          <div className="font-semibold">{Math.round(totals.protein)}g</div>
+        <div className="p-3 rounded-2xl bg-white border border-gray-100 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase tracking-wide">Protein</div>
+          <div className="mt-1 text-xl font-bold text-gray-900">{Math.round(totals.protein)}g</div>
         </div>
 
-        <div className="p-2 rounded bg-gray-50">
-          <div className="text-gray-500">Carbs</div>
-          <div className="font-semibold">{Math.round(totals.carbs)}g</div>
+        <div className="p-3 rounded-2xl bg-white border border-gray-100 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase tracking-wide">Carbs</div>
+          <div className="mt-1 text-xl font-bold text-gray-900">{Math.round(totals.carbs)}g</div>
         </div>
 
-        <div className="p-2 rounded bg-gray-50">
-          <div className="text-gray-500">Fat</div>
-          <div className="font-semibold">{Math.round(totals.fat)}g</div>
+        <div className="p-3 rounded-2xl bg-white border border-gray-100 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase tracking-wide">Fat</div>
+          <div className="mt-1 text-xl font-bold text-gray-900">{Math.round(totals.fat)}g</div>
         </div>
       </div>
 
+      {/* Entries */}
       <div className="mt-6">
         {loading ? (
           <div className="text-gray-500">Loading…</div>
@@ -131,15 +199,44 @@ export default function FoodLogPage() {
         ) : entries.length === 0 ? (
           <div className="text-gray-500">No entries for this day.</div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {entries.map((e) => (
-              <li key={e.id} className="p-3 rounded border">
-                <div className="flex items-center justify-between">
-                  <div className="font-medium">
-                    {e.meal_type} · {e.name}
+              <li key={e.id} className="p-4 rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={
+                          "inline-flex items-center px-2 py-1 rounded-full border text-xs font-bold " +
+                          mealPillClass(e.meal_type)
+                        }
+                      >
+                        {e.meal_type || "Meal"}
+                      </span>
+
+                      <div className="font-semibold text-gray-900 truncate">{e.name}</div>
+                    </div>
+
+                    <div className="mt-2 text-sm text-gray-600">
+                      <span className="font-semibold text-gray-800">{e.calories ?? 0}</span> cal
+                      <span className="mx-2 text-gray-300">•</span>
+                      P <span className="font-semibold text-gray-800">{e.protein ?? 0}</span>g
+                      <span className="mx-2 text-gray-300">•</span>
+                      C <span className="font-semibold text-gray-800">{e.carbs ?? 0}</span>g
+                      <span className="mx-2 text-gray-300">•</span>
+                      F <span className="font-semibold text-gray-800">{e.fat ?? 0}</span>g
+                      {e.servings ? (
+                        <>
+                          <span className="mx-2 text-gray-300">•</span>
+                          <span className="text-gray-700">{e.servings} servings</span>
+                        </>
+                      ) : null}
+                    </div>
+
+                    {e.notes ? <div className="mt-2 text-sm text-gray-700">{e.notes}</div> : null}
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     <div className="text-xs text-gray-500">
                       {e.created
                         ? new Date(e.created).toLocaleTimeString([], {
@@ -149,23 +246,24 @@ export default function FoodLogPage() {
                         : ""}
                     </div>
 
-                    <button
-                      onClick={() => requestDelete(e)}
-                      disabled={deletingId === e.id}
-                      className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
-                    >
-                      {deletingId === e.id ? "Deleting..." : "Delete"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => requestEdit(e)}
+                        className="text-xs font-semibold text-gray-700 hover:text-gray-900"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => requestDelete(e)}
+                        disabled={deletingId === e.id}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                      >
+                        {deletingId === e.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="mt-1 text-sm text-gray-600">
-                  {e.calories ?? 0} cal · P {e.protein ?? 0}g · C {e.carbs ?? 0}g · F{" "}
-                  {e.fat ?? 0}g
-                  {e.servings ? ` · ${e.servings} servings` : ""}
-                </div>
-
-                {e.notes ? <div className="mt-2 text-sm">{e.notes}</div> : null}
               </li>
             ))}
           </ul>
@@ -202,6 +300,134 @@ export default function FoodLogPage() {
                 disabled={!!deletingId}
               >
                 {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => (savingEdit ? null : setEditing(null))}
+          />
+
+          <div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Edit entry</div>
+                <div className="text-xs text-gray-500 mt-0.5">Update meal details and macros.</div>
+              </div>
+
+              <button
+                className="text-sm font-semibold text-gray-500 hover:text-gray-700"
+                onClick={() => setEditing(null)}
+                disabled={savingEdit}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-xs font-semibold text-gray-600">
+                Meal type
+                <input
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  value={editing.meal_type}
+                  onChange={(ev) => setEditing((p) => ({ ...p, meal_type: ev.target.value }))}
+                  placeholder="Breakfast / Lunch / Dinner / Snack"
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-gray-600">
+                Name
+                <input
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  value={editing.name}
+                  onChange={(ev) => setEditing((p) => ({ ...p, name: ev.target.value }))}
+                  placeholder="Food name"
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-gray-600">
+                Calories
+                <input
+                  type="number"
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  value={editing.calories}
+                  onChange={(ev) => setEditing((p) => ({ ...p, calories: ev.target.value }))}
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-gray-600">
+                Servings
+                <input
+                  type="number"
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  value={editing.servings}
+                  onChange={(ev) => setEditing((p) => ({ ...p, servings: ev.target.value }))}
+                  placeholder="Optional"
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-gray-600">
+                Protein (g)
+                <input
+                  type="number"
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  value={editing.protein}
+                  onChange={(ev) => setEditing((p) => ({ ...p, protein: ev.target.value }))}
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-gray-600">
+                Carbs (g)
+                <input
+                  type="number"
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  value={editing.carbs}
+                  onChange={(ev) => setEditing((p) => ({ ...p, carbs: ev.target.value }))}
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-gray-600">
+                Fat (g)
+                <input
+                  type="number"
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  value={editing.fat}
+                  onChange={(ev) => setEditing((p) => ({ ...p, fat: ev.target.value }))}
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-gray-600 sm:col-span-2">
+                Notes
+                <textarea
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 min-h-[90px]"
+                  value={editing.notes}
+                  onChange={(ev) => setEditing((p) => ({ ...p, notes: ev.target.value }))}
+                  placeholder="Optional notes"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 disabled:opacity-50"
+                onClick={() => setEditing(null)}
+                disabled={savingEdit}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
+                onClick={saveEdit}
+                disabled={savingEdit}
+              >
+                {savingEdit ? "Saving..." : "Save"}
               </button>
             </div>
           </div>
