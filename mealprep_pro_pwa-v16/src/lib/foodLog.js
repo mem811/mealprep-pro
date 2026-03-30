@@ -47,4 +47,4 @@ export async function deleteFoodLogEntry(id) {
 }
 export async function updateFoodLogEntry(id, data) {
   return pb.collection("food_log").update(id, data);
-}
+} 
