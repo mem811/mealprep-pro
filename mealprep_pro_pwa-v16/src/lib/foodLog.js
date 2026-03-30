@@ -9,7 +9,7 @@ import pb from "./pb";
  * @returns PocketBase list result { page, perPage, totalItems, items: [...] }
  */
 export async function listFoodLogsByDate(dateStr) {
-  // Build a UTC day range: [start, nextDayStart)
+  // dateStr: "YYYY-MM-DD" (we treat it as a UTC day to match PocketBase UI)
   const start = new Date(`${dateStr}T00:00:00.000Z`);
   const end = new Date(`${dateStr}T00:00:00.000Z`);
   end.setUTCDate(end.getUTCDate() + 1);
