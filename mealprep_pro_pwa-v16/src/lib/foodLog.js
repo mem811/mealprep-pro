@@ -1,14 +1,14 @@
 import pb from "./pb";
 
 export async function listFoodLogsByDate(dateStr) {
-  // dateStr like "2026-03-30"
-  const start = new Date(`${dateStr}T00:00:00.000Z`).toISOString();
-  const end = new Date(`${dateStr}T00:00:00.000Z`);
-  end.setUTCDate(end.getUTCDate() + 1);
+  // dateStr like "2026-03-30" (LOCAL day)
+  const startLocal = new Date(`${dateStr}T00:00:00`); // local midnight
+  const endLocal = new Date(`${dateStr}T00:00:00`);
+  endLocal.setDate(endLocal.getDate() + 1); // next local midnight
 
   return pb.collection("food_log").getList(1, 500, {
     sort: "-created",
-    filter: `date >= "${start}" && date < "${end.toISOString()}"`,
+    filter: `date >= "${startLocal.toISOString()}" && date < "${endLocal.toISOString()}"`,
     expand: "recipe",
   });
 }
