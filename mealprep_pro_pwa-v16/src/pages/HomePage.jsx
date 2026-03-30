@@ -672,18 +672,16 @@ export default function HomePage() {
                             var cellSlots = slots[key] || [];
                             return (
                               <td key={di} className={"align-top rounded-xl " + (fmt(d) === today ? "bg-green-50" : "")}>
-                                <MealCell
-                                  date={date}
-                                  meal={meal}
-                                  cellSlots={cellSlots}
-                                  onAdd={function () {
-                                    openModal(date, meal);
-                                  }}
-                                  onRemove={removeSlot}
-                                  onAteThis={handleAteThis}
-                                  loggedSlots={loggedSlots}
-                                  saving={saving}
-                                />
+                               <MealCell
+                                date={date}
+                                meal={meal}
+                                cellSlots={cellSlots}
+                                onAdd={function () { openModal(date, meal); }}
+                                onRemove={removeSlot}
+                                onAteThis={handleAteThis}
+                                loggedSlots={loggedSlots}
+                                saving={saving}
+                              />
                               </td>
                             );
                           })}
@@ -989,22 +987,14 @@ function MealCell({ date, meal, cellSlots, onAdd, onRemove, onAteThis, loggedSlo
             key={cs.slotId}
             recipe={cs.recipe}
             servings={cs.servings_multiplier}
-            onRemove={function () {
-              onRemove(cs.slotId);
-            }}
-            onAteThis={function () {
-              onAteThis(date, meal, cs);
-            }}
+            onRemove={function () { onRemove(cs.slotId); }}
+            onAteThis={function () { onAteThis(date, meal, cs); }}
             ateDisabled={disabled}
           />
         );
       })}
 
-      <button
-        onClick={onAdd}
-        disabled={saving}
-        className="flex items-center justify-center w-full mt-auto py-1 rounded-lg border border-dashed border-gray-200 hover:border-green-400 hover:bg-green-50 transition-colors group/btn"
-      >
+      <button onClick={onAdd} disabled={saving} className="flex items-center justify-center w-full mt-auto py-1 rounded-lg border border-dashed border-gray-200 hover:border-green-400 hover:bg-green-50 transition-colors group/btn">
         <Plus size={14} className="text-gray-300 group-hover/btn:text-green-500 transition-colors" />
       </button>
     </div>
