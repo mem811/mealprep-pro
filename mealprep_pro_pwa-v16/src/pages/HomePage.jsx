@@ -11,11 +11,12 @@ var MEAL_LABELS = {
 	dinner: "Dinner",
 	snack: "Snack",
 };
+
 var MEAL_COLORS = {
-	breakfast: "from-amber-50 to-orange-50 border-amber-200",
-	lunch: "from-green-50 to-emerald-50 border-green-200",
-	dinner: "from-blue-50 to-indigo-50 border-blue-200",
-	snack: "from-purple-50 to-pink-50 border-purple-200",
+	breakfast: "from-amber-50/80 to-orange-50/80 border-amber-200/60",
+	lunch: "from-green-50/80 to-emerald-50/80 border-green-200/60",
+	dinner: "from-blue-50/80 to-indigo-50/80 border-blue-200/60",
+	snack: "from-purple-50/80 to-pink-50/80 border-purple-200/60",
 };
 
 var CATEGORY_MAP = {
@@ -157,7 +158,7 @@ function fmt(d) {
 
 function getProxiedImage(url) {
 	if (!url) return null;
-	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=80&h=80&fit=cover&q=80";
+	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=120&h=120&fit=cover&q=80";
 }
 
 export default function HomePage() {
@@ -172,12 +173,7 @@ export default function HomePage() {
 	const [groceryGroups, setGroceryGroups] = useState([]);
 	const [checkedItems, setCheckedItems] = useState({});
 
-	// persisted "logged" status:
-	// - we store by SLOT only so it persists across leaving page
-	// - and also by full key for instant UI updates
-	// keys:
-	//   "SLOT**<slotId>" => true
-	//   "<date>**<mealType>**<slotId>" => true
+	// persisted + optimistic "Logged"
 	const [loggedSlots, setLoggedSlots] = useState({});
 
 	var today = fmt(new Date());
@@ -232,7 +228,7 @@ export default function HomePage() {
 		[fetchSlots]
 	);
 
-	// Persist "Logged" labels for the visible week by loading food_log entries
+	// Persist Logged for visible week
 	useEffect(
 		function () {
 			async function fetchLoggedForWeek() {
@@ -462,7 +458,6 @@ export default function HomePage() {
 		var slotId = item?.slotId;
 		if (!slotId) return;
 
-		// If already logged (persisted or optimistic), do nothing
 		if (isLogged(date, mealType, slotId)) return;
 
 		// Optimistic lock
@@ -477,14 +472,11 @@ export default function HomePage() {
 			var userId = pb.authStore.model?.id;
 			if (!userId) throw new Error("Not signed in.");
 
-			// Permanent guard: check DB for existing food_log by source_slot_id
 			var existing = await pb.collection("food_log").getList(1, 1, {
 				filter: `source_slot_id = "${slotId}"`,
 			});
 
-			if (existing.items.length > 0) {
-				return; // already exists, leave as logged
-			}
+			if (existing.items.length > 0) return;
 
 			var recipe = item?.recipe;
 			if (!recipe) throw new Error("No recipe found for this slot.");
@@ -511,7 +503,6 @@ export default function HomePage() {
 				source_slot_id: slotId,
 			});
 		} catch (e) {
-			// If it failed, unlock the optimistic lock
 			setLoggedSlots(function (prev) {
 				var copy = Object.assign({}, prev);
 				delete copy["SLOT**" + slotId];
@@ -525,9 +516,16 @@ export default function HomePage() {
 	};
 
 	var DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+	// Dribbble-ish wrapper styles
+	var pageBg = "min-h-screen bg-gradient-to-b from-emerald-50/70 via-teal-50/30 to-white";
+	var shellCard = "bg-white/80 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-xl shadow-emerald-100/50";
+	var softBtn =
+		"px-3 py-2 rounded-2xl bg-white/90 border border-emerald-100 text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors";
+
 	var todayCardStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
 	var slotCardStyle = { backgroundColor: "rgba(255,255,255,0.15)" };
-	var nothingTextStyle = { color: "rgba(255,255,255,0.5)" };
+	var nothingTextStyle = { color: "rgba(255,255,255,0.55)" };
 	var recipeThumbStyle = { backgroundColor: "rgba(255,255,255,0.2)" };
 
 	var todayMeals = MEAL_TYPES.map(function (meal) {
@@ -555,393 +553,444 @@ export default function HomePage() {
 	var todayNutrition = getDayNutrition(today);
 
 	return (
-		<div className="max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
-			<div className="flex items-center justify-between mb-4">
-				<div>
-					<h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meal Planner</h1>
-					<p className="text-xs text-gray-400 mt-0.5">
-						{weekDays[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} –{" "}
-						{weekDays[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-					</p>
-				</div>
-
-				<div className="flex items-center gap-2">
-					<button
-						onClick={function () {
-							setWeekOffset(function (w) {
-								return w - 1;
-							});
-						}}
-						className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-					>
-						<ChevronLeft size={18} className="text-gray-600" />
-					</button>
-
-					<button
-						onClick={function () {
-							setWeekOffset(0);
-						}}
-						className="px-3 py-1.5 text-xs font-medium rounded-xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
-					>
-						Today
-					</button>
-
-					<button
-						onClick={function () {
-							setWeekOffset(function (w) {
-								return w + 1;
-							});
-						}}
-						className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-					>
-						<ChevronRight size={18} className="text-gray-600" />
-					</button>
-				</div>
-			</div>
-
-			{/* Today hero */}
-			<div className="rounded-3xl p-5 text-white shadow-lg mb-5" style={todayCardStyle}>
-				<div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-					<div className="flex-shrink-0">
-						<p className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-0.5">Today</p>
-						<h2 className="text-xl font-bold">
-							{weekDays.find(function (d) {
-								return fmt(d) === today;
-							})?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) || "Today"}
-						</h2>
-					</div>
-
-					<div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full md:w-auto">
-						{todayMeals.map(function (tm) {
-							return (
-								<div key={tm.meal} className="rounded-2xl p-3" style={slotCardStyle}>
-									<p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">
-										{MEAL_LABELS[tm.meal]}
-									</p>
-
-									{tm.items.length === 0 ? (
-										<p className="text-xs italic" style={nothingTextStyle}>
-											Nothing planned
-										</p>
-									) : (
-										<div className="flex flex-col gap-2">
-											{tm.items.map(function (item) {
-												var disabled = isLogged(today, tm.meal, item.slotId);
-
-												return (
-													<div key={item.slotId} className="flex items-start gap-2">
-														<div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0" style={recipeThumbStyle}>
-															{item.recipe?.image_url ? (
-																<img src={item.recipe.image_url} className="w-full h-full object-cover" />
-															) : (
-																<div className="w-full h-full flex items-center justify-center">
-																	<Utensils size={12} className="text-white opacity-60" />
-																</div>
-															)}
-														</div>
-
-														<div className="flex-1 min-w-0">
-															<p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">{item.recipe?.title}</p>
-
-															<button
-																disabled={disabled}
-																onClick={function (e) {
-																	e.preventDefault();
-																	e.stopPropagation();
-																	handleAteThis(today, tm.meal, item);
-																}}
-																className={
-																	"mt-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-colors " +
-																	(disabled
-																		? "bg-white/10 text-white/60 cursor-not-allowed"
-																		: "bg-white/20 hover:bg-white/25")
-																}
-															>
-																{disabled ? "Logged" : "✅ Ate this"}
-															</button>
-														</div>
-													</div>
-												);
-											})}
-										</div>
-									)}
-								</div>
-							);
-						})}
-					</div>
-				</div>
-
-				{todayNutrition.calories > 0 && (
-					<div className="flex items-center justify-end gap-4 mt-3 text-emerald-100 text-xs font-bold">
-						<span>🔥 {todayNutrition.calories} cal</span>
-						<span>P {todayNutrition.protein}g</span>
-						<span>C {todayNutrition.carbs}g</span>
-						<span>F {todayNutrition.fat}g</span>
-					</div>
-				)}
-			</div>
-
-			<div className="flex gap-6 items-start">
-				<div className="flex-1 min-w-0">
-					{loading ? (
-						<div className="flex items-center justify-center py-24">
-							<div className="w-9 h-9 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+		<div className={pageBg}>
+			<div className="max-w-6xl mx-auto px-3 sm:px-6 py-6">
+				<div className={shellCard + " p-4 sm:p-6"}>
+					{/* Header */}
+					<div className="flex items-center justify-between mb-5">
+						<div>
+							<h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meal Planner</h1>
+							<p className="text-xs text-gray-400 mt-1">
+								{weekDays[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} –{" "}
+								{weekDays[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+							</p>
 						</div>
-					) : (
-						<>
-							{/* Desktop table */}
-							<div className="hidden md:block overflow-x-auto">
-								<table className="w-full border-separate border-spacing-1.5 table-fixed">
-									<thead>
-										<tr>
-											<th className="w-24" />
-											{weekDays.map(function (d, i) {
-												var isToday = fmt(d) === today;
-												return (
-													<th key={i} className="text-center pb-1">
-														<div
-															className={
-																"inline-flex flex-col items-center px-3 py-1.5 rounded-xl " +
-																(isToday
-																	? "bg-green-100 text-green-700 border border-green-300"
-																	: "text-gray-500")
-															}
-														>
-															<span className="text-xs font-medium">{DAY_NAMES[i]}</span>
-															<span className={"text-base font-bold " + (isToday ? "" : "text-gray-800")}>
-																{d.getDate()}
-															</span>
-														</div>
-													</th>
-												);
-											})}
-										</tr>
-									</thead>
 
-									<tbody>
-										{MEAL_TYPES.map(function (meal) {
-											return (
-												<tr key={meal}>
-													<td className="pr-2 py-1 align-top">
-														<div className="text-right">
-															<span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{MEAL_LABELS[meal]}</span>
-														</div>
-													</td>
+						<div className="flex items-center gap-2">
+							<button
+								onClick={function () {
+									setWeekOffset(function (w) {
+										return w - 1;
+									});
+								}}
+								className={softBtn}
+							>
+								<ChevronLeft size={16} className="text-emerald-700" />
+							</button>
 
-													{weekDays.map(function (d, di) {
-														var date = fmt(d);
-														var key = date + "**" + meal;
-														var cellSlots = slots[key] || [];
+							<button onClick={function () { setWeekOffset(0); }} className={softBtn}>
+								Today
+							</button>
 
-														return (
-															<td key={di} className={"align-top rounded-xl " + (fmt(d) === today ? "bg-green-50" : "")}>
-																<MealCell
-																	date={date}
-																	meal={meal}
-																	cellSlots={cellSlots}
-																	onAdd={function () {
-																		openModal(date, meal);
-																	}}
-																	onRemove={removeSlot}
-																	onAteThis={handleAteThis}
-																	isLogged={isLogged}
-																	saving={saving}
-																/>
-															</td>
-														);
-													})}
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
+							<button
+								onClick={function () {
+									setWeekOffset(function (w) {
+										return w + 1;
+									});
+								}}
+								className={softBtn}
+							>
+								<ChevronRight size={16} className="text-emerald-700" />
+							</button>
+						</div>
+					</div>
+
+					{/* Today hero */}
+					<div className="rounded-[28px] p-5 text-white shadow-lg shadow-emerald-200/40 mb-6" style={todayCardStyle}>
+						<div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+							<div className="flex-shrink-0">
+								<p className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-0.5">Today</p>
+								<h2 className="text-xl font-bold">
+									{weekDays.find(function (d) {
+										return fmt(d) === today;
+									})?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) || "Today"}
+								</h2>
 							</div>
 
-							{/* Mobile view */}
-							<div className="md:hidden">
-								<div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-									{weekDays.map(function (d, i) {
-										var date = fmt(d);
-										var isToday = date === today;
-										var isSelected = date === selectedDay;
+							<div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full md:w-auto">
+								{todayMeals.map(function (tm) {
+									return (
+										<div key={tm.meal} className="rounded-2xl p-3" style={slotCardStyle}>
+											<p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">
+												{MEAL_LABELS[tm.meal]}
+											</p>
 
-										return (
-											<button
-												key={i}
-												onClick={function () {
-													setSelectedDay(date);
-												}}
-												className={
-													"flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl transition-all " +
-													(isSelected
-														? "bg-green-500 text-white shadow-md"
-														: isToday
-															? "bg-green-50 text-green-700 border border-green-200"
-															: "bg-white text-gray-600 border border-gray-100")
-												}
-											>
-												<span className="text-xs font-medium">{DAY_NAMES[i]}</span>
-												<span className="text-base font-bold">{d.getDate()}</span>
-											</button>
-										);
-									})}
-								</div>
+											{tm.items.length === 0 ? (
+												<p className="text-xs italic" style={nothingTextStyle}>
+													Nothing planned
+												</p>
+											) : (
+												<div className="flex flex-col gap-2">
+													{tm.items.map(function (item) {
+														var disabled = isLogged(today, tm.meal, item.slotId);
 
-								<div className="space-y-3">
-									{MEAL_TYPES.map(function (meal) {
-										var key = selectedDay + "**" + meal;
-										var cellSlots = slots[key] || [];
+														return (
+															<div key={item.slotId} className="flex items-start gap-2">
+																<div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0" style={recipeThumbStyle}>
+																	{item.recipe?.image_url ? (
+																		<img src={item.recipe.image_url} className="w-full h-full object-cover" />
+																	) : (
+																		<div className="w-full h-full flex items-center justify-center">
+																			<Utensils size={12} className="text-white opacity-60" />
+																		</div>
+																	)}
+																</div>
 
-										return (
-											<div key={meal} className={"bg-gradient-to-r " + MEAL_COLORS[meal] + " border rounded-2xl p-3"}>
-												<div className="flex items-center justify-between mb-2">
-													<span className="text-sm font-semibold text-gray-700">{MEAL_LABELS[meal]}</span>
-													<button
-														onClick={function () {
-															openModal(selectedDay, meal);
-														}}
-														className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center hover:bg-green-50 transition-colors"
-													>
-														<Plus size={14} className="text-green-600" />
-													</button>
-												</div>
-
-												{cellSlots.length === 0 ? (
-													<p className="text-xs text-gray-400 italic">No recipes added</p>
-												) : (
-													<div className="space-y-2">
-														{cellSlots.map(function (cs) {
-															var disabled = isLogged(selectedDay, meal, cs.slotId);
-
-															return (
-																<div key={cs.slotId} className="space-y-1">
-																	<MobileRecipeCard
-																		recipe={cs.recipe}
-																		servings={cs.servings_multiplier}
-																		onRemove={function () {
-																			removeSlot(cs.slotId);
-																		}}
-																	/>
+																<div className="flex-1 min-w-0">
+																	<p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">{item.recipe?.title}</p>
 
 																	<button
 																		disabled={disabled}
 																		onClick={function (e) {
 																			e.preventDefault();
 																			e.stopPropagation();
-																			handleAteThis(selectedDay, meal, cs);
+																			handleAteThis(today, tm.meal, item);
 																		}}
 																		className={
-																			"w-full text-xs font-semibold py-2 rounded-xl transition-colors " +
+																			"mt-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-colors " +
 																			(disabled
-																				? "bg-gray-200 text-gray-500 cursor-not-allowed"
-																				: "bg-emerald-600 text-white hover:bg-emerald-700")
+																				? "bg-white/10 text-white/60 cursor-not-allowed"
+																				: "bg-white/20 hover:bg-white/25")
 																		}
 																	>
 																		{disabled ? "Logged" : "✅ Ate this"}
 																	</button>
 																</div>
-															);
-														})}
-													</div>
-												)}
-											</div>
-										);
-									})}
-								</div>
-							</div>
-						</>
-					)}
-				</div>
-
-				{/* Sidebar */}
-				<div className="hidden lg:flex flex-col gap-4 w-72 flex-shrink-0 sticky top-4 self-start">
-					<div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-						<div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-							<h3 className="font-bold text-gray-800 text-sm">🛒 This Week&apos;s Shopping</h3>
-							<a href="/grocery-list" className="text-xs text-green-600 font-medium hover:underline">
-								See all
-							</a>
-						</div>
-
-						{groceryGroups.length === 0 ? (
-							<p className="text-xs text-gray-400 italic p-4">Add meals to generate your list</p>
-						) : (
-							<div className="max-h-[500px] overflow-y-auto">
-								{groceryGroups.map(function (group, gi) {
-									return (
-										<div key={gi}>
-											<div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-												<span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-													{group.icon} {group.category}
-												</span>
-											</div>
-
-											<ul className="divide-y divide-gray-50">
-												{group.items.map(function (item, i) {
-													var checkKey = item.name.toLowerCase().trim();
-													return (
-														<li
-															key={i}
-															className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
-															onClick={function () {
-																toggleCheck(checkKey);
-															}}
-														>
-															<div
-																className={
-																	"w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors " +
-																	(checkedItems[checkKey] ? "bg-green-500 border-green-500" : "border-gray-300")
-																}
-															>
-																{checkedItems[checkKey] && (
-																	<svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-																	</svg>
-																)}
 															</div>
-
-															<span
-																className={
-																	"flex-1 text-xs transition-colors " +
-																	(checkedItems[checkKey] ? "line-through text-gray-300" : "text-gray-700")
-																}
-															>
-																{item.name}
-															</span>
-
-															{item.qty > 0 && (
-																<span className={"text-xs flex-shrink-0 " + (checkedItems[checkKey] ? "text-gray-300" : "text-gray-400")}>
-																	{parseFloat(item.qty.toFixed(1))} {item.unit}
-																</span>
-															)}
-														</li>
-													);
-												})}
-											</ul>
+														);
+													})}
+												</div>
+											)}
 										</div>
 									);
 								})}
 							</div>
+						</div>
+
+						{todayNutrition.calories > 0 && (
+							<div className="flex items-center justify-end gap-4 mt-3 text-emerald-100 text-xs font-bold">
+								<span>🔥 {todayNutrition.calories} cal</span>
+								<span>P {todayNutrition.protein}g</span>
+								<span>C {todayNutrition.carbs}g</span>
+								<span>F {todayNutrition.fat}g</span>
+							</div>
 						)}
 					</div>
+
+					<div className="flex gap-6 items-start">
+						{/* Main */}
+						<div className="flex-1 min-w-0">
+							{loading ? (
+								<div className="flex items-center justify-center py-24">
+									<div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+								</div>
+							) : (
+								<>
+									{/* Desktop table */}
+									<div className="hidden md:block overflow-x-auto">
+										<table className="w-full border-separate border-spacing-2 table-fixed">
+											<thead>
+												<tr>
+													<th className="w-24" />
+													{weekDays.map(function (d, i) {
+														var isToday = fmt(d) === today;
+														return (
+															<th key={i} className="text-center pb-1">
+																<div
+																	className={
+																		"inline-flex flex-col items-center px-3 py-1.5 rounded-2xl border " +
+																		(isToday
+																			? "bg-emerald-50 text-emerald-700 border-emerald-200"
+																			: "bg-white/70 text-gray-600 border-gray-100")
+																	}
+																>
+																	<span className="text-xs font-medium">{DAY_NAMES[i]}</span>
+																	<span className={"text-base font-bold " + (isToday ? "" : "text-gray-800")}>{d.getDate()}</span>
+																</div>
+															</th>
+														);
+													})}
+												</tr>
+											</thead>
+
+											<tbody>
+												{MEAL_TYPES.map(function (meal) {
+													return (
+														<tr key={meal}>
+															<td className="pr-2 py-1 align-top">
+																<div className="text-right">
+																	<span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{MEAL_LABELS[meal]}</span>
+																</div>
+															</td>
+
+															{weekDays.map(function (d, di) {
+																var date = fmt(d);
+																var key = date + "**" + meal;
+																var cellSlots = slots[key] || [];
+																return (
+																	<td key={di} className={"align-top rounded-2xl " + (fmt(d) === today ? "bg-emerald-50/40" : "")}>
+																		<MealCell
+																			date={date}
+																			meal={meal}
+																			cellSlots={cellSlots}
+																			onAdd={function () {
+																				openModal(date, meal);
+																			}}
+																			onRemove={removeSlot}
+																			onAteThis={handleAteThis}
+																			isLogged={isLogged}
+																			saving={saving}
+																		/>
+																	</td>
+																);
+															})}
+														</tr>
+													);
+												})}
+											</tbody>
+										</table>
+									</div>
+
+									{/* Mobile view */}
+									<div className="md:hidden">
+										<div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+											{weekDays.map(function (d, i) {
+												var date = fmt(d);
+												var isToday = date === today;
+												var isSelected = date === selectedDay;
+
+												return (
+													<button
+														key={i}
+														onClick={function () {
+															setSelectedDay(date);
+														}}
+														className={
+															"flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-2xl border transition-all " +
+															(isSelected
+																? "bg-emerald-600 text-white border-emerald-600 shadow-md"
+																: isToday
+																	? "bg-emerald-50 text-emerald-700 border-emerald-200"
+																	: "bg-white/70 text-gray-600 border-gray-100")
+														}
+													>
+														<span className="text-xs font-medium">{DAY_NAMES[i]}</span>
+														<span className="text-base font-bold">{d.getDate()}</span>
+													</button>
+												);
+											})}
+										</div>
+
+										<div className="space-y-3">
+											{MEAL_TYPES.map(function (meal) {
+												var key = selectedDay + "**" + meal;
+												var cellSlots = slots[key] || [];
+
+												return (
+													<div key={meal} className={"bg-gradient-to-r " + MEAL_COLORS[meal] + " border rounded-3xl p-3"}>
+														<div className="flex items-center justify-between mb-2">
+															<span className="text-sm font-semibold text-gray-700">{MEAL_LABELS[meal]}</span>
+															<button
+																onClick={function () {
+																	openModal(selectedDay, meal);
+																}}
+																className="w-8 h-8 rounded-2xl bg-white/80 border border-white/60 shadow-sm flex items-center justify-center hover:bg-white transition-colors"
+															>
+																<Plus size={14} className="text-emerald-600" />
+															</button>
+														</div>
+
+														{cellSlots.length === 0 ? (
+															<p className="text-xs text-gray-400 italic">No recipes added</p>
+														) : (
+															<div className="space-y-2">
+																{cellSlots.map(function (cs) {
+																	var disabled = isLogged(selectedDay, meal, cs.slotId);
+
+																	return (
+																		<div key={cs.slotId} className="space-y-1">
+																			<MobileRecipeCard
+																				recipe={cs.recipe}
+																				servings={cs.servings_multiplier}
+																				onRemove={function () {
+																					removeSlot(cs.slotId);
+																				}}
+																			/>
+
+																			<button
+																				disabled={disabled}
+																				onClick={function (e) {
+																					e.preventDefault();
+																					e.stopPropagation();
+																					handleAteThis(selectedDay, meal, cs);
+																				}}
+																				className={
+																					"w-full text-xs font-semibold py-2 rounded-2xl transition-colors " +
+																					(disabled
+																						? "bg-gray-200/70 text-gray-500 cursor-not-allowed"
+																						: "bg-emerald-600 text-white hover:bg-emerald-700")
+																				}
+																			>
+																				{disabled ? "Logged" : "✅ Ate this"}
+																			</button>
+																		</div>
+																	);
+																})}
+															</div>
+														)}
+													</div>
+												);
+											})}
+										</div>
+									</div>
+								</>
+							)}
+						</div>
+
+						{/* Sidebar */}
+						<div className="hidden lg:flex flex-col gap-4 w-80 flex-shrink-0 sticky top-6 self-start">
+							<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 overflow-hidden">
+								<div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100/60 bg-white/40">
+									<h3 className="font-bold text-gray-800 text-sm">🛒 This Week&apos;s Shopping</h3>
+									<a href="/grocery-list" className="text-xs text-emerald-700 font-semibold hover:underline">
+										See all
+									</a>
+								</div>
+
+								{groceryGroups.length === 0 ? (
+									<p className="text-xs text-gray-400 italic p-4">Add meals to generate your list</p>
+								) : (
+									<div className="max-h-[520px] overflow-y-auto">
+										{groceryGroups.map(function (group, gi) {
+											return (
+												<div key={gi}>
+													<div className="px-4 py-2 bg-emerald-50/40 border-b border-emerald-100/60">
+														<span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+															{group.icon} {group.category}
+														</span>
+													</div>
+
+													<ul className="divide-y divide-emerald-100/60">
+														{group.items.map(function (item, i) {
+															var checkKey = item.name.toLowerCase().trim();
+															return (
+																<li
+																	key={i}
+																	className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-emerald-50/40 transition-colors"
+																	onClick={function () {
+																		toggleCheck(checkKey);
+																	}}
+																>
+																	<div
+																		className={
+																			"w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors " +
+																			(checkedItems[checkKey] ? "bg-emerald-600 border-emerald-600" : "border-emerald-200")
+																		}
+																	>
+																		{checkedItems[checkKey] && (
+																			<svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+																			</svg>
+																		)}
+																	</div>
+
+																	<span
+																		className={
+																			"flex-1 text-xs transition-colors " +
+																			(checkedItems[checkKey] ? "line-through text-gray-300" : "text-gray-700")
+																		}
+																	>
+																		{item.name}
+																	</span>
+
+																	{item.qty > 0 && (
+																		<span className={"text-xs flex-shrink-0 " + (checkedItems[checkKey] ? "text-gray-300" : "text-gray-400")}>
+																			{parseFloat(item.qty.toFixed(1))} {item.unit}
+																		</span>
+																	)}
+																</li>
+															);
+														})}
+													</ul>
+												</div>
+											);
+										})}
+									</div>
+								)}
+							</div>
+
+							{/* Recent recipes */}
+							<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4">
+								<div className="flex items-center justify-between mb-3">
+									<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
+									<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
+										See all
+									</a>
+								</div>
+
+								<div className="grid grid-cols-2 gap-3">
+									{featuredRecipes.map(function (recipe) {
+										var nut = null;
+										if (recipe.nutrition) {
+											nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
+										}
+
+										return (
+											<a
+												key={recipe.id}
+												href={"/recipes/" + recipe.id}
+												className="bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
+												title={recipe.title}
+											>
+												<div className="w-full aspect-square rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
+													{recipe.image_url ? (
+														<img
+															src={recipe.image_url}
+															className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+															alt={recipe.title}
+														/>
+													) : (
+														<div className="w-full h-full flex items-center justify-center">
+															<Utensils size={24} className="text-emerald-300" />
+														</div>
+													)}
+
+													<div className="absolute bottom-2 left-2 flex gap-1">
+														{nut && nut.calories > 0 && (
+															<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
+																🔥 {nut.calories}
+															</span>
+														)}
+													</div>
+												</div>
+
+												<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
+												<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
+											</a>
+										);
+									})}
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<RecipePickerModal
+						isOpen={modalOpen}
+						onClose={function () {
+							setModalOpen(false);
+							setActiveCell(null);
+						}}
+						onSelect={handleRecipeSelect}
+					/>
 				</div>
 			</div>
-
-			<RecipePickerModal
-				isOpen={modalOpen}
-				onClose={function () {
-					setModalOpen(false);
-					setActiveCell(null);
-				}}
-				onSelect={handleRecipeSelect}
-			/>
 		</div>
 	);
 }
 
 function MealCell({ date, meal, cellSlots, onAdd, onRemove, onAteThis, isLogged, saving }) {
 	return (
-		<div className="min-h-[70px] bg-white border border-gray-100 rounded-xl p-1.5 flex flex-col gap-1 group hover:border-green-200 transition-colors">
+		<div className="min-h-[78px] bg-white/70 backdrop-blur border border-emerald-100/70 rounded-3xl p-2 flex flex-col gap-2 hover:border-emerald-200 transition-colors">
 			{cellSlots.map(function (cs) {
 				return (
 					<DesktopRecipeCard
@@ -962,9 +1011,9 @@ function MealCell({ date, meal, cellSlots, onAdd, onRemove, onAteThis, isLogged,
 			<button
 				onClick={onAdd}
 				disabled={saving}
-				className="flex items-center justify-center w-full mt-auto py-1 rounded-lg border border-dashed border-gray-200 hover:border-green-400 hover:bg-green-50 transition-colors group/btn"
+				className="flex items-center justify-center w-full mt-auto py-2 rounded-2xl border border-dashed border-emerald-100/80 hover:border-emerald-300 hover:bg-emerald-50/60 transition-colors"
 			>
-				<Plus size={14} className="text-gray-300 group-hover/btn:text-green-500 transition-colors" />
+				<Plus size={14} className="text-emerald-300" />
 			</button>
 		</div>
 	);
@@ -979,27 +1028,27 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 	return (
 		<a
 			href={"/recipes/" + recipe.id}
-			className="flex flex-col items-center gap-1 bg-gray-50 rounded-lg p-1.5 group/card relative hover:bg-green-50 transition-colors"
+			className="flex flex-col items-center gap-1 bg-white/70 rounded-2xl border border-emerald-100/60 p-2 group/card relative hover:bg-emerald-50/50 transition-colors"
 			title={recipe.title}
 		>
 			{proxied ? (
 				<img
 					src={proxied}
 					alt={recipe.title}
-					className="w-full h-12 rounded-md object-cover"
+					className="w-full h-14 rounded-xl object-cover"
 					onError={function () {
 						setImgError(true);
 					}}
 				/>
 			) : (
-				<div className="w-full h-12 rounded-md bg-green-100 flex items-center justify-center">
-					<Utensils size={16} className="text-green-500" />
+				<div className="w-full h-14 rounded-xl bg-emerald-50 flex items-center justify-center">
+					<Utensils size={16} className="text-emerald-300" />
 				</div>
 			)}
 
-			<span className="text-[10px] text-gray-700 font-medium leading-tight text-center line-clamp-1 w-full">{recipe.title}</span>
+			<span className="text-[10px] text-gray-700 font-semibold leading-tight text-center line-clamp-1 w-full">{recipe.title}</span>
 
-			{servings > 1 && <span className="text-[9px] text-green-600 font-semibold">{servings}x</span>}
+			{servings > 1 && <span className="text-[9px] text-emerald-700 font-bold">{servings}x</span>}
 
 			<button
 				disabled={ateDisabled}
@@ -1009,8 +1058,8 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 					onAteThis?.();
 				}}
 				className={
-					"mt-1 w-full text-[9px] font-bold py-1 rounded-md transition-colors " +
-					(ateDisabled ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700")
+					"mt-1 w-full text-[9px] font-bold py-1 rounded-xl transition-colors " +
+					(ateDisabled ? "bg-gray-200/70 text-gray-500 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700")
 				}
 			>
 				{ateDisabled ? "Logged" : "✅ Ate this"}
@@ -1022,9 +1071,9 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 					e.stopPropagation();
 					onRemove();
 				}}
-				className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white hidden group-hover/card:flex items-center justify-center shadow-sm"
+				className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-emerald-100 text-gray-500 hidden group-hover/card:flex items-center justify-center shadow-sm"
 			>
-				<X size={9} strokeWidth={3} />
+				<X size={12} />
 			</button>
 		</a>
 	);
@@ -1037,25 +1086,28 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
 	var proxied = !imgError && recipe.image_url ? getProxiedImage(recipe.image_url) : null;
 
 	return (
-		<a href={"/recipes/" + recipe.id} className="flex items-center gap-2 bg-white rounded-xl px-2.5 py-2 shadow-sm hover:bg-green-50 transition-colors">
+		<a
+			href={"/recipes/" + recipe.id}
+			className="flex items-center gap-3 bg-white/70 backdrop-blur rounded-3xl px-3 py-3 border border-emerald-100/60 shadow-sm hover:bg-emerald-50/40 transition-colors"
+		>
 			{proxied ? (
 				<img
 					src={proxied}
 					alt={recipe.title}
-					className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+					className="w-10 h-10 rounded-2xl object-cover flex-shrink-0"
 					onError={function () {
 						setImgError(true);
 					}}
 				/>
 			) : (
-				<div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-					<Utensils size={14} className="text-green-500" />
+				<div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+					<Utensils size={16} className="text-emerald-300" />
 				</div>
 			)}
 
 			<div className="flex-1 min-w-0">
-				<p className="text-sm font-medium text-gray-800 truncate">{recipe.title}</p>
-				{servings > 1 && <p className="text-xs text-green-600">{servings}x serving</p>}
+				<p className="text-sm font-semibold text-gray-800 truncate">{recipe.title}</p>
+				{servings > 1 && <p className="text-xs text-emerald-700 font-bold">{servings}x serving</p>}
 			</div>
 
 			<button
@@ -1064,9 +1116,9 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
 					e.stopPropagation();
 					onRemove();
 				}}
-				className="w-6 h-6 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors flex-shrink-0"
+				className="w-8 h-8 rounded-2xl hover:bg-red-50 flex items-center justify-center transition-colors flex-shrink-0"
 			>
-				<X size={13} className="text-red-400" />
+				<X size={16} className="text-red-400" />
 			</button>
 		</a>
 	);
