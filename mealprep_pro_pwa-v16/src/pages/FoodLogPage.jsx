@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listFoodLogsByDate } from "../lib/foodLog";
+import { listFoodLogsByDate, deleteFoodLogEntry } from "../lib/foodLog";
 
 
 export default function FoodLogPage() {
@@ -7,6 +7,7 @@ export default function FoodLogPage() {
   const [entries, setEntries] = useState([]); // ALWAYS an array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState("");
 function toDateOnlyUTC(date = new Date()) {
   // UTC date -> YYYY-MM-DD
   return date.toISOString().slice(0, 10);
@@ -41,24 +42,39 @@ function addDaysUTC(dateStr, deltaDays) {
     }
 
     run();
-    return () => {
+     () => {
       alive = false;
     };
   }, [dateStr]);
 
   const totals = useMemo(() => {
-    return entries.reduce(
+     entries.reduce(
       (acc, e) => {
         acc.calories += Number(e?.calories || 0);
         acc.protein += Number(e?.protein || 0);
         acc.carbs += Number(e?.carbs || 0);
         acc.fat += Number(e?.fat || 0);
-        return acc;
+         acc;
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
   }, [entries]);
+  async function handleDelete(id) {
+  if (!id) return;
+  if (!confirm("Delete this entry?")) return;
 
+  try {
+    setDeletingId(id);
+    await deleteFoodLogEntry(id);
+
+    // remove from UI immediately
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+  } catch (err) {
+    alert(err?.message || "Failed to delete entry.");
+  } finally {
+    setDeletingId("");
+  }
+}
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <div className="flex items-center justify-between gap-3">
@@ -117,14 +133,24 @@ function addDaysUTC(dateStr, deltaDays) {
                     {e.meal_type} · {e.name}
                   </div>
 
-                  <div className="text-xs text-gray-500">
-                    {e.created
-                      ? new Date(e.created).toLocaleTimeString([], {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })
-                      : ""}
-                  </div>
+                  <div className="flex items-center gap-3">
+  <div className="text-xs text-gray-500">
+    {e.created
+      ? new Date(e.created).toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : ""}
+  </div>
+
+  <button
+    onClick={() => handleDelete(e.id)}
+    disabled={deletingId === e.id}
+    className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+  >
+    {deletingId === e.id ? "Deleting..." : "Delete"}
+  </button>
+</div>
                 </div>
 
                 <div className="mt-1 text-sm text-gray-600">
