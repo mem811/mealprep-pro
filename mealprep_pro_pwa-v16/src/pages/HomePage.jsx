@@ -846,6 +846,60 @@ export default function HomePage() {
 								</>
 							)}
 						</div>
+							{/* Recent recipes */}
+							<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4">
+								<div className="flex items-center justify-between mb-3">
+									<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
+									<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
+										See all
+									</a>
+								</div>
+
+								<div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+									{featuredRecipes.map(function (recipe) {
+										var nut = null;
+										if (recipe.nutrition) {
+											nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
+										}
+
+										return (
+											<a
+												key={recipe.id}
+												href={"/recipes/" + recipe.id}
+												className="bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
+												title={recipe.title}
+											>
+												<div className="w-full aspect-square rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
+													{recipe.image_url ? (
+														<img
+															src={recipe.image_url}
+															className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+															alt={recipe.title}
+														/>
+													) : (
+														<div className="w-full h-full flex items-center justify-center">
+															<Utensils size={24} className="text-emerald-300" />
+														</div>
+													)}
+
+													<div className="absolute bottom-2 left-2 flex gap-1">
+														{nut && nut.calories > 0 && (
+															<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
+																🔥 {nut.calories}
+															</span>
+														)}
+													</div>
+												</div>
+
+												<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
+												<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
+											</a>
+										);
+									})}
+								</div>
+							</div>
+						</div>
+					</div>
 
 						{/* Sidebar */}
 						<div className="hidden lg:flex flex-col gap-4 w-80 flex-shrink-0 sticky top-6 self-start">
@@ -918,61 +972,6 @@ export default function HomePage() {
 									</div>
 								)}
 							</div>
-
-							{/* Recent recipes */}
-							<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4">
-								<div className="flex items-center justify-between mb-3">
-									<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
-									<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
-										See all
-									</a>
-								</div>
-
-								<div className="grid grid-cols-2 gap-3">
-									{featuredRecipes.map(function (recipe) {
-										var nut = null;
-										if (recipe.nutrition) {
-											nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
-										}
-
-										return (
-											<a
-												key={recipe.id}
-												href={"/recipes/" + recipe.id}
-												className="bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
-												title={recipe.title}
-											>
-												<div className="w-full aspect-square rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
-													{recipe.image_url ? (
-														<img
-															src={recipe.image_url}
-															className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-															alt={recipe.title}
-														/>
-													) : (
-														<div className="w-full h-full flex items-center justify-center">
-															<Utensils size={24} className="text-emerald-300" />
-														</div>
-													)}
-
-													<div className="absolute bottom-2 left-2 flex gap-1">
-														{nut && nut.calories > 0 && (
-															<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
-																🔥 {nut.calories}
-															</span>
-														)}
-													</div>
-												</div>
-
-												<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
-												<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
-											</a>
-										);
-									})}
-								</div>
-							</div>
-						</div>
-					</div>
 
 					<RecipePickerModal
 						isOpen={modalOpen}
