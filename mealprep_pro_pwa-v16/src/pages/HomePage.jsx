@@ -425,14 +425,20 @@ export default function HomePage() {
 
 	// ✅ Ate this handler
 	var handleAteThis = async function (date, mealType, item) {
-  var slotKey = date + "**" + mealType + "**" + item?.slotId;
+    var slotKey = date + "**" + mealType + "**" + item?.slotId;
 
   if (!item?.slotId) return;
   if (loggedSlots[slotKey]) return; // already logged, block duplicates
+		// Permanent guard: check DB for an existing log from this slot
+		var existing = await pb.collection("food_log").getList(1, 1, {
+ 		 filter: 'source_slot_id = "' + item.slotId + '"',
+		});
+
+if (existing.items.length > 0) return;
 
   setLoggedSlots(function(prev) {
     var copy = Object.assign({}, prev);
-    copy[slotKey] = true;
+    copy[slotKey] = false;
     return copy;
   });
 
@@ -475,6 +481,7 @@ export default function HomePage() {
 				servings: mult,
 				recipe: recipe.id,
 				notes: "",
+				source_slot_id: item.slotId, // <-- add this line
 			});
 		} catch (e) {
 			console.error("Ate this error:", e);
