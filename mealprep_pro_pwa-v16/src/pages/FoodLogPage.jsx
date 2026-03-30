@@ -13,13 +13,11 @@ function addDaysUTC(dateStr, deltaDays) {
 
 export default function FoodLogPage() {
   const [dateStr, setDateStr] = useState(toDateOnlyUTC());
-  const [entries, setEntries] = useState([]);
+  const [entries, setEntries] = useState([]); // ALWAYS array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState("");
 
-  // ...rest of your code
-}
   useEffect(() => {
     let alive = true;
 
@@ -29,10 +27,7 @@ export default function FoodLogPage() {
 
       try {
         const res = await listFoodLogsByDate(dateStr);
-
-        // PocketBase getList returns an object with { items: [...] }
         const items = Array.isArray(res?.items) ? res.items : [];
-
         if (alive) setEntries(items);
       } catch (err) {
         if (alive) {
@@ -45,39 +40,39 @@ export default function FoodLogPage() {
     }
 
     run();
-     () => {
+    return () => {
       alive = false;
     };
   }, [dateStr]);
 
   const totals = useMemo(() => {
-     entries.reduce(
+    return entries.reduce(
       (acc, e) => {
         acc.calories += Number(e?.calories || 0);
         acc.protein += Number(e?.protein || 0);
         acc.carbs += Number(e?.carbs || 0);
         acc.fat += Number(e?.fat || 0);
-         acc;
+        return acc;
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
   }, [entries]);
+
   async function handleDelete(id) {
-  if (!id) return;
-  if (!confirm("Delete this entry?")) return;
+    if (!id) return;
+    if (!confirm("Delete this entry?")) return;
 
-  try {
-    setDeletingId(id);
-    await deleteFoodLogEntry(id);
-
-    // remove from UI immediately
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-  } catch (err) {
-    alert(err?.message || "Failed to delete entry.");
-  } finally {
-    setDeletingId("");
+    try {
+      setDeletingId(id);
+      await deleteFoodLogEntry(id);
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      alert(err?.message || "Failed to delete entry.");
+    } finally {
+      setDeletingId("");
+    }
   }
-}
+
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <div className="flex items-center justify-between gap-3">
@@ -137,28 +132,28 @@ export default function FoodLogPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-  <div className="text-xs text-gray-500">
-    {e.created
-      ? new Date(e.created).toLocaleTimeString([], {
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      : ""}
-  </div>
+                    <div className="text-xs text-gray-500">
+                      {e.created
+                        ? new Date(e.created).toLocaleTimeString([], {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                        : ""}
+                    </div>
 
-  <button
-    onClick={() => handleDelete(e.id)}
-    disabled={deletingId === e.id}
-    className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
-  >
-    {deletingId === e.id ? "Deleting..." : "Delete"}
-  </button>
-</div>
+                    <button
+                      onClick={() => handleDelete(e.id)}
+                      disabled={deletingId === e.id}
+                      className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                    >
+                      {deletingId === e.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-1 text-sm text-gray-600">
-                  {e.calories ?? 0} cal · P {e.protein ?? 0}g · C {e.carbs ?? 0}g ·
-                  F {e.fat ?? 0}g
+                  {e.calories ?? 0} cal · P {e.protein ?? 0}g · C {e.carbs ?? 0}g · F{" "}
+                  {e.fat ?? 0}g
                   {e.servings ? ` · ${e.servings} servings` : ""}
                 </div>
 
