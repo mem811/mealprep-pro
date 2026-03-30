@@ -17,17 +17,29 @@ function addDays(dateStr, deltaDays) {
 
 export default function FoodLogPage() {
   const [dateStr, setDateStr] = useState(toDateOnlyLocal());
-  const [entries, setEntries] = useState([]);
+  const [entries, setEntries] = useState([]); // ALWAYS an array
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let alive = true;
 
     async function run() {
       setLoading(true);
+      setError("");
+
       try {
-        const rows = await listFoodLogsByDate(dateStr);
-        if (alive) setEntries(rows);
+        const res = await listFoodLogsByDate(dateStr);
+
+        // PocketBase getList returns an object with { items: [...] }
+        const items = Array.isArray(res?.items) ? res.items : [];
+
+        if (alive) setEntries(items);
+      } catch (err) {
+        if (alive) {
+          setEntries([]);
+          setError(err?.message || "Failed to load food log entries.");
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -42,10 +54,10 @@ export default function FoodLogPage() {
   const totals = useMemo(() => {
     return entries.reduce(
       (acc, e) => {
-        acc.calories += Number(e.calories || 0);
-        acc.protein += Number(e.protein || 0);
-        acc.carbs += Number(e.carbs || 0);
-        acc.fat += Number(e.fat || 0);
+        acc.calories += Number(e?.calories || 0);
+        acc.protein += Number(e?.protein || 0);
+        acc.carbs += Number(e?.carbs || 0);
+        acc.fat += Number(e?.fat || 0);
         return acc;
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
@@ -77,14 +89,17 @@ export default function FoodLogPage() {
           <div className="text-gray-500">Calories</div>
           <div className="font-semibold">{Math.round(totals.calories)}</div>
         </div>
+
         <div className="p-2 rounded bg-gray-50">
           <div className="text-gray-500">Protein</div>
           <div className="font-semibold">{Math.round(totals.protein)}g</div>
         </div>
+
         <div className="p-2 rounded bg-gray-50">
           <div className="text-gray-500">Carbs</div>
           <div className="font-semibold">{Math.round(totals.carbs)}g</div>
         </div>
+
         <div className="p-2 rounded bg-gray-50">
           <div className="text-gray-500">Fat</div>
           <div className="font-semibold">{Math.round(totals.fat)}g</div>
@@ -94,6 +109,8 @@ export default function FoodLogPage() {
       <div className="mt-6">
         {loading ? (
           <div className="text-gray-500">Loading…</div>
+        ) : error ? (
+          <div className="text-red-600 text-sm">{error}</div>
         ) : entries.length === 0 ? (
           <div className="text-gray-500">No entries for this day.</div>
         ) : (
@@ -104,17 +121,20 @@ export default function FoodLogPage() {
                   <div className="font-medium">
                     {e.meal_type} · {e.name}
                   </div>
+
                   <div className="text-xs text-gray-500">
-                    {new Date(e.created).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                    {e.created
+                      ? new Date(e.created).toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })
+                      : ""}
                   </div>
                 </div>
 
                 <div className="mt-1 text-sm text-gray-600">
-                  {e.calories ?? 0} cal · P {e.protein ?? 0}g · C {e.carbs ?? 0}g · F{" "}
-                  {e.fat ?? 0}g
+                  {e.calories ?? 0} cal · P {e.protein ?? 0}g · C {e.carbs ?? 0}g ·
+                  F {e.fat ?? 0}g
                   {e.servings ? ` · ${e.servings} servings` : ""}
                 </div>
 
