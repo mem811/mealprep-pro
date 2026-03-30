@@ -45,3 +45,6 @@ export async function createFoodLogEntry(data) {
 export async function deleteFoodLogEntry(id) {
   return pb.collection("food_log").delete(id);
 }
+export async function updateFoodLogEntry(id, data) {
+  return pb.collection("food_log").update(id, data);
+}
