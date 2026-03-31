@@ -69,6 +69,7 @@ export default function FoodLogPage() {
 	const [scanError, setScanError] = useState("");
 	const [addFood, setAddFood] = useState(null);
 	const [savingNew, setSavingNew] = useState(false);
+	console.log("FoodLogPage: ZXING BUILD");
 
 	const isMobile = useMemo(() => {
 		if (typeof window === "undefined") return false;
