@@ -233,17 +233,19 @@ export default function FoodLogPage() {
     };
   }
 
-  async function doLookup(barcode) {
-    try {
-      setLookingUp(true);
-      const { barcode: clean, product } = await lookupOpenFoodFacts(barcode);
-      setAddFood(buildAddFoodFromOff(clean, product));
-    } catch (e) {
-      alert(e?.message || "Lookup failed.");
-    } finally {
-      setLookingUp(false);
-    }
-  }
+ async function doLookup(barcode) {
+	try {
+		setLookingUp(true);
+		const { barcode: clean, product } = await lookupOpenFoodFacts(barcode);
+		setAddFood(buildAddFoodFromOff(clean, product));
+		return true;
+	} catch (e) {
+		alert(e?.message || "Lookup failed.");
+		return false;
+	} finally {
+		setLookingUp(false);
+	}
+}
 
   async function saveNewFoodLogEntry() {
     if (!addFood) return;
@@ -332,12 +334,9 @@ await qr.start(
 			return;
 		}
 
-		// 2) Then stop camera and close scanner
-		try {
-			await qr.stop();
-		} catch {}
-
-		setScanOpen(false);
+		// 2) Stop camera + close scanner (iOS-safe: do not await stop)
+			qr.stop().catch(() => {});
+			setScanOpen(false);
 	} catch (e) {
 		console.error("Scan lookup error:", e);
 		setScanError(e?.message || "Lookup failed. Try again.");
