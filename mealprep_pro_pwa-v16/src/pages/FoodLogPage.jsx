@@ -314,16 +314,36 @@ await qr.start(
   { facingMode: "environment" },
   config,
   async (decodedText) => {
-    if (stopped) return;
-    stopped = true;
+	if (stopped) return;
+	stopped = true;
 
-    try {
-      await qr.stop();
-    } catch {}
+	const clean = String(decodedText || "").replace(/\D/g, "");
+	if (!clean) {
+		setScanError("Could not read a valid barcode. Try again.");
+		stopped = false;
+		return;
+	}
 
-    setScanOpen(false);
-    await doLookup(decodedText);
-  },
+	try {
+		// 1) Do lookup first (keeps UX from feeling like it went blank)
+		const ok = await doLookup(clean);
+		if (!ok) {
+			stopped = false;
+			return;
+		}
+
+		// 2) Then stop camera and close scanner
+		try {
+			await qr.stop();
+		} catch {}
+
+		setScanOpen(false);
+	} catch (e) {
+		console.error("Scan lookup error:", e);
+		setScanError(e?.message || "Lookup failed. Try again.");
+		stopped = false;
+	}
+}
   () => {}
 );
       } catch (e) {
