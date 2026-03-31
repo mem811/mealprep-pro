@@ -143,7 +143,7 @@ function fmt(d) {
 
 function getProxiedImage(url) {
 	if (!url) return null;
-	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=200&h=200&fit=cover&q=85";
+	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=120&h=120&fit=cover&q=85";
 }
 
 export default function HomePage() {
@@ -673,10 +673,10 @@ export default function HomePage() {
 									<a
 										key={recipe.id}
 										href={"/recipes/" + recipe.id}
-										className="flex-shrink-0 w-44 bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
+										className="flex-shrink-0 w-40 bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
 										title={recipe.title}
 									>
-										<div className="w-full aspect-square rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
+										<div className="w-full h-24 rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
 											{recipe.image_url ? (
 												<img
 													src={recipe.image_url}
@@ -991,11 +991,11 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 				<img
 					src={proxied}
 					alt={recipe.title}
-					className="w-full h-14 rounded-xl object-cover"
+					className="w-full h-12 rounded-xl object-cover"
 					onError={function () { setImgError(true); }}
 				/>
 			) : (
-				<div className="w-full h-14 rounded-xl bg-emerald-50 flex items-center justify-center">
+				<div className="w-full h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
 					<Utensils size={16} className="text-emerald-300" />
 				</div>
 			)}
@@ -1048,11 +1048,11 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
 				<img
 					src={proxied}
 					alt={recipe.title}
-					className="w-10 h-10 rounded-2xl object-cover flex-shrink-0"
+					className="w-9 h-9 rounded-2xl object-cover flex-shrink-0"
 					onError={function () { setImgError(true); }}
 				/>
 			) : (
-				<div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+				<div className="w9 h-9 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
 					<Utensils size={16} className="text-emerald-300" />
 				</div>
 			)}
