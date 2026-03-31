@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import pb from "../lib/pb";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { listFoodLogsByDate, deleteFoodLogEntry, updateFoodLogEntry } from "../lib/foodLog";
 
 function toDateOnlyUTC(date = new Date()) {
@@ -298,22 +298,33 @@ export default function FoodLogPage() {
       try {
         qr = new Html5Qrcode("barcode-reader");
 
-        await qr.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 240, height: 160 } },
-          async (decodedText) => {
-            if (stopped) return;
-            stopped = true;
+        const config = {
+  fps: 10,
+  qrbox: { width: 280, height: 180 },
+  formatsToSupport: [
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E,
+  ],
+};
 
-            try {
-              await qr.stop();
-            } catch {}
+await qr.start(
+  { facingMode: { exact: "environment" } },
+  config,
+  async (decodedText) => {
+    if (stopped) return;
+    stopped = true;
 
-            setScanOpen(false);
-            await doLookup(decodedText);
-          },
-          () => {}
-        );
+    try {
+      await qr.stop();
+    } catch {}
+
+    setScanOpen(false);
+    await doLookup(decodedText);
+  },
+  () => {}
+);
       } catch (e) {
         setScanError(e?.message || "Unable to start camera.");
       }
