@@ -299,18 +299,16 @@ export default function FoodLogPage() {
         qr = new Html5Qrcode("barcode-reader");
 
         const config = {
-          fps: 12,
-          qrbox: { width: 320, height: 220 },
-          aspectRatio: 1.7778, // helps iOS video sizing
-          rememberLastUsedCamera: true,
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.CODE_128,
-            ],
-          };
+  fps: 12,
+  qrbox: { width: 320, height: 220 },
+  aspectRatio: 1.7778,
+  disableFlip: true,
+
+  // Big iOS improvement:
+  experimentalFeatures: {
+    useBarCodeDetectorIfSupported: true,
+  },
+};
 
 await qr.start(
   { facingMode: "environment" },
