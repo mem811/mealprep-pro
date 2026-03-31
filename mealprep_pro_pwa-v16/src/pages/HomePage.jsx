@@ -925,7 +925,7 @@ export default function HomePage() {
 						<p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
 						  Browse your library
 						</p>
-						<div className="bg-white/60 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4 mb-6">
+						<div className="bg-white/60 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4 mt-8">
 						<div className="flex items-center justify-between mb-3">
 							<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
 							<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
