@@ -922,7 +922,7 @@ export default function HomePage() {
 							</div>
 						</div>
 					</div>
-						<p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+						<p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-6">
 						  Browse your library
 						</p>
 						<div className="bg-white/60 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4 mt-8">
