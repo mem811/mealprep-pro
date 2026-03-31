@@ -50,9 +50,9 @@ async function lookupOpenFoodFacts(barcode) {
   const clean = String(barcode || "").replace(/\D/g, "");
   if (!clean) throw new Error("Please enter a barcode.");
 
-  const url = `https://world.openfoodfacts.org/api/v2/product/${clean}.json`;
+  const url = `https://world.openfoodfacts.org/api/v2/product/${clean}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Lookup failed.");
+  if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
   const data = await res.json();
 
   if (data?.status !== 1) throw new Error("Not found in Open Food Facts.");
