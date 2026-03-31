@@ -4,7 +4,7 @@ import { listFoodLogsByDate, deleteFoodLogEntry, updateFoodLogEntry } from "../l
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
 function toDateOnlyUTC(date = new Date()) {
-	return date.toISOString().slice(0, 10);
+	return date.toISOString().slice(0, 10); 
 }
 
 function addDaysUTC(dateStr, deltaDays) {
