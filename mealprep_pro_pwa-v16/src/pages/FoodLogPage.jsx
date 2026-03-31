@@ -315,33 +315,36 @@ export default function FoodLogPage() {
 await qr.start(
   { facingMode: "environment" },
   config,
-  async (decodedText) => {
-	if (stopped) return;
-	stopped = true;
+async (decodedText, decodedResult) => {
+  if (stopped) return;
 
-	const clean = String(decodedText || "").replace(/\D/g, "");
-	if (!clean) {
-		setScanError("Could not read a valid barcode. Try again.");
-		stopped = false;
-		return;
-	}
+  // html5-qrcode sometimes gives text in different places depending on platform
+  const raw =
+    (typeof decodedText === "string" && decodedText) ||
+    decodedResult?.decodedText ||
+    decodedResult?.result?.text ||
+    "";
 
-	try {
-		// 1) Do lookup first (keeps UX from feeling like it went blank)
-		const ok = await doLookup(clean);
-		if (!ok) {
-			stopped = false;
-			return;
-		}
+  const clean = String(raw).replace(/\D/g, "");
 
-		// 2) Stop camera + close scanner (iOS-safe: do not await stop)
-			qr.stop().catch(() => {});
-			setScanOpen(false);
-	} catch (e) {
-		console.error("Scan lookup error:", e);
-		setScanError(e?.message || "Lookup failed. Try again.");
-		stopped = false;
-	}
+  // Require a plausible UPC/EAN length before looking up
+  // (UPC-A=12, EAN-13=13, EAN-8=8)
+  if (!(clean.length === 8 || clean.length === 12 || clean.length === 13)) {
+    // Not a real decode yet — keep scanning, no alerts
+    return;
+  }
+
+  stopped = true;
+
+  const ok = await doLookup(clean);
+  if (!ok) {
+    stopped = false;
+    return;
+  }
+
+  // iOS-safe stop
+  qr.stop().catch(() => {});
+  setScanOpen(false);
 }
   () => {}
 );
