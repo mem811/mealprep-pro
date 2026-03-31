@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import pb from "../lib/pb";
 import { listFoodLogsByDate, deleteFoodLogEntry, updateFoodLogEntry } from "../lib/foodLog";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 function toDateOnlyUTC(date = new Date()) {
 	return date.toISOString().slice(0, 10);
@@ -121,71 +122,51 @@ export default function FoodLogPage() {
 
 	// ── Barcode scanner (native BarcodeDetector — no library needed) ──
 	useEffect(() => {
-		if (!scanOpen) return;
+  if (!scanOpen) return;
 
-		let stream = null;
-		let animFrame = null;
-		let stopped = false;
+  let reader = null;
+  let stopped = false;
 
-		const video = document.getElementById("barcode-video");
+  async function start() {
+    setScanError("");
+    try {
+      reader = new BrowserMultiFormatReader();
 
-		async function start() {
-			setScanError("");
+      const videoEl = document.getElementById("barcode-video");
+      if (!videoEl) return;
 
-			if (!("BarcodeDetector" in window)) {
-				setScanError("Your browser does not support barcode scanning. Use the manual input below.");
-				return;
-			}
+      await reader.decodeFromConstraints(
+        { video: { facingMode: "environment" } },
+        videoEl,
+        async (result, err) => {
+          if (stopped) return;
+          if (result) {
+            const clean = String(result.getText()).replace(/\D/g, "");
+            if (
+              clean.length === 8 ||
+              clean.length === 12 ||
+              clean.length === 13
+            ) {
+              stopped = true;
+              try { reader.reset(); } catch {}
+              setScanOpen(false);
+              await doLookup(clean);
+            }
+          }
+        }
+      );
+    } catch (e) {
+      setScanError(e?.message || "Could not access camera. Check permissions.");
+    }
+  }
 
-			try {
-				stream = await navigator.mediaDevices.getUserMedia({
-					video: { facingMode: "environment" },
-					audio: false,
-				});
+  start();
 
-				if (!video) return;
-				video.srcObject = stream;
-				await video.play();
-
-				const detector = new window.BarcodeDetector({
-					formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"],
-				});
-
-				async function tick() {
-					if (stopped) return;
-					if (video.readyState === video.HAVE_ENOUGH_DATA) {
-						try {
-							const codes = await detector.detect(video);
-							if (codes.length > 0) {
-								const raw = codes[0].rawValue;
-								const clean = String(raw).replace(/\D/g, "");
-								if (clean.length === 8 || clean.length === 12 || clean.length === 13) {
-									stopped = true;
-									stream.getTracks().forEach((t) => t.stop());
-									setScanOpen(false);
-									await doLookup(clean);
-									return;
-								}
-							}
-						} catch {}
-					}
-					animFrame = requestAnimationFrame(tick);
-				}
-
-				animFrame = requestAnimationFrame(tick);
-			} catch (e) {
-				setScanError(e?.message || "Could not access camera. Check permissions.");
-			}
-		}
-
-		start();
-
-		return () => {
-			stopped = true;
-			if (animFrame) cancelAnimationFrame(animFrame);
-			if (stream) stream.getTracks().forEach((t) => t.stop());
-		};
-	}, [scanOpen]);
+  return () => {
+    stopped = true;
+    try { reader?.reset(); } catch {}
+  };
+}, [scanOpen]);
 
 	function buildAddFoodFromOff(barcode, product) {
 		const name =
