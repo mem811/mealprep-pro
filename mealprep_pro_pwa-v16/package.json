@@ -14,7 +14,8 @@
     "react-router-dom": "6.22.3",
     "@tanstack/react-query": "5.28.0",
     "pocketbase": "0.21.3",
-    "lucide-react": "0.368.0"
+    "lucide-react": "0.368.0",
+    "html5-qrcode": "^2.3.8"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "4.2.1",
