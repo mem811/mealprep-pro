@@ -146,6 +146,29 @@ function getProxiedImage(url) {
 	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=120&h=120&fit=cover&q=85";
 }
 
+function parseNutrition(nutrition) {
+	if (!nutrition) return null;
+	try {
+		return typeof nutrition === "string" ? JSON.parse(nutrition) : nutrition;
+	} catch {
+		return null;
+	}
+}
+
+function getMacros(recipe, mult) {
+	var nut = parseNutrition(recipe?.nutrition);
+	if (!nut) return null;
+
+	var m = mult || 1;
+	var cal = Math.round((nut.calories || 0) * m);
+	var p = Math.round((nut.protein || 0) * m);
+	var c = Math.round((nut.carbs || 0) * m);
+	var f = Math.round((nut.fat || 0) * m);
+
+	if (!cal && !p && !c && !f) return null;
+	return { cal, p, c, f };
+}
+
 export default function HomePage() {
 	const [weekOffset, setWeekOffset] = useState(0);
 	const [selectedDay, setSelectedDay] = useState(fmt(new Date()));
@@ -438,7 +461,6 @@ export default function HomePage() {
 		if (!slotId) return;
 		if (isLogged(date, mealType, slotId)) return;
 
-		// optimistic lock
 		setLoggedSlots(function (prev) {
 			var copy = Object.assign({}, prev);
 			copy["SLOT**" + slotId] = true;
@@ -493,10 +515,8 @@ export default function HomePage() {
 
 	var DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-	// Style wrappers
 	var pageBg = "min-h-screen bg-gradient-to-b from-emerald-50/70 via-teal-50/30 to-white";
-	var shellCard =
-		"bg-white/80 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-xl shadow-emerald-100/50";
+	var shellCard = "bg-white/80 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-xl shadow-emerald-100/50";
 	var softBtn =
 		"px-3 py-2 rounded-2xl bg-white/90 border border-emerald-100 text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors";
 
@@ -533,7 +553,6 @@ export default function HomePage() {
 		<div className={pageBg}>
 			<div className="max-w-6xl mx-auto px-3 sm:px-6 py-6">
 				<div className={shellCard + " p-4 sm:p-6"}>
-					{/* Header */}
 					<div className="flex items-center justify-between mb-5">
 						<div>
 							<h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meal Planner</h1>
@@ -555,7 +574,12 @@ export default function HomePage() {
 								<ChevronLeft size={16} className="text-emerald-700" />
 							</button>
 
-							<button onClick={function () { setWeekOffset(0); }} className={softBtn}>
+							<button
+								onClick={function () {
+									setWeekOffset(0);
+								}}
+								className={softBtn}
+							>
 								Today
 							</button>
 
@@ -572,15 +596,16 @@ export default function HomePage() {
 						</div>
 					</div>
 
-					{/* Today hero */}
 					<div className="rounded-[28px] p-5 text-white shadow-lg shadow-emerald-200/40 mb-5" style={todayCardStyle}>
 						<div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
 							<div className="flex-shrink-0">
 								<p className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-0.5">Today</p>
 								<h2 className="text-xl font-bold">
-									{weekDays.find(function (d) {
-										return fmt(d) === today;
-									})?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) || "Today"}
+									{weekDays
+										.find(function (d) {
+											return fmt(d) === today;
+										})
+										?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) || "Today"}
 								</h2>
 							</div>
 
@@ -588,9 +613,7 @@ export default function HomePage() {
 								{todayMeals.map(function (tm) {
 									return (
 										<div key={tm.meal} className="rounded-2xl p-3" style={slotCardStyle}>
-											<p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">
-												{MEAL_LABELS[tm.meal]}
-											</p>
+											<p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-2">{MEAL_LABELS[tm.meal]}</p>
 
 											{tm.items.length === 0 ? (
 												<p className="text-xs italic" style={nothingTextStyle}>
@@ -600,6 +623,8 @@ export default function HomePage() {
 												<div className="flex flex-col gap-2">
 													{tm.items.map(function (item) {
 														var disabled = isLogged(today, tm.meal, item.slotId);
+														var macros = getMacros(item.recipe, item.servings_multiplier);
+
 														return (
 															<div key={item.slotId} className="flex items-start gap-2">
 																<div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0" style={recipeThumbStyle}>
@@ -613,9 +638,12 @@ export default function HomePage() {
 																</div>
 
 																<div className="flex-1 min-w-0">
-																	<p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">
-																		{item.recipe?.title}
-																	</p>
+																	<p className="text-white text-[11px] font-semibold leading-tight line-clamp-2">{item.recipe?.title}</p>
+																	{macros && (
+																		<p className="text-[10px] text-emerald-100 font-bold mt-0.5">
+																			🔥 {macros.cal} · P {macros.p}g · C {macros.c}g · F {macros.f}g
+																		</p>
+																	)}
 
 																	<button
 																		disabled={disabled}
@@ -653,7 +681,6 @@ export default function HomePage() {
 						)}
 					</div>
 
-					{/* Recent recipes (compact row) */}
 					<div className="bg-white/60 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4 mb-6">
 						<div className="flex items-center justify-between mb-3">
 							<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
@@ -668,6 +695,15 @@ export default function HomePage() {
 								if (recipe.nutrition) {
 									nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
 								}
+
+								var macros = nut
+									? {
+											cal: Math.round(nut.calories || 0),
+											p: Math.round(nut.protein || 0),
+											c: Math.round(nut.carbs || 0),
+											f: Math.round(nut.fat || 0),
+									  }
+									: null;
 
 								return (
 									<a
@@ -689,22 +725,31 @@ export default function HomePage() {
 												</div>
 											)}
 
-											{nut && nut.calories > 0 && (
-												<span className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
-													🔥 {nut.calories}
-												</span>
+											{macros && macros.cal > 0 && (
+												<div className="absolute bottom-2 left-2 flex gap-1">
+													<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
+														🔥 {macros.cal}
+													</span>
+													<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-gray-700 px-2 py-1 rounded-full">
+														P {macros.p}
+													</span>
+												</div>
 											)}
 										</div>
 
 										<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
 										<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
+										{macros && (
+											<p className="text-[10px] text-gray-400 mt-1 font-semibold">
+												P {macros.p}g · C {macros.c}g · F {macros.f}g
+											</p>
+										)}
 									</a>
 								);
 							})}
 						</div>
 					</div>
 
-					{/* Planner + sidebar */}
 					<div className="flex gap-6 items-start">
 						<div className="flex-1 min-w-0">
 							{loading ? (
@@ -713,7 +758,6 @@ export default function HomePage() {
 								</div>
 							) : (
 								<>
-									{/* Desktop table */}
 									<div className="hidden md:block overflow-x-auto">
 										<table className="w-full border-separate border-spacing-2 table-fixed">
 											<thead>
@@ -726,7 +770,9 @@ export default function HomePage() {
 																<div
 																	className={
 																		"inline-flex flex-col items-center px-3 py-1.5 rounded-2xl border " +
-																		(isToday ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-white/70 text-gray-600 border-gray-100")
+																		(isToday
+																			? "bg-emerald-50 text-emerald-700 border-emerald-200"
+																			: "bg-white/70 text-gray-600 border-gray-100")
 																	}
 																>
 																	<span className="text-xs font-medium">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}</span>
@@ -753,7 +799,7 @@ export default function HomePage() {
 																var key = date + "**" + meal;
 																var cellSlots = slots[key] || [];
 																return (
-																	<td key={di} className={"align-top rounded-2xl " + (fmt(d) === today ? "bg-emerald-50/40" : "")}>
+																	<td key={di} className={"align-top rounded-2xl " + (fmt(d) === today ? "bg-emerald-50/40" : "") }>
 																		<MealCell
 																			date={date}
 																			meal={meal}
@@ -774,7 +820,6 @@ export default function HomePage() {
 										</table>
 									</div>
 
-									{/* Mobile view */}
 									<div className="md:hidden">
 										<div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
 											{weekDays.map(function (d, i) {
@@ -814,7 +859,9 @@ export default function HomePage() {
 														<div className="flex items-center justify-between mb-2">
 															<span className="text-sm font-semibold text-gray-700">{MEAL_LABELS[meal]}</span>
 															<button
-																onClick={function () { openModal(selectedDay, meal); }}
+																onClick={function () {
+																	openModal(selectedDay, meal);
+																}}
 																className="w-8 h-8 rounded-2xl bg-white/80 border border-white/60 shadow-sm flex items-center justify-center hover:bg-white transition-colors"
 															>
 																<Plus size={14} className="text-emerald-600" />
@@ -827,12 +874,17 @@ export default function HomePage() {
 															<div className="space-y-2">
 																{cellSlots.map(function (cs) {
 																	var disabled = isLogged(selectedDay, meal, cs.slotId);
+																	var macros = getMacros(cs.recipe, cs.servings_multiplier);
+
 																	return (
 																		<div key={cs.slotId} className="space-y-1">
 																			<MobileRecipeCard
 																				recipe={cs.recipe}
 																				servings={cs.servings_multiplier}
-																				onRemove={function () { removeSlot(cs.slotId); }}
+																				macros={macros}
+																				onRemove={function () {
+																					removeSlot(cs.slotId);
+																				}}
 																			/>
 
 																			<button
@@ -844,7 +896,9 @@ export default function HomePage() {
 																				}}
 																				className={
 																					"w-full text-xs font-semibold py-2 rounded-2xl transition-colors " +
-																					(disabled ? "bg-gray-200/70 text-gray-500 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700")
+																					(disabled
+																						? "bg-gray-200/70 text-gray-500 cursor-not-allowed"
+																						: "bg-emerald-600 text-white hover:bg-emerald-700")
 																				}
 																			>
 																				{disabled ? "Logged" : "✅ Ate this"}
@@ -863,11 +917,10 @@ export default function HomePage() {
 							)}
 						</div>
 
-						{/* Shopping sidebar */}
 						<div className="hidden lg:flex flex-col gap-4 w-80 flex-shrink-0 sticky top-6 self-start">
 							<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 overflow-hidden">
 								<div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100/60 bg-white/40">
-									<h3 className="font-bold text-gray-800 text-sm">🛒 This Week&apos;s Shopping</h3>
+									<h3 className="font-bold text-gray-800 text-sm">🛒 This Week's Shopping</h3>
 									<a href="/grocery-list" className="text-xs text-emerald-700 font-semibold hover:underline">
 										See all
 									</a>
@@ -893,12 +946,16 @@ export default function HomePage() {
 																<li
 																	key={i}
 																	className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-emerald-50/40 transition-colors"
-																	onClick={function () { toggleCheck(checkKey); }}
+																	onClick={function () {
+																		toggleCheck(checkKey);
+																	}}
 																>
 																	<div
 																		className={
 																			"w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors " +
-																			(checkedItems[checkKey] ? "bg-emerald-600 border-emerald-600" : "border-emerald-200")
+																			(checkedItems[checkKey]
+																				? "bg-emerald-600 border-emerald-600"
+																				: "border-emerald-200")
 																		}
 																	>
 																		{checkedItems[checkKey] && (
@@ -910,7 +967,8 @@ export default function HomePage() {
 
 																	<span
 																		className={
-																			"flex-1 text-xs transition-colors " + (checkedItems[checkKey] ? "line-through text-gray-300" : "text-gray-700")
+																			"flex-1 text-xs transition-colors " +
+																			(checkedItems[checkKey] ? "line-through text-gray-300" : "text-gray-700")
 																		}
 																	>
 																		{item.name}
@@ -957,8 +1015,13 @@ function MealCell({ date, meal, cellSlots, onAdd, onRemove, onAteThis, isLogged,
 						key={cs.slotId}
 						recipe={cs.recipe}
 						servings={cs.servings_multiplier}
-						onRemove={function () { onRemove(cs.slotId); }}
-						onAteThis={function () { onAteThis(date, meal, cs); }}
+						macros={getMacros(cs.recipe, cs.servings_multiplier)}
+						onRemove={function () {
+							onRemove(cs.slotId);
+						}}
+						onAteThis={function () {
+							onAteThis(date, meal, cs);
+						}}
 						ateDisabled={isLogged(date, meal, cs.slotId)}
 					/>
 				);
@@ -975,7 +1038,7 @@ function MealCell({ date, meal, cellSlots, onAdd, onRemove, onAteThis, isLogged,
 	);
 }
 
-function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled }) {
+function DesktopRecipeCard({ recipe, servings, macros, onRemove, onAteThis, ateDisabled }) {
 	const [imgError, setImgError] = useState(false);
 	if (!recipe) return null;
 
@@ -992,7 +1055,9 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 					src={proxied}
 					alt={recipe.title}
 					className="w-full h-12 rounded-xl object-cover"
-					onError={function () { setImgError(true); }}
+					onError={function () {
+						setImgError(true);
+					}}
 				/>
 			) : (
 				<div className="w-full h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -1001,6 +1066,15 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 			)}
 
 			<span className="text-[10px] text-gray-700 font-semibold leading-tight text-center line-clamp-1 w-full">{recipe.title}</span>
+
+			{macros && (
+				<div className="mt-0.5 flex flex-wrap items-center justify-center gap-1 text-[9px] font-bold text-gray-700">
+					<span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">🔥 {macros.cal}</span>
+					<span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">P {macros.p}g</span>
+					<span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">C {macros.c}g</span>
+					<span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">F {macros.f}g</span>
+				</div>
+			)}
 
 			{servings > 1 && <span className="text-[9px] text-emerald-700 font-bold">{servings}x</span>}
 
@@ -1033,7 +1107,7 @@ function DesktopRecipeCard({ recipe, servings, onRemove, onAteThis, ateDisabled 
 	);
 }
 
-function MobileRecipeCard({ recipe, servings, onRemove }) {
+function MobileRecipeCard({ recipe, servings, macros, onRemove }) {
 	const [imgError, setImgError] = useState(false);
 	if (!recipe) return null;
 
@@ -1049,10 +1123,12 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
 					src={proxied}
 					alt={recipe.title}
 					className="w-9 h-9 rounded-2xl object-cover flex-shrink-0"
-					onError={function () { setImgError(true); }}
+					onError={function () {
+						setImgError(true);
+					}}
 				/>
 			) : (
-				<div className="w9 h-9 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+				<div className="w-9 h-9 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
 					<Utensils size={16} className="text-emerald-300" />
 				</div>
 			)}
@@ -1060,6 +1136,11 @@ function MobileRecipeCard({ recipe, servings, onRemove }) {
 			<div className="flex-1 min-w-0">
 				<p className="text-sm font-semibold text-gray-800 truncate">{recipe.title}</p>
 				{servings > 1 && <p className="text-xs text-emerald-700 font-bold">{servings}x serving</p>}
+				{macros && (
+					<p className="text-[10px] text-gray-500 font-semibold mt-0.5">
+						🔥 {macros.cal} · P {macros.p}g · C {macros.c}g · F {macros.f}g
+					</p>
+				)}
 			</div>
 
 			<button
