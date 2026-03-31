@@ -681,75 +681,6 @@ export default function HomePage() {
 						)}
 					</div>
 
-					<div className="bg-white/60 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4 mb-6">
-						<div className="flex items-center justify-between mb-3">
-							<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
-							<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
-								See all
-							</a>
-						</div>
-
-						<div className="flex gap-3 overflow-x-auto pb-2">
-							{featuredRecipes.map(function (recipe) {
-								var nut = null;
-								if (recipe.nutrition) {
-									nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
-								}
-
-								var macros = nut
-									? {
-											cal: Math.round(nut.calories || 0),
-											p: Math.round(nut.protein || 0),
-											c: Math.round(nut.carbs || 0),
-											f: Math.round(nut.fat || 0),
-									  }
-									: null;
-
-								return (
-									<a
-										key={recipe.id}
-										href={"/recipes/" + recipe.id}
-										className="flex-shrink-0 w-40 bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
-										title={recipe.title}
-									>
-										<div className="w-full h-24 rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
-											{recipe.image_url ? (
-												<img
-													src={recipe.image_url}
-													className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-													alt={recipe.title}
-												/>
-											) : (
-												<div className="w-full h-full flex items-center justify-center">
-													<Utensils size={24} className="text-emerald-300" />
-												</div>
-											)}
-
-											{macros && macros.cal > 0 && (
-												<div className="absolute bottom-2 left-2 flex gap-1">
-													<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
-														🔥 {macros.cal}
-													</span>
-													<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-gray-700 px-2 py-1 rounded-full">
-														P {macros.p}
-													</span>
-												</div>
-											)}
-										</div>
-
-										<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
-										<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
-										{macros && (
-											<p className="text-[10px] text-gray-400 mt-1 font-semibold">
-												P {macros.p}g · C {macros.c}g · F {macros.f}g
-											</p>
-										)}
-									</a>
-								);
-							})}
-						</div>
-					</div>
-
 					<div className="flex gap-6 items-start">
 						<div className="flex-1 min-w-0">
 							{loading ? (
@@ -1005,7 +936,74 @@ export default function HomePage() {
 		</div>
 	);
 }
+<div className="bg-white/60 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-lg shadow-emerald-100/40 p-4 mb-6">
+						<div className="flex items-center justify-between mb-3">
+							<h3 className="font-bold text-gray-800 text-sm">⭐ Recent Recipes</h3>
+							<a href="/recipes" className="text-xs text-emerald-700 font-semibold hover:underline">
+								See all
+							</a>
+						</div>
 
+						<div className="flex gap-3 overflow-x-auto pb-2">
+							{featuredRecipes.map(function (recipe) {
+								var nut = null;
+								if (recipe.nutrition) {
+									nut = typeof recipe.nutrition === "string" ? JSON.parse(recipe.nutrition) : recipe.nutrition;
+								}
+
+								var macros = nut
+									? {
+											cal: Math.round(nut.calories || 0),
+											p: Math.round(nut.protein || 0),
+											c: Math.round(nut.carbs || 0),
+											f: Math.round(nut.fat || 0),
+									  }
+									: null;
+
+								return (
+									<a
+										key={recipe.id}
+										href={"/recipes/" + recipe.id}
+										className="flex-shrink-0 w-40 bg-white/70 rounded-3xl border border-emerald-100/60 shadow-sm p-3 hover:shadow-md transition-shadow group"
+										title={recipe.title}
+									>
+										<div className="w-full h-24 rounded-2xl overflow-hidden bg-emerald-50 mb-2 relative">
+											{recipe.image_url ? (
+												<img
+													src={recipe.image_url}
+													className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+													alt={recipe.title}
+												/>
+											) : (
+												<div className="w-full h-full flex items-center justify-center">
+													<Utensils size={24} className="text-emerald-300" />
+												</div>
+											)}
+
+											{macros && macros.cal > 0 && (
+												<div className="absolute bottom-2 left-2 flex gap-1">
+													<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
+														🔥 {macros.cal}
+													</span>
+													<span className="bg-white/90 backdrop-blur-sm text-[10px] font-bold text-gray-700 px-2 py-1 rounded-full">
+														P {macros.p}
+													</span>
+												</div>
+											)}
+										</div>
+
+										<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
+										<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
+										{macros && (
+											<p className="text-[10px] text-gray-400 mt-1 font-semibold">
+												P {macros.p}g · C {macros.c}g · F {macros.f}g
+											</p>
+										)}
+									</a>
+								);
+							})}
+						</div>
+					</div>
 function MealCell({ date, meal, cellSlots, onAdd, onRemove, onAteThis, isLogged, saving }) {
 	return (
 		<div className="min-h-[78px] bg-white/70 backdrop-blur border border-emerald-100/70 rounded-3xl p-2 flex flex-col gap-2 hover:border-emerald-200 transition-colors">
