@@ -8,10 +8,11 @@ export default function Navbar() {
   const { user } = useAuth();
 
   const links = [
-    { to: '/', label: 'Planner' },
-    { to: '/recipes', label: 'Recipes' },
-    { to: '/grocery-list', label: 'Grocery List' },
-  ];
+  { to: '/', label: 'Planner' },
+  { to: '/recipes', label: 'Recipes' },
+  { to: '/grocery-list', label: 'Grocery List' },
+  { to: '/food-log', label: 'Food Log' },  // ← ADD
+];	
 
   return (
     <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-40">
