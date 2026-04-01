@@ -14,11 +14,12 @@ export default function Navbar() {
   const pathname = usePathname();
 
   const links = [
-    { href: '/', label: 'Planner', icon: Calendar },
-    { href: '/recipes', label: 'Recipes', icon: BookOpen },
-    { href: '/grocery-list', label: 'Groceries', icon: ShoppingCart },
-    { href: '/profile', label: 'Profile', icon: User },
-  ];
+  { href: '/', label: 'Planner', icon: Calendar },
+  { href: '/recipes', label: 'Recipes', icon: BookOpen },
+  { href: '/grocery-list', label: 'Groceries', icon: ShoppingCart },
+  { href: '/food-log', label: 'Food Log', icon: Utensils },  // ← ADD
+  { href: '/profile', label: 'Profile', icon: User },
+];
 
   return (
     <>
