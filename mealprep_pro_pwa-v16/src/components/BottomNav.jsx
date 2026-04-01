@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { CalendarDays, BookOpen, ShoppingCart, User } from 'lucide-react';
+import { CalendarDays, BookOpen, ShoppingCart, User, Utensils } from 'lucide-react';
 
 const tabs = [
   { to: '/', icon: CalendarDays, label: 'Planner' },
   { to: '/recipes', icon: BookOpen, label: 'Recipes' },
   { to: '/grocery-list', icon: ShoppingCart, label: 'Grocery' },
+  { to: '/food-log', icon: Utensils, label: 'Food Log' },  // ← ADD
   { to: '/profile', icon: User, label: 'Profile' },
 ];
 
