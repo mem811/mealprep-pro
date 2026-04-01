@@ -446,6 +446,11 @@ export default function FoodLogPage() {
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   value={addFood.servings}
                   onChange={(ev) => setAddFood((p) => ({ ...p, servings: ev.target.value }))} />
+                {(addFood.serving_size_label || addFood.serving_size_g) && (
+                  <div className="mt-1 text-xs text-emerald-700 font-medium">
+                    1 serving = {addFood.serving_size_label || `${addFood.serving_size_g}g`}
+                  </div>
+                )}
               </label>
               <label className="text-xs font-semibold text-gray-600 sm:col-span-2">Notes
                 <textarea className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 min-h-[60px]"
