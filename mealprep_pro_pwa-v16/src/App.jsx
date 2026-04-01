@@ -30,6 +30,7 @@ function AppRoutes() {
         <Route path="grocery-list" element={<GroceryListPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="food-log" element={<FoodLogPage />} />
+        <NavLink to="/food-log">Food Log</NavLink>
       </Route>
     </Routes>
   );
