@@ -55,6 +55,7 @@ export default function FoodLogPage() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryItems, setLibraryItems] = useState([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
 
   const isMobile = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -81,6 +82,13 @@ export default function FoodLogPage() {
     (acc, e) => { acc.calories += n0(e?.calories); acc.protein += n0(e?.protein); acc.carbs += n0(e?.carbs); acc.fat += n0(e?.fat); return acc; },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   ), [entries]);
+  const filteredLibrary = useMemo(() => {
+  if (!librarySearch.trim()) return libraryItems;
+  const q = librarySearch.toLowerCase();
+  return libraryItems.filter(
+    (item) => item.name?.toLowerCase().includes(q) || item.brand?.toLowerCase().includes(q)
+  );
+}, [libraryItems, librarySearch]);
 
   // ZXing scanner
   useEffect(() => {
@@ -362,39 +370,46 @@ export default function FoodLogPage() {
       </div>
 
       {/* Food Library modal */}
-      {libraryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setLibraryOpen(false)} />
-          <div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4 max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-gray-900">📋 Food Library</div>
-              <button className="text-sm font-semibold text-gray-500 hover:text-gray-700" onClick={() => setLibraryOpen(false)}>Close</button>
-            </div>
-            <div className="mt-3 overflow-y-auto flex-1">
-              {libraryLoading ? <div className="text-sm text-gray-500 py-4 text-center">Loading…</div>
-              : libraryItems.length === 0 ? <div className="text-sm text-gray-500 py-4 text-center">No saved foods yet. Scan a barcode to add your first one!</div>
-              : (
-                <ul className="space-y-2">
-                  {libraryItems.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        className="w-full text-left p-3 rounded-xl border border-gray-100 hover:bg-emerald-50 hover:border-emerald-200 transition-colors"
-                        onClick={() => { setAddFood(buildAddFoodFromLibrary(item)); setLibraryOpen(false); }}
-                      >
-                        <div className="font-semibold text-gray-900 text-sm">{item.name}</div>
-                        {item.brand ? <div className="text-xs text-gray-500">{item.brand}</div> : null}
-                        <div className="mt-1 text-xs text-gray-500">
-                          {item.serving_size_label || `${item.serving_size_g}g`} · {round0(item.calories_per_serving)} cal · P {round0(item.protein_per_serving)}g · C {round0(item.carbs_per_serving)}g · F {round0(item.fat_per_serving)}g
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+{libraryOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="absolute inset-0 bg-black/40" onClick={() => setLibraryOpen(false)} />
+    <div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4 max-h-[80vh] flex flex-col">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-gray-900">📋 Food Library</div>
+        <button className="text-sm font-semibold text-gray-500 hover:text-gray-700" onClick={() => setLibraryOpen(false)}>Close</button>
+      </div>
+      <input
+        type="text"
+        placeholder="Search foods..."
+        value={librarySearch}
+        onChange={(e) => setLibrarySearch(e.target.value)}
+        className="mt-3 w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+      />
+      <div className="mt-3 overflow-y-auto flex-1">
+        {libraryLoading ? <div className="text-sm text-gray-500 py-4 text-center">Loading…</div>
+        : filteredLibrary.length === 0 ? <div className="text-sm text-gray-500 py-4 text-center">{libraryItems.length === 0 ? "No saved foods yet. Scan a barcode to add your first one!" : "No matches found."}</div>
+        : (
+          <ul className="space-y-2">
+            {filteredLibrary.map((item) => (
+              <li key={item.id}>
+                <button
+                  className="w-full text-left p-3 rounded-xl border border-gray-100 hover:bg-emerald-50 hover:border-emerald-200 transition-colors"
+                  onClick={() => { setAddFood(buildAddFoodFromLibrary(item)); setLibraryOpen(false); setLibrarySearch(""); }}
+                >
+                  <div className="font-semibold text-gray-900 text-sm">{item.name}</div>
+                  {item.brand ? <div className="text-xs text-gray-500">{item.brand}</div> : null}
+                  <div className="mt-1 text-xs text-gray-500">
+                    {item.serving_size_label || `${item.serving_size_g}g`} · {round0(item.calories_per_serving)} cal · P {round0(item.protein_per_serving)}g · C {round0(item.carbs_per_serving)}g · F {round0(item.fat_per_serving)}g
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Scanner modal */}
       {scanOpen && (
