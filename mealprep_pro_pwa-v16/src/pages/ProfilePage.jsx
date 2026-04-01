@@ -6,6 +6,7 @@ import {
   User, Crown, ChevronRight, LogOut, CheckCircle,
   ShieldCheck, Loader2
 } from 'lucide-react';
+import { getUserGoals, saveUserGoals } from "../lib/userGoals";
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
@@ -149,3 +150,55 @@ export default function ProfilePage() {
     </div>
   );
 }
+const [goals, setGoals] = useState({ calories: "", protein: "", carbs: "", fat: "" });
+const [savingGoals, setSavingGoals] = useState(false);
+const [goalsSaved, setGoalsSaved] = useState(false);
+
+useEffect(() => {
+  getUserGoals().then((g) => {
+    if (g) setGoals({ calories: g.calories || "", protein: g.protein || "", carbs: g.carbs || "", fat: g.fat || "" });
+  });
+}, []);
+
+async function handleSaveGoals(e) {
+  e.preventDefault();
+  try {
+    setSavingGoals(true);
+    await saveUserGoals({
+      calories: Number(goals.calories) || 0,
+      protein: Number(goals.protein) || 0,
+      carbs: Number(goals.carbs) || 0,
+      fat: Number(goals.fat) || 0,
+    });
+    setGoalsSaved(true);
+    setTimeout(() => setGoalsSaved(false), 2000);
+  } catch (e) {
+    alert(e?.message || "Failed to save goals.");
+  } finally {
+    setSavingGoals(false);
+  }
+}	
+{/* Nutritional Goals */}
+<div className="mt-8 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
+  <div className="text-sm font-semibold text-gray-900 mb-4">🎯 Daily Nutritional Goals</div>
+  <form onSubmit={handleSaveGoals} className="grid grid-cols-2 gap-3">
+    {[["Calories", "calories", "kcal"], ["Protein", "protein", "g"], ["Carbs", "carbs", "g"], ["Fat", "fat", "g"]].map(([label, key, unit]) => (
+      <label key={key} className="text-xs font-semibold text-gray-600">
+        {label} ({unit})
+        <input
+          type="number"
+          className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+          value={goals[key]}
+          onChange={(e) => setGoals((p) => ({ ...p, [key]: e.target.value }))}
+          placeholder={`e.g. ${key === "calories" ? "2000" : key === "protein" ? "150" : key === "carbs" ? "200" : "65"}`}
+        />
+      </label>
+    ))}
+    <div className="col-span-2 flex justify-end mt-1">
+      <button type="submit" disabled={savingGoals}
+        className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
+        {savingGoals ? "Saving..." : goalsSaved ? "✓ Saved!" : "Save Goals"}
+      </button>
+    </div>
+  </form>
+</div>
