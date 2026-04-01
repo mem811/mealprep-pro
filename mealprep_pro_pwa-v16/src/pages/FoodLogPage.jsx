@@ -4,6 +4,7 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import { listFoodLogsByDate, deleteFoodLogEntry, updateFoodLogEntry } from "../lib/foodLog";
 import { lookupFoodLibrary, saveFoodLibrary } from "../lib/foodLibrary";
 import { getFoodByBarcode, saveFoodToLibrary } from "../lib/foodLibrary";
+import { getUserGoals } from "../lib/userGoals";
 
 function toDateOnlyUTC(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -61,6 +62,12 @@ export default function FoodLogPage() {
     if (typeof window === "undefined") return false;
     return window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   }, []);
+  
+  const [goals, setGoals] = useState(null);
+
+useEffect(() => {
+  getUserGoals().then(setGoals);
+}, []);
 
   useEffect(() => {
     let alive = true;
@@ -320,16 +327,37 @@ export default function FoodLogPage() {
         </button>
       </div>
 
-      {/* Totals */}
-      <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-        {[["Calories", Math.round(totals.calories), ""], ["Protein", Math.round(totals.protein), "g"],
-          ["Carbs", Math.round(totals.carbs), "g"], ["Fat", Math.round(totals.fat), "g"]].map(([label, val, unit]) => (
-          <div key={label} className="p-3 rounded-2xl bg-white border border-gray-100 shadow-sm">
-            <div className="text-gray-500 text-xs font-semibold uppercase tracking-wide">{label}</div>
-            <div className="mt-1 text-xl font-bold text-gray-900">{val}{unit}</div>
-          </div>
-        ))}
+     {/* Totals + Progress */}
+<div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+  {[
+    ["Calories", Math.round(totals.calories), "", goals?.calories],
+    ["Protein", Math.round(totals.protein), "g", goals?.protein],
+    ["Carbs", Math.round(totals.carbs), "g", goals?.carbs],
+    ["Fat", Math.round(totals.fat), "g", goals?.fat],
+  ].map(([label, val, unit, goal]) => {
+    const pct = goal > 0 ? Math.min(100, Math.round((val / goal) * 100)) : null;
+    const over = goal > 0 && val > goal;
+    return (
+      <div key={label} className="p-3 rounded-2xl bg-white border border-gray-100 shadow-sm">
+        <div className="text-gray-500 text-xs font-semibold uppercase tracking-wide">{label}</div>
+        <div className="mt-1 text-xl font-bold text-gray-900">{val}{unit}</div>
+        {goal > 0 && (
+          <>
+            <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${over ? "bg-red-400" : "bg-emerald-400"}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className={`mt-1 text-xs ${over ? "text-red-500" : "text-gray-400"}`}>
+              {over ? `+${val - goal}${unit} over` : `${goal - val}${unit} left`}
+            </div>
+          </>
+        )}
       </div>
+    );
+  })}
+</div>
 
       {/* Entries */}
       <div className="mt-6">
