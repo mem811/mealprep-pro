@@ -38,3 +38,5 @@ export async function searchFoodLibrary(query) {
 		return [];
 	}
 }
+export const lookupFoodLibrary = getFoodByBarcode;
+export const saveFoodLibrary = saveFoodToLibrary;
