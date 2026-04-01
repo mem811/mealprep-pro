@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import pb from "../lib/pb";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { listFoodLogsByDate, deleteFoodLogEntry, updateFoodLogEntry } from "../lib/foodLog";
+import { getFoodByBarcode, saveFoodToLibrary, searchFoodLibrary } from "../lib/foodLibrary";
 
 function toDateOnlyUTC(date = new Date()) {
 	return date.toISOString().slice(0, 10);
@@ -31,16 +32,43 @@ function round0(v) {
 	return Math.round(n0(v));
 }
 
-function offKcalPer100g(product) {
-	return n0(product?.nutriments?.["energy-kcal_100g"]);
+// Parse serving size from Open Food Facts product
+function parseServingSize(product) {
+	const raw = product?.serving_size || "";
+	const g = n0(product?.serving_quantity) ||
+		n0((raw.match(/(\d+(?:\.\d+)?)\s*g/i) || [])[1]);
+	const label = raw || (g ? `${g}g` : "100g");
+	return { g: g || 100, label };
 }
 
-function offMacroPer100g(product, key) {
-	return n0(product?.nutriments?.[`${key}_100g`]);
+function buildLibraryEntryFromOff(barcode, product) {
+	const { g, label } = parseServingSize(product);
+	const kcalPer100 = n0(product?.nutriments?.["energy-kcal_100g"]);
+	const proteinPer100 = n0(product?.nutriments?.["proteins_100g"]);
+	const carbsPer100 = n0(product?.nutriments?.["carbohydrates_100g"]);
+	const fatPer100 = n0(product?.nutriments?.["fat_100g"]);
+
+	return {
+		barcode,
+		name: product?.product_name || product?.product_name_en || product?.generic_name || "Unknown food",
+		brand: product?.brands || "",
+		serving_size_g: g,
+		serving_size_label: label,
+		calories_per_serving: round0((kcalPer100 * g) / 100),
+		protein_per_serving: round0((proteinPer100 * g) / 100),
+		carbs_per_serving: round0((carbsPer100 * g) / 100),
+		fat_per_serving: round0((fatPer100 * g) / 100),
+	};
 }
 
-function scalePer100g(per100g, grams) {
-	return (n0(per100g) * n0(grams)) / 100;
+function computeFromServings(libraryItem, servings) {
+	const s = n0(servings) || 1;
+	return {
+		calories: round0(n0(libraryItem.calories_per_serving) * s),
+		protein: round0(n0(libraryItem.protein_per_serving) * s),
+		carbs: round0(n0(libraryItem.carbs_per_serving) * s),
+		fat: round0(n0(libraryItem.fat_per_serving) * s),
+	};
 }
 
 async function lookupOpenFoodFacts(barcode) {
@@ -69,22 +97,27 @@ export default function FoodLogPage() {
 	const [scanError, setScanError] = useState("");
 	const [addFood, setAddFood] = useState(null);
 	const [savingNew, setSavingNew] = useState(false);
-	console.log("FoodLogPage: ZXING BUILD");
+
+	// Food library
+	const [libraryOpen, setLibraryOpen] = useState(false);
+	const [librarySearch, setLibrarySearch] = useState("");
+	const [libraryItems, setLibraryItems] = useState([]);
+	const [libraryLoading, setLibraryLoading] = useState(false);
+	const searchTimer = useRef(null);
 
 	const isMobile = useMemo(() => {
 		if (typeof window === "undefined") return false;
 		return window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
 	}, []);
 
+	// Load food log entries
 	useEffect(() => {
 		let alive = true;
 		async function run() {
-			setLoading(true);
-			setError("");
+			setLoading(true); setError("");
 			try {
 				const res = await listFoodLogsByDate(dateStr);
-				const items = Array.isArray(res?.items) ? res.items : [];
-				if (alive) setEntries(items);
+				if (alive) setEntries(Array.isArray(res?.items) ? res.items : []);
 			} catch (err) {
 				if (alive) { setEntries([]); setError(err?.message || "Failed to load."); }
 			} finally {
@@ -95,12 +128,28 @@ export default function FoodLogPage() {
 		return () => { alive = false; };
 	}, [dateStr]);
 
+	// Load food library (with debounce)
+	useEffect(() => {
+		if (!libraryOpen) return;
+		clearTimeout(searchTimer.current);
+		searchTimer.current = setTimeout(async () => {
+			setLibraryLoading(true);
+			const items = await searchFoodLibrary(librarySearch);
+			setLibraryItems(items);
+			setLibraryLoading(false);
+		}, 300);
+	}, [librarySearch, libraryOpen]);
+
 	const totals = useMemo(() => entries.reduce(
-		(acc, e) => { acc.calories += n0(e?.calories); acc.protein += n0(e?.protein); acc.carbs += n0(e?.carbs); acc.fat += n0(e?.fat); return acc; },
+		(acc, e) => {
+			acc.calories += n0(e?.calories); acc.protein += n0(e?.protein);
+			acc.carbs += n0(e?.carbs); acc.fat += n0(e?.fat);
+			return acc;
+		},
 		{ calories: 0, protein: 0, carbs: 0, fat: 0 }
 	), [entries]);
 
-	// ZXing scanner — works on all iOS versions, no BarcodeDetector needed
+	// ZXing scanner
 	useEffect(() => {
 		if (!scanOpen) return;
 		let reader = null;
@@ -112,65 +161,47 @@ export default function FoodLogPage() {
 				reader = new BrowserMultiFormatReader();
 				const videoEl = document.getElementById("barcode-video");
 				if (!videoEl) return;
-
 				await reader.decodeFromConstraints(
 					{ video: { facingMode: "environment" } },
 					videoEl,
-					async (result, err) => {
-						if (stopped) return;
-						if (result) {
-							const clean = String(result.getText()).replace(/\D/g, "");
-							if (clean.length === 8 || clean.length === 12 || clean.length === 13) {
-								stopped = true;
-								try { reader.reset(); } catch {}
-								setScanOpen(false);
-								await doLookup(clean);
-							}
+					async (result) => {
+						if (stopped || !result) return;
+						const clean = String(result.getText()).replace(/\D/g, "");
+						if (clean.length === 8 || clean.length === 12 || clean.length === 13) {
+							stopped = true;
+							try { reader.reset(); } catch {}
+							setScanOpen(false);
+							await doLookup(clean);
 						}
 					}
 				);
 			} catch (e) {
-				setScanError(e?.message || "Could not access camera. Check permissions.");
+				setScanError(e?.message || "Could not access camera.");
 			}
 		}
-
 		start();
-		return () => {
-			stopped = true;
-			try { reader?.reset(); } catch {}
-		};
+		return () => { stopped = true; try { reader?.reset(); } catch {} };
 	}, [scanOpen]);
 
-	function buildAddFoodFromOff(barcode, product) {
-		const name = product?.product_name || product?.product_name_en || product?.generic_name || product?.brands || "Scanned food";
-		return {
-			barcode, name, meal_type: "Snack", grams: 100,
-			per100g: {
-				calories: offKcalPer100g(product),
-				protein: offMacroPer100g(product, "proteins"),
-				carbs: offMacroPer100g(product, "carbohydrates"),
-				fat: offMacroPer100g(product, "fat"),
-			},
-			notes: "",
-		};
-	}
-
-	function computedFromAddFood(state) {
-		const grams = n0(state?.grams || 0);
-		const p = state?.per100g || {};
-		return {
-			calories: round0(scalePer100g(p.calories, grams)),
-			protein: round0(scalePer100g(p.protein, grams)),
-			carbs: round0(scalePer100g(p.carbs, grams)),
-			fat: round0(scalePer100g(p.fat, grams)),
-		};
-	}
-
+	// Look up barcode: check library first, then OFF
 	const doLookup = useCallback(async function (barcode) {
 		try {
 			setLookingUp(true);
-			const { barcode: clean, product } = await lookupOpenFoodFacts(barcode);
-			setAddFood(buildAddFoodFromOff(clean, product));
+			const clean = String(barcode || "").replace(/\D/g, "");
+			if (!clean) throw new Error("Please enter a barcode.");
+
+			// 1) Check food library cache first
+			let item = await getFoodByBarcode(clean);
+
+			// 2) Not found — fetch from OFF and save to library
+			if (!item) {
+				const { barcode: b, product } = await lookupOpenFoodFacts(clean);
+				const entry = buildLibraryEntryFromOff(b, product);
+				await saveFoodToLibrary(entry);
+				item = entry;
+			}
+
+			setAddFood({ ...item, servings: 1, meal_type: "Snack" });
 			return true;
 		} catch (e) {
 			alert(e?.message || "Lookup failed.");
@@ -180,19 +211,39 @@ export default function FoodLogPage() {
 		}
 	}, []);
 
+	// Open add modal from food library
+	function addFromLibrary(item) {
+		setAddFood({ ...item, servings: 1, meal_type: "Snack" });
+		setLibraryOpen(false);
+	}
+
+	// Computed macros for add modal
+	const addFoodComputed = useMemo(() => {
+		if (!addFood) return null;
+		return computeFromServings(addFood, addFood.servings);
+	}, [addFood?.servings, addFood?.calories_per_serving, addFood?.protein_per_serving, addFood?.carbs_per_serving, addFood?.fat_per_serving]);
+
 	async function saveNewFoodLogEntry() {
-		if (!addFood) return;
+		if (!addFood || !addFoodComputed) return;
 		try {
 			setSavingNew(true);
-			const t = computedFromAddFood(addFood);
 			const userId = pb.authStore.model?.id;
 			if (!userId) throw new Error("Not signed in.");
 			const created = await pb.collection("food_log").create({
-				user: userId, date: dateStr,
+				user: userId,
+				date: dateStr,
 				meal_type: addFood.meal_type || "Snack",
 				name: addFood.name || "Food",
-				calories: t.calories, protein: t.protein, carbs: t.carbs, fat: t.fat,
-				servings: null, notes: addFood.notes || "",
+				calories: addFoodComputed.calories,
+				protein: addFoodComputed.protein,
+				carbs: addFoodComputed.carbs,
+				fat: addFoodComputed.fat,
+				servings: n0(addFood.servings),
+				calories_per_serving: n0(addFood.calories_per_serving),
+				protein_per_serving: n0(addFood.protein_per_serving),
+				carbs_per_serving: n0(addFood.carbs_per_serving),
+				fat_per_serving: n0(addFood.fat_per_serving),
+				notes: "",
 			});
 			setEntries((prev) => [created, ...prev]);
 			setAddFood(null);
@@ -221,20 +272,54 @@ export default function FoodLogPage() {
 	}
 
 	function requestEdit(entry) {
-		setEditing({ id: entry.id, meal_type: entry.meal_type || "", name: entry.name || "",
-			calories: n0(entry.calories), protein: n0(entry.protein), carbs: n0(entry.carbs),
-			fat: n0(entry.fat), servings: entry.servings ?? "", notes: entry.notes || "" });
+		setEditing({
+			id: entry.id,
+			meal_type: entry.meal_type || "",
+			name: entry.name || "",
+			servings: entry.servings ?? 1,
+			calories_per_serving: n0(entry.calories_per_serving),
+			protein_per_serving: n0(entry.protein_per_serving),
+			carbs_per_serving: n0(entry.carbs_per_serving),
+			fat_per_serving: n0(entry.fat_per_serving),
+			// fallback if no per-serving data stored
+			calories: n0(entry.calories),
+			protein: n0(entry.protein),
+			carbs: n0(entry.carbs),
+			fat: n0(entry.fat),
+			notes: entry.notes || "",
+		});
 	}
+
+	// Auto-recalculate edit totals when servings changes
+	const editComputed = useMemo(() => {
+		if (!editing) return null;
+		if (editing.calories_per_serving > 0) {
+			return computeFromServings(editing, editing.servings);
+		}
+		// No per-serving data: keep manual values
+		return null;
+	}, [editing?.servings, editing?.calories_per_serving]);
 
 	async function saveEdit() {
 		if (!editing?.id) return;
 		try {
 			setSavingEdit(true);
-			const payload = { meal_type: editing.meal_type, name: editing.name,
-				calories: n0(editing.calories), protein: n0(editing.protein),
-				carbs: n0(editing.carbs), fat: n0(editing.fat),
-				servings: editing.servings === "" ? null : n0(editing.servings),
-				notes: editing.notes || "" };
+			const totals = editComputed || {
+				calories: n0(editing.calories),
+				protein: n0(editing.protein),
+				carbs: n0(editing.carbs),
+				fat: n0(editing.fat),
+			};
+			const payload = {
+				meal_type: editing.meal_type,
+				name: editing.name,
+				servings: n0(editing.servings),
+				calories: totals.calories,
+				protein: totals.protein,
+				carbs: totals.carbs,
+				fat: totals.fat,
+				notes: editing.notes || "",
+			};
 			await updateFoodLogEntry(editing.id, payload);
 			setEntries((prev) => prev.map((e) => e.id === editing.id ? { ...e, ...payload } : e));
 			setEditing(null);
@@ -275,6 +360,10 @@ export default function FoodLogPage() {
 						{lookingUp ? "Looking up..." : "Lookup"}
 					</button>
 				</div>
+				<button onClick={() => { setLibrarySearch(""); setLibraryOpen(true); }}
+					className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50">
+					📋 Food library
+				</button>
 			</div>
 
 			{/* Totals */}
@@ -308,9 +397,8 @@ export default function FoodLogPage() {
 											<span className="mx-2 text-gray-300">•</span>P <span className="font-semibold text-gray-800">{e.protein ?? 0}</span>g
 											<span className="mx-2 text-gray-300">•</span>C <span className="font-semibold text-gray-800">{e.carbs ?? 0}</span>g
 											<span className="mx-2 text-gray-300">•</span>F <span className="font-semibold text-gray-800">{e.fat ?? 0}</span>g
-											{e.servings ? <><span className="mx-2 text-gray-300">•</span><span>{e.servings} servings</span></> : null}
+											{e.servings ? <><span className="mx-2 text-gray-300">•</span><span>{e.servings} serving{e.servings !== 1 ? "s" : ""}</span></> : null}
 										</div>
-										{e.notes ? <div className="mt-2 text-sm text-gray-700">{e.notes}</div> : null}
 									</div>
 									<div className="flex flex-col items-end gap-2 flex-shrink-0">
 										<div className="text-xs text-gray-500">{e.created ? new Date(e.created).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</div>
@@ -326,28 +414,26 @@ export default function FoodLogPage() {
 				)}
 			</div>
 
-			{/* Scanner modal */}
+			{/* ── Scanner modal ── */}
 			{scanOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center">
 					<div className="absolute inset-0 bg-black/50" onClick={() => setScanOpen(false)} />
 					<div className="relative w-[92%] max-w-md rounded-2xl bg-white shadow-xl border border-gray-100 p-4">
 						<div className="flex items-center justify-between">
 							<div className="text-sm font-semibold text-gray-900">Scan barcode</div>
-							<button className="text-sm font-semibold text-gray-500 hover:text-gray-700" onClick={() => setScanOpen(false)}>Close</button>
+							<button className="text-sm font-semibold text-gray-500" onClick={() => setScanOpen(false)}>Close</button>
 						</div>
 						<div className="mt-3 rounded-xl overflow-hidden border border-gray-200 bg-black">
 							<video id="barcode-video" className="w-full" playsInline muted autoPlay />
 						</div>
-						{scanError
-							? <div className="mt-3 text-sm text-red-600">{scanError}</div>
-							: <div className="mt-3 text-xs text-gray-500">Point camera at the barcode. Hold steady.</div>
-						}
+						{scanError ? <div className="mt-3 text-sm text-red-600">{scanError}</div>
+							: <div className="mt-3 text-xs text-gray-500">Point camera at the barcode. Hold steady.</div>}
 						<div className="mt-3 flex gap-2">
 							<input value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)}
 								placeholder="Or type barcode manually"
 								className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200" />
 							<button onClick={async () => { setScanOpen(false); await doLookup(barcodeInput); }} disabled={lookingUp}
-								className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
+								className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50">
 								{lookingUp ? "..." : "Lookup"}
 							</button>
 						</div>
@@ -355,54 +441,104 @@ export default function FoodLogPage() {
 				</div>
 			)}
 
-			{/* Add food modal */}
-			{addFood && (
+			{/* ── Food Library modal ── */}
+			{libraryOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center">
-					<div className="absolute inset-0 bg-black/40" onClick={() => savingNew ? null : setAddFood(null)} />
-					<div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4">
-						<div className="flex items-start justify-between gap-3">
-							<div>
-								<div className="text-sm font-semibold text-gray-900">Add scanned food</div>
-								<div className="text-xs text-gray-500 mt-0.5">Default is per 100g. Adjust grams to match your portion.</div>
-							</div>
-							<button className="text-sm font-semibold text-gray-500 hover:text-gray-700" onClick={() => setAddFood(null)} disabled={savingNew}>Close</button>
+					<div className="absolute inset-0 bg-black/50" onClick={() => setLibraryOpen(false)} />
+					<div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4 flex flex-col" style= maxHeight: "80vh" >
+						<div className="flex items-center justify-between">
+							<div className="text-sm font-semibold text-gray-900">Food Library</div>
+							<button className="text-sm font-semibold text-gray-500" onClick={() => setLibraryOpen(false)}>Close</button>
 						</div>
-						<div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<label className="text-xs font-semibold text-gray-600">Name
-								<input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={addFood.name} onChange={(ev) => setAddFood((p) => ({ ...p, name: ev.target.value }))} />
-							</label>
-							<label className="text-xs font-semibold text-gray-600">Meal type
-								<input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={addFood.meal_type} onChange={(ev) => setAddFood((p) => ({ ...p, meal_type: ev.target.value }))} placeholder="Breakfast / Lunch / Dinner / Snack" />
-							</label>
-							<label className="text-xs font-semibold text-gray-600">Grams
-								<input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={addFood.grams} onChange={(ev) => setAddFood((p) => ({ ...p, grams: ev.target.value }))} />
-							</label>
-							<label className="text-xs font-semibold text-gray-600 sm:col-span-2">Notes
-								<textarea className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 min-h-[70px]" value={addFood.notes} onChange={(ev) => setAddFood((p) => ({ ...p, notes: ev.target.value }))} placeholder="Optional" />
-							</label>
-						</div>
-						{(() => {
-							const t = computedFromAddFood(addFood);
-							return (
-								<div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-									{[["Calories",t.calories,""],["Protein",t.protein,"g"],["Carbs",t.carbs,"g"],["Fat",t.fat,"g"]].map(([label,val,unit]) => (
-										<div key={label} className="p-2 rounded-xl bg-gray-50">
-											<div className="text-xs text-gray-500">{label}</div>
-											<div className="font-bold">{val}{unit}</div>
-										</div>
-									))}
+						<input
+							value={librarySearch}
+							onChange={(e) => setLibrarySearch(e.target.value)}
+							placeholder="Search by name or brand…"
+							className="mt-3 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+							autoFocus
+						/>
+						<div className="mt-3 overflow-y-auto flex-1">
+							{libraryLoading ? (
+								<div className="text-sm text-gray-500 py-4 text-center">Loading…</div>
+							) : libraryItems.length === 0 ? (
+								<div className="text-sm text-gray-400 py-4 text-center">
+									{librarySearch ? "No results found." : "No foods in library yet. Scan a barcode to add one!"}
 								</div>
-							);
-						})()}
-						<div className="mt-4 flex items-center justify-end gap-2">
-							<button className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 disabled:opacity-50" onClick={() => setAddFood(null)} disabled={savingNew}>Cancel</button>
-							<button className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50" onClick={saveNewFoodLogEntry} disabled={savingNew}>{savingNew ? "Saving..." : "Log it"}</button>
+							) : (
+								<ul className="space-y-2">
+									{libraryItems.map((item) => (
+										<li key={item.id}
+											className="p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-emerald-50 hover:border-emerald-200 cursor-pointer transition-colors"
+											onClick={() => addFromLibrary(item)}
+										>
+											<div className="font-semibold text-gray-900 text-sm">{item.name}</div>
+											{item.brand && <div className="text-xs text-gray-500">{item.brand}</div>}
+											<div className="mt-1 text-xs text-gray-600">
+												{item.calories_per_serving} cal • P {item.protein_per_serving}g • C {item.carbs_per_serving}g • F {item.fat_per_serving}g
+												{item.serving_size_label && <span className="ml-2 text-gray-400">per {item.serving_size_label}</span>}
+											</div>
+										</li>
+									))}
+								</ul>
+							)}
 						</div>
 					</div>
 				</div>
 			)}
 
-			{/* Delete confirm */}
+			{/* ── Add food modal ── */}
+			{addFood && addFoodComputed && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center">
+					<div className="absolute inset-0 bg-black/40" onClick={() => savingNew ? null : setAddFood(null)} />
+					<div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4">
+						<div className="flex items-start justify-between gap-3">
+							<div>
+								<div className="text-sm font-semibold text-gray-900">{addFood.name}</div>
+								{addFood.brand && <div className="text-xs text-gray-500">{addFood.brand}</div>}
+							</div>
+							<button className="text-sm font-semibold text-gray-500" onClick={() => setAddFood(null)} disabled={savingNew}>Close</button>
+						</div>
+
+						<div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<label className="text-xs font-semibold text-gray-600">Meal type
+								<select className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+									value={addFood.meal_type} onChange={(ev) => setAddFood((p) => ({ ...p, meal_type: ev.target.value }))}>
+									<option>Breakfast</option>
+									<option>Lunch</option>
+									<option>Dinner</option>
+									<option>Snack</option>
+								</select>
+							</label>
+							<label className="text-xs font-semibold text-gray-600">How many servings?
+								<input type="number" step="0.5" min="0.5"
+									className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+									value={addFood.servings}
+									onChange={(ev) => setAddFood((p) => ({ ...p, servings: ev.target.value }))} />
+								{addFood.serving_size_label && (
+									<div className="mt-1 text-xs text-gray-400">1 serving = {addFood.serving_size_label}</div>
+								)}
+							</label>
+						</div>
+
+						<div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+							{[["Calories", addFoodComputed.calories, ""], ["Protein", addFoodComputed.protein, "g"],
+							  ["Carbs", addFoodComputed.carbs, "g"], ["Fat", addFoodComputed.fat, "g"]].map(([label, val, unit]) => (
+								<div key={label} className="p-2 rounded-xl bg-emerald-50">
+									<div className="text-xs text-gray-500">{label}</div>
+									<div className="font-bold text-emerald-700">{val}{unit}</div>
+								</div>
+							))}
+						</div>
+
+						<div className="mt-4 flex items-center justify-end gap-2">
+							<button className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold disabled:opacity-50" onClick={() => setAddFood(null)} disabled={savingNew}>Cancel</button>
+							<button className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50" onClick={saveNewFoodLogEntry} disabled={savingNew}>{savingNew ? "Saving..." : "Log it"}</button>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* ── Delete confirm ── */}
 			{confirmDelete && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center">
 					<div className="absolute inset-0 bg-black/40" onClick={() => deletingId ? null : setConfirmDelete(null)} />
@@ -417,25 +553,65 @@ export default function FoodLogPage() {
 				</div>
 			)}
 
-			{/* Edit modal */}
+			{/* ── Edit modal ── */}
 			{editing && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center">
 					<div className="absolute inset-0 bg-black/40" onClick={() => savingEdit ? null : setEditing(null)} />
 					<div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4">
 						<div className="flex items-start justify-between gap-3">
-							<div><div className="text-sm font-semibold text-gray-900">Edit entry</div><div className="text-xs text-gray-500 mt-0.5">Update meal details and macros.</div></div>
-							<button className="text-sm font-semibold text-gray-500 hover:text-gray-700" onClick={() => setEditing(null)} disabled={savingEdit}>Close</button>
+							<div>
+								<div className="text-sm font-semibold text-gray-900">Edit entry</div>
+								{editing.calories_per_serving > 0 && (
+									<div className="text-xs text-emerald-600 mt-0.5">Macros update automatically when servings changes.</div>
+								)}
+							</div>
+							<button className="text-sm font-semibold text-gray-500" onClick={() => setEditing(null)} disabled={savingEdit}>Close</button>
 						</div>
 						<div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<label className="text-xs font-semibold text-gray-600">Meal type<input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={editing.meal_type} onChange={(ev) => setEditing((p) => ({ ...p, meal_type: ev.target.value }))} /></label>
-							<label className="text-xs font-semibold text-gray-600">Name<input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={editing.name} onChange={(ev) => setEditing((p) => ({ ...p, name: ev.target.value }))} /></label>
-							<label className="text-xs font-semibold text-gray-600">Calories<input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={editing.calories} onChange={(ev) => setEditing((p) => ({ ...p, calories: ev.target.value }))} /></label>
-							<label className="text-xs font-semibold text-gray-600">Servings<input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={editing.servings} onChange={(ev) => setEditing((p) => ({ ...p, servings: ev.target.value }))} placeholder="Optional" /></label>
-							<label className="text-xs font-semibold text-gray-600">Protein (g)<input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={editing.protein} onChange={(ev) => setEditing((p) => ({ ...p, protein: ev.target.value }))} /></label>
-							<label className="text-xs font-semibold text-gray-600">Carbs (g)<input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={editing.carbs} onChange={(ev) => setEditing((p) => ({ ...p, carbs: ev.target.value }))} /></label>
-							<label className="text-xs font-semibold text-gray-600">Fat (g)<input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={editing.fat} onChange={(ev) => setEditing((p) => ({ ...p, fat: ev.target.value }))} /></label>
-							<label className="text-xs font-semibold text-gray-600 sm:col-span-2">Notes<textarea className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 min-h-[90px]" value={editing.notes} onChange={(ev) => setEditing((p) => ({ ...p, notes: ev.target.value }))} /></label>
+							<label className="text-xs font-semibold text-gray-600">Meal type
+								<select className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+									value={editing.meal_type} onChange={(ev) => setEditing((p) => ({ ...p, meal_type: ev.target.value }))}>
+									<option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option>
+								</select>
+							</label>
+							<label className="text-xs font-semibold text-gray-600">Name
+								<input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+									value={editing.name} onChange={(ev) => setEditing((p) => ({ ...p, name: ev.target.value }))} />
+							</label>
+							<label className="text-xs font-semibold text-gray-600">Servings
+								<input type="number" step="0.5" min="0.5"
+									className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+									value={editing.servings} onChange={(ev) => setEditing((p) => ({ ...p, servings: ev.target.value }))} />
+							</label>
+							<label className="text-xs font-semibold text-gray-600">Notes
+								<input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+									value={editing.notes} onChange={(ev) => setEditing((p) => ({ ...p, notes: ev.target.value }))} />
+							</label>
 						</div>
+
+						{/* Show live recalculated macros if per-serving data exists */}
+						{editComputed ? (
+							<div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+								{[["Calories", editComputed.calories, ""], ["Protein", editComputed.protein, "g"],
+								  ["Carbs", editComputed.carbs, "g"], ["Fat", editComputed.fat, "g"]].map(([label, val, unit]) => (
+									<div key={label} className="p-2 rounded-xl bg-emerald-50">
+										<div className="text-xs text-gray-500">{label}</div>
+										<div className="font-bold text-emerald-700">{val}{unit}</div>
+									</div>
+								))}
+							</div>
+						) : (
+							<div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+								{[["Calories", "calories", ""], ["Protein", "protein", "g"], ["Carbs", "carbs", "g"], ["Fat", "fat", "g"]].map(([label, key, unit]) => (
+									<label key={label} className="text-xs font-semibold text-gray-600">{label}
+										<input type="number"
+											className="mt-1 w-full px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+											value={editing[key]} onChange={(ev) => setEditing((p) => ({ ...p, [key]: ev.target.value }))} />
+									</label>
+								))}
+							</div>
+						)}
+
 						<div className="mt-4 flex items-center justify-end gap-2">
 							<button className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold disabled:opacity-50" onClick={() => setEditing(null)} disabled={savingEdit}>Cancel</button>
 							<button className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50" onClick={saveEdit} disabled={savingEdit}>{savingEdit ? "Saving..." : "Save"}</button>
