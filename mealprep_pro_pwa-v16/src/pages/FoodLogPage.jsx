@@ -3,6 +3,7 @@ import pb from "../lib/pb";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { listFoodLogsByDate, deleteFoodLogEntry, updateFoodLogEntry } from "../lib/foodLog";
 import { lookupFoodLibrary, saveFoodLibrary } from "../lib/foodLibrary";
+import { getFoodByBarcode, saveFoodToLibrary } from "../lib/foodLibrary";
 
 function toDateOnlyUTC(date = new Date()) {
   return date.toISOString().slice(0, 10);
