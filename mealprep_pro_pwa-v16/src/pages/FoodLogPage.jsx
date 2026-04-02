@@ -292,6 +292,32 @@ useEffect(() => {
     } catch (err) { alert(err?.message || "Failed to save."); }
     finally { setSavingEdit(false); }
   }
+          async function saveManualEntry() {
+                      if (!manualFood.name.trim()) { alert("Please enter a food name."); return; }
+                      try {
+                        setSavingManual(true);
+                        const userId = pb.authStore.model?.id;
+                        if (!userId) throw new Error("Not signed in.");
+                        const created = await pb.collection("food_log").create({
+                          user: userId, date: dateStr,
+                          meal_type: manualFood.meal_type || "Snack",
+                          name: manualFood.name,
+                          calories: Number(manualFood.calories) || 0,
+                          protein: Number(manualFood.protein) || 0,
+                          carbs: Number(manualFood.carbs) || 0,
+                          fat: Number(manualFood.fat) || 0,
+                          servings: Number(manualFood.servings) || 1,
+                          notes: manualFood.notes || "",
+                        });
+                        setEntries((prev) => [created, ...prev]);
+                        setManualOpen(false);
+                        setManualFood({ name: "", meal_type: "Snack", calories: "", protein: "", carbs: "", fat: "", servings: "1", notes: "" });
+                      } catch (e) {
+                        alert(e?.message || "Failed to add entry.");
+                      } finally {
+                        setSavingManual(false);
+                      }
+                    }
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
@@ -332,33 +358,7 @@ useEffect(() => {
             className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 text-sm">
             ✏️ Add manually
           </button>
-                async function saveManualEntry() {
-                if (!manualFood.name.trim()) { alert("Please enter a food name."); return; }
-                try {
-                  setSavingManual(true);
-                  const userId = pb.authStore.model?.id;
-                  if (!userId) throw new Error("Not signed in.");
-                  const created = await pb.collection("food_log").create({
-                    user: userId, date: dateStr,
-                    meal_type: manualFood.meal_type || "Snack",
-                    name: manualFood.name,
-                    calories: Number(manualFood.calories) || 0,
-                    protein: Number(manualFood.protein) || 0,
-                    carbs: Number(manualFood.carbs) || 0,
-                    fat: Number(manualFood.fat) || 0,
-                    servings: Number(manualFood.servings) || 1,
-                    notes: manualFood.notes || "",
-                  });
-                  setEntries((prev) => [created, ...prev]);
-                  setManualOpen(false);
-                  setManualFood({ name: "", meal_type: "Snack", calories: "", protein: "", carbs: "", fat: "", servings: "1", notes: "" });
-                } catch (e) {
-                  alert(e?.message || "Failed to add entry.");
-                } finally {
-                  setSavingManual(false);
-                }
-              }
-
+               
      {/* Totals + Progress */}
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           {[
