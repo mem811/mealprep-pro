@@ -6,9 +6,14 @@ import {
   Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save
 } from 'lucide-react';
 
-function getProxiedImage(url) {
-  if (!url) return null;
-  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=1200&fit=cover&q=90&n=-1`;
+function getRecipeImage(recipe) {
+  if (recipe.image_file) {
+    return pb.getFileUrl(recipe, recipe.image_file, { thumb: '400x300' });
+  }
+  if (recipe.image_url) {
+    return `https://images.weserv.nl/?url=${encodeURIComponent(recipe.image_url)}&w=400&fit=cover&q=80&n=-1`;
+  }
+  return null;
 }
 
 const toTitleCase = (str) => {
@@ -206,7 +211,7 @@ export default function RecipeDetailPage() {
   const tags = parseTags(recipe.tags);
   const steps = parseInstructions(recipe.instructions);
   const sourceName = getSourceName(recipe.source_url);
-  const proxiedImage = getProxiedImage(recipe.image_url);
+  const proxiedImg = getRecipeImage(recipe);
 
   const scaledQty = (qty) => {
     const num = parseFloat(qty);
