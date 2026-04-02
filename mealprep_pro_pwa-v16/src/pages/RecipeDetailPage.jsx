@@ -6,7 +6,7 @@ import {
   Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save
 } from 'lucide-react';
 
-function getRecipeImage(recipe) {
+function getProxiedImage(recipe) {
   if (recipe.image_file) {
     return pb.getFileUrl(recipe, recipe.image_file, { thumb: '400x300' });
   }
