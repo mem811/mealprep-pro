@@ -20,6 +20,8 @@ export default function RecipeFormPage() {
   const [servings, setServings] = useState(4);
   const [instructions, setInstructions] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [tags, setTags] = useState([]);
   const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: 'cup' }]);
@@ -48,6 +50,10 @@ export default function RecipeFormPage() {
           setInstructions(record.instructions || '');
           setImageUrl(record.image_url || '');
           setSourceUrl(record.source_url || '');
+
+          if (record.image_file) {
+            setImagePreview(pb.getFileUrl(record, record.image_file));
+          }
 
           let parsedTags = [];
           if (typeof record.tags === 'string') {
@@ -110,65 +116,56 @@ export default function RecipeFormPage() {
     setImporting(true);
     setImportError(null);
 
-  
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-  const res = await fetch(
-    'https://n8n.srv1052955.hstgr.cloud/webhook/5ea8e8c8-94bf-41e7-8ffa-5dd843cdfe13',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: importUrl.trim() }),
-      signal: controller.signal
-    }
-  );
-  clearTimeout(timeout);
-  if (!res.ok) throw new Error(`Import error: ${res.status}`);
-  const data = await res.json();
-    
+      const res = await fetch(
+        'https://n8n.srv1052955.hstgr.cloud/webhook/5ea8e8c8-94bf-41e7-8ffa-5dd843cdfe13',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: importUrl.trim() }),
+          signal: controller.signal
+        }
+      );
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`Import error: ${res.status}`);
+      const data = await res.json();
 
       setTitle(data.title || '');
-setServings(data.servings || 4);
-setImageUrl(data.image_url || '');
-setSourceUrl(data.source_url || importUrl.trim());
+      setServings(data.servings || 4);
+      setImageUrl(data.image_url || '');
+      setSourceUrl(data.source_url || importUrl.trim());
 
-if (data.ingredients?.length) {
-  setIngredients(
-    data.ingredients.map((ing) => {
-      if (typeof ing === 'string') {
-        // n8n returns ingredients as strings like "1 cup flour"
-        return { name: ing, quantity: '', unit: '' };
+      if (data.ingredients?.length) {
+        setIngredients(
+          data.ingredients.map((ing) => {
+            if (typeof ing === 'string') {
+              return { name: ing, quantity: '', unit: '' };
+            }
+            return { name: ing.name || '', quantity: String(ing.quantity || ''), unit: ing.unit || '' };
+          })
+        );
       }
-      return { name: ing.name || '', quantity: String(ing.quantity || ''), unit: ing.unit || '' };
-    })
-  );
-}
-// n8n returns instructions as a newline-separated string
-if (data.instructions) {
-  setInstructions(data.instructions);
-}
-
-// Set nutrition data from n8n
-if (data.nutrition) {
-  setNutrition(JSON.stringify(data.nutrition));
-}
-
-setImportUrl('');
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err.name === 'AbortError') {
-      setImportError('Request timed out. Please try again.');
-    } else {
-      setImportError('Failed to import recipe. Check the URL and try again.');
+      if (data.instructions) {
+        setInstructions(data.instructions);
+      }
+      if (data.nutrition) {
+        setNutrition(JSON.stringify(data.nutrition));
+      }
+      setImportUrl('');
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err.name === 'AbortError') {
+        setImportError('Request timed out. Please try again.');
+      } else {
+        setImportError('Failed to import recipe. Check the URL and try again.');
+      }
+    } finally {
+      setImporting(false);
     }
-    console.error('Import error:', err);
-  } finally {
-    setImporting(false);
-  }
-};
- 
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -196,44 +193,54 @@ setImportUrl('');
 
     setLoading(true);
     try {
-      const data = {
-  user: pb.authStore.model.id,
-  title: title.trim(),
-  servings: Number(servings),
-  instructions: instructions.trim(),
-  ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
-  tags: JSON.stringify(tags),
-  ...(imageUrl ? { image_url: imageUrl } : {}),
-  ...(sourceUrl ? { source_url: sourceUrl } : {}),
-  ...(nutrition ? { nutrition } : {}),
-};
+      let payload;
 
-      console.log('Recipe data being sent:', JSON.stringify(data));
+      if (imageFile) {
+        payload = new FormData();
+        payload.append('user', pb.authStore.model.id);
+        payload.append('title', title.trim());
+        payload.append('servings', Number(servings));
+        payload.append('instructions', instructions.trim());
+        payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
+        payload.append('tags', JSON.stringify(tags));
+        payload.append('image_file', imageFile);
+        payload.append('image_url', '');
+        if (sourceUrl) payload.append('source_url', sourceUrl);
+        if (nutrition) payload.append('nutrition', nutrition);
+      } else {
+        payload = {
+          user: pb.authStore.model.id,
+          title: title.trim(),
+          servings: Number(servings),
+          instructions: instructions.trim(),
+          ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
+          tags: JSON.stringify(tags),
+          ...(imageUrl ? { image_url: imageUrl } : {}),
+          ...(sourceUrl ? { source_url: sourceUrl } : {}),
+          ...(nutrition ? { nutrition } : {}),
+        };
+      }
 
       if (isEdit) {
-  await pb.collection('recipes').update(id, data);
-} else {
-  // Check for duplicate recipe by source URL
-  if (data.source_url) {
-    const userId = pb.authStore.model.id;
-    const existing = await pb.collection('recipes').getList(1, 1, {
-      filter: `user = "${userId}" && source_url = "${data.source_url}"`,
-    });
-    if (existing.items.length > 0) {
-      setSubmitError('This recipe is already in your collection!');
-      setLoading(false);
-      return;
-    }
-  }
-  await pb.collection('recipes').create(data);
-}
+        await pb.collection('recipes').update(id, payload);
+      } else {
+        if (sourceUrl) {
+          const existing = await pb.collection('recipes').getList(1, 1, {
+            filter: `user = "${pb.authStore.model.id}" && source_url = "${sourceUrl}"`,
+          });
+          if (existing.items.length > 0) {
+            setSubmitError('This recipe is already in your collection!');
+            setLoading(false);
+            return;
+          }
+        }
+        await pb.collection('recipes').create(payload);
+      }
 
       navigate('/recipes');
     } catch (err) {
       console.error('Full error:', err.response);
-      setSubmitError(
-        err?.response?.message || err?.message || 'Failed to save recipe.'
-      );
+      setSubmitError(err?.response?.message || err?.message || 'Failed to save recipe.');
     } finally {
       setLoading(false);
     }
@@ -287,21 +294,15 @@ setImportUrl('');
             onClick={handleImport}
             disabled={importing}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
-              isPro
-                ? 'bg-green-500 hover:bg-green-600 text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              isPro ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
             {importing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             Import
           </button>
         </div>
-        {importError && (
-          <p className="text-red-500 text-xs mt-2">{importError}</p>
-        )}
-        {!isPro && (
-          <p className="text-xs text-gray-400 mt-2">Upgrade to Pro to import recipes from any URL.</p>
-        )}
+        {importError && <p className="text-red-500 text-xs mt-2">{importError}</p>}
+        {!isPro && <p className="text-xs text-gray-400 mt-2">Upgrade to Pro to import recipes from any URL.</p>}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -330,24 +331,63 @@ setImportUrl('');
           />
         </div>
 
-        {/* Image URL */}
+        {/* Image */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Image URL</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Recipe Image</label>
+
+          {/* File upload */}
+          <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors text-sm text-gray-500 hover:text-green-600 mb-2">
+            <ChefHat size={16} />
+            {imageFile ? imageFile.name : 'Upload a photo from your device'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  setImageFile(file);
+                  setImagePreview(URL.createObjectURL(file));
+                  setImageUrl('');
+                }
+              }}
+            />
+          </label>
+
+          {/* OR divider */}
+          <div className="flex items-center gap-2 my-2">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 font-medium">or paste URL</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          {/* URL input */}
           <input
             type="url"
             value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
+            onChange={(e) => { setImageUrl(e.target.value); setImageFile(null); setImagePreview(''); }}
             placeholder="https://..."
             className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
           />
-          {imageUrl && (
-            <div className="mt-2 h-32 rounded-xl overflow-hidden bg-gray-100">
+
+          {/* Preview */}
+          {(imagePreview || imageUrl) && (
+            <div className="mt-2 h-32 rounded-xl overflow-hidden bg-gray-100 relative">
               <img
-                src={`https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}&w=400&h=200&fit=cover&q=80`}
+                src={imagePreview || `https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}&w=400&h=200&fit=cover&q=80`}
                 alt="Preview"
                 className="w-full h-full object-cover"
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
+              {imageFile && (
+                <button
+                  type="button"
+                  onClick={() => { setImageFile(null); setImagePreview(''); }}
+                  className="absolute top-2 right-2 bg-white/80 rounded-full p-1 hover:bg-white"
+                >
+                  <X size={14} className="text-gray-600" />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -369,23 +409,14 @@ setImportUrl('');
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tags</label>
           <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-xl bg-white min-h-[48px]">
             {tags.map((tag) => (
-              <span
-                key={tag}
-                className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full"
-              >
+              <span key={tag} className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">
                 {tag}
-                <button
-                  type="button"
-                  onClick={() => toggleTag(tag)}
-                  className="hover:text-green-900 transition-colors"
-                >
+                <button type="button" onClick={() => toggleTag(tag)} className="hover:text-green-900 transition-colors">
                   <X size={12} />
                 </button>
               </span>
             ))}
-            {tags.length === 0 && (
-              <span className="text-gray-400 text-xs self-center">Select tags below...</span>
-            )}
+            {tags.length === 0 && <span className="text-gray-400 text-xs self-center">Select tags below...</span>}
           </div>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {TAG_OPTIONS.filter((t) => !tags.includes(t)).map((tag) => (
@@ -464,14 +495,11 @@ setImportUrl('');
           />
         </div>
 
-        {/* Submit Error / Duplicate Warning */}
+        {/* Duplicate Warning */}
         {duplicateRecipe && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
             <p className="font-semibold mb-1">Looks like you already have this recipe!</p>
-            <Link
-              to={`/recipes/${duplicateRecipe.id}`}
-              className="text-green-600 underline font-medium"
-            >
+            <Link to={`/recipes/${duplicateRecipe.id}`} className="text-green-600 underline font-medium">
               View existing recipe →
             </Link>
           </div>
