@@ -319,6 +319,18 @@ export default function RecipeDetailPage() {
                     ))}
                   </div>
                 </div>
+				 {recipe.prep_time ? (
+				  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2">
+				    <Clock className="w-4 h-4 text-gray-500" />
+				    <span className="text-sm text-gray-600 font-medium">Prep: {recipe.prep_time} min</span>
+				  </div>
+				) : null}
+				<div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2">
+				  <Clock className="w-4 h-4 text-gray-500" />
+				  <span className="text-sm text-gray-600 font-medium">
+				    {recipe.cook_time ? `${recipe.cook_time} min` : "—"}
+				  </span>
+				</div>
                 <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2">
                  <Clock className="w-4 h-4 text-gray-500" />
 									<span className="text-sm text-gray-600 font-medium">
