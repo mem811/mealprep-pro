@@ -24,9 +24,14 @@ const RECIPE_FILTERS = [
   { label: 'Favorites', icon: Bookmark },
 ];
 
-function getProxiedImage(url) {
-  if (!url) return null;
-  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=1200&fit=cover&q=90&n=-1`;
+function getProxiedImage(recipe) {
+  if (recipe.image_file) {
+    return pb.getFileUrl(recipe, recipe.image_file, { thumb: '400x300' });
+  }
+  if (recipe.image_url) {
+    return `{{https://images.weserv.nl/?url=${encodeURIComponent(recipe.image_url}})}&w=400&fit=cover&q=80&n=-1`;
+  }
+  return null;
 }
 
 function getSourceSiteName(url) {
@@ -227,7 +232,7 @@ const confirmDelete = async () => {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredRecipes.map((recipe) => {
-            const proxiedImg = getProxiedImage(recipe.image_url);
+            const proxiedImg = getProxiedImage(recipe);
             const sourceSite = getSourceSiteName(recipe.source_url);
             const isFav = !!recipe.favorited;
             return (
