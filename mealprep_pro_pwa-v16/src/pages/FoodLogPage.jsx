@@ -333,31 +333,29 @@ useEffect(() => {
       </div>
 
       {/* Scan / Lookup / Library row */}
-      <div className="mt-4 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-        {isMobile && (
-          <button onClick={() => setScanOpen(true)} className="px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700">
-            📷 Scan
-          </button>
-        )}
-        <div className="flex-1 flex gap-2">
-          <input value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && doLookup(barcodeInput)}
-            placeholder="Enter barcode (UPC/EAN)"
-            className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
-          <button onClick={() => doLookup(barcodeInput)} disabled={lookingUp}
-            className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-50">
-            {lookingUp ? "..." : "Lookup"}
-          </button>
-        </div>
-        <button onClick={openLibrary}
-          className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 text-sm">
-          📋 Food Library
-        </button>
-      </div>
-          <button onClick={() => setManualOpen(true)}
-            className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 text-sm">
-            ✏️ Add manually
-          </button>
+<div className="mt-4 flex flex-wrap gap-2 items-center">
+  {isMobile && (
+    <button onClick={() => setScanOpen(true)} className="px-3 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 text-sm">
+      📷 Scan
+    </button>
+  )}
+  <input value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)}
+    onKeyDown={(e) => e.key === "Enter" && doLookup(barcodeInput)}
+    placeholder="Enter barcode (UPC/EAN)"
+    className="w-48 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm" />
+  <button onClick={() => doLookup(barcodeInput)} disabled={lookingUp}
+    className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-50 text-sm">
+    {lookingUp ? "..." : "Lookup"}
+  </button>
+  <button onClick={openLibrary}
+    className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 text-sm">
+    📋 Food Library
+  </button>
+  <button onClick={() => setManualOpen(true)}
+    className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 text-sm">
+    ✏️ Add manually
+  </button>
+</div>
                
      {/* Totals + Progress */}
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
