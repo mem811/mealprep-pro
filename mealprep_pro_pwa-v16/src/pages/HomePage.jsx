@@ -141,6 +141,12 @@ function fmt(d) {
 	return d.toISOString().split("T")[0];
 }
 
+function addDays(dateStr, days) {
+  const d = new Date(dateStr + "T00:00:00.000Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 function getProxiedImage(url) {
 	if (!url) return null;
 	return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=120&h=120&fit=cover&q=85";
@@ -456,6 +462,53 @@ export default function HomePage() {
 		}
 	};
 
+	var copyLastWeek = async function () {
+  try {
+    var userId = pb.authStore.model?.id;
+    if (!userId) return;
+
+    var lastWeekStart = addDays(weekStart, -7);
+    var lastWeekEnd = addDays(weekEnd, -7);
+
+    var res = await pb.collection("meal_slots").getList(1, 200, {
+      filter: `meal_plan.user = "${userId}" && date >= "${lastWeekStart}" && date <= "${lastWeekEnd}"`,
+    });
+
+    if (res.items.length === 0) {
+      alert("No meals found from last week to copy.");
+      return;
+    }
+
+    var mealPlan;
+    var existing = await pb.collection("meal_plans").getList(1, 1, {
+      filter: `user = "${userId}" && week_start_date = "${weekStart}"`,
+    });
+    if (existing.items.length > 0) {
+      mealPlan = existing.items[0];
+    } else {
+      mealPlan = await pb.collection("meal_plans").create({
+        user: userId,
+        week_start_date: weekStart,
+      });
+    }
+
+    for (var slot of res.items) {
+      await pb.collection("meal_slots").create({
+        meal_plan: mealPlan.id,
+        date: addDays(slot.date, 7),
+        slot: slot.slot,
+        recipe: slot.recipe,
+        servings_multiplier: slot.servings_multiplier || 1,
+      });
+    }
+
+    await fetchSlots();
+  } catch (e) {
+    console.error("Copy last week error:", e);
+    alert("Failed to copy last week's meals.");
+  }
+};
+
 	var handleAteThis = async function (date, mealType, item) {
 		var slotId = item?.slotId;
 		if (!slotId) return;
@@ -592,6 +645,12 @@ export default function HomePage() {
 								className={softBtn}
 							>
 								<ChevronRight size={16} className="text-emerald-700" />
+							</button>
+							<button
+							  onClick={copyLastWeek}
+							  className={softBtn}
+							>
+							  📋 Copy Last Week
 							</button>
 						</div>
 					</div>
