@@ -56,6 +56,9 @@ export default function FoodLogPage() {
   const [libraryItems, setLibraryItems] = useState([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [librarySearch, setLibrarySearch] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualFood, setManualFood] = useState({ name: "", meal_type: "Snack", calories: "", protein: "", carbs: "", fat: "", servings: "1", notes: "" });
+  const [savingManual, setSavingManual] = useState(false);
 
   const isMobile = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -325,15 +328,45 @@ useEffect(() => {
           📋 Food Library
         </button>
       </div>
+          <button onClick={() => setManualOpen(true)}
+            className="px-3 py-2 rounded-xl bg-white border border-gray-200 font-semibold hover:bg-gray-50 text-sm">
+            ✏️ Add manually
+          </button>
+                async function saveManualEntry() {
+                if (!manualFood.name.trim()) { alert("Please enter a food name."); return; }
+                try {
+                  setSavingManual(true);
+                  const userId = pb.authStore.model?.id;
+                  if (!userId) throw new Error("Not signed in.");
+                  const created = await pb.collection("food_log").create({
+                    user: userId, date: dateStr,
+                    meal_type: manualFood.meal_type || "Snack",
+                    name: manualFood.name,
+                    calories: Number(manualFood.calories) || 0,
+                    protein: Number(manualFood.protein) || 0,
+                    carbs: Number(manualFood.carbs) || 0,
+                    fat: Number(manualFood.fat) || 0,
+                    servings: Number(manualFood.servings) || 1,
+                    notes: manualFood.notes || "",
+                  });
+                  setEntries((prev) => [created, ...prev]);
+                  setManualOpen(false);
+                  setManualFood({ name: "", meal_type: "Snack", calories: "", protein: "", carbs: "", fat: "", servings: "1", notes: "" });
+                } catch (e) {
+                  alert(e?.message || "Failed to add entry.");
+                } finally {
+                  setSavingManual(false);
+                }
+              }
 
      {/* Totals + Progress */}
-<div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-  {[
-    ["Calories", Math.round(totals.calories), "", goals?.calories],
-    ["Protein", Math.round(totals.protein), "g", goals?.protein],
-    ["Carbs", Math.round(totals.carbs), "g", goals?.carbs],
-    ["Fat", Math.round(totals.fat), "g", goals?.fat],
-  ].map(([label, val, unit, goal]) => {
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          {[
+            ["Calories", Math.round(totals.calories), "", goals?.calories],
+            ["Protein", Math.round(totals.protein), "g", goals?.protein],
+            ["Carbs", Math.round(totals.carbs), "g", goals?.carbs],
+            ["Fat", Math.round(totals.fat), "g", goals?.fat],
+          ].map(([label, val, unit, goal]) => {
     const pct = goal > 0 ? Math.min(100, Math.round((val / goal) * 100)) : null;
     const over = goal > 0 && val > goal;
     return (
@@ -437,7 +470,61 @@ useEffect(() => {
     </div>
   </div>
 )}
-
+{/* Manual entry modal */}
+{manualOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="absolute inset-0 bg-black/40" onClick={() => savingManual ? null : setManualOpen(false)} />
+    <div className="relative w-[92%] max-w-lg rounded-2xl bg-white shadow-xl border border-gray-100 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-gray-900">Add food manually</div>
+          <div className="text-xs text-gray-500 mt-0.5">Enter nutrition info directly.</div>
+        </div>
+        <button className="text-sm font-semibold text-gray-500 hover:text-gray-700" onClick={() => setManualOpen(false)} disabled={savingManual}>Close</button>
+      </div>
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="text-xs font-semibold text-gray-600 sm:col-span-2">Food name
+          <input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={manualFood.name} onChange={(e) => setManualFood((p) => ({ ...p, name: e.target.value }))}
+            placeholder="e.g. Chicken breast, Greek yogurt..." />
+        </label>
+        <label className="text-xs font-semibold text-gray-600">Meal type
+          <input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={manualFood.meal_type} onChange={(e) => setManualFood((p) => ({ ...p, meal_type: e.target.value }))}
+            placeholder="Breakfast / Lunch / Dinner / Snack" />
+        </label>
+        <label className="text-xs font-semibold text-gray-600">Servings
+          <input type="number" step="0.5" min="0.5" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={manualFood.servings} onChange={(e) => setManualFood((p) => ({ ...p, servings: e.target.value }))} />
+        </label>
+        <label className="text-xs font-semibold text-gray-600">Calories
+          <input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={manualFood.calories} onChange={(e) => setManualFood((p) => ({ ...p, calories: e.target.value }))} placeholder="kcal" />
+        </label>
+        <label className="text-xs font-semibold text-gray-600">Protein (g)
+          <input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={manualFood.protein} onChange={(e) => setManualFood((p) => ({ ...p, protein: e.target.value }))} />
+        </label>
+        <label className="text-xs font-semibold text-gray-600">Carbs (g)
+          <input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={manualFood.carbs} onChange={(e) => setManualFood((p) => ({ ...p, carbs: e.target.value }))} />
+        </label>
+        <label className="text-xs font-semibold text-gray-600">Fat (g)
+          <input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={manualFood.fat} onChange={(e) => setManualFood((p) => ({ ...p, fat: e.target.value }))} />
+        </label>
+        <label className="text-xs font-semibold text-gray-600 sm:col-span-2">Notes
+          <textarea className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200 min-h-[60px]"
+            value={manualFood.notes} onChange={(e) => setManualFood((p) => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
+        </label>
+      </div>
+      <div className="mt-4 flex items-center justify-end gap-2">
+        <button className="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 disabled:opacity-50" onClick={() => setManualOpen(false)} disabled={savingManual}>Cancel</button>
+        <button className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50" onClick={saveManualEntry} disabled={savingManual}>{savingManual ? "Saving..." : "Log it"}</button>
+      </div>
+    </div>
+  </div>
+)}
       {/* Scanner modal */}
       {scanOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
