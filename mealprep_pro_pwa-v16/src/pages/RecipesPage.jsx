@@ -292,10 +292,17 @@ const confirmDelete = async () => {
                       {recipe.title}
                     </h3>
                   </Link>
-                  {sourceSite && (
-                    <p className="text-xs text-gray-400 mb-2 capitalize">{sourceSite}</p>
-                  )}
-                  <div className="flex items-center justify-end gap-1">
+                    {sourceSite && (
+                              <p className="text-xs text-gray-400 mb-1 capitalize">{sourceSite}</p>
+                            )}
+                            {recipe.rating > 0 && (
+                              <div className="flex items-center gap-0.5 mb-2">
+                                {[1,2,3,4,5].map((star) => (
+                                  <span key={star} className={`text-xs ${star <= recipe.rating ? 'text-amber-400' : 'text-gray-200'}`}>★</span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex items-center justify-end gap-1">
                     <Link
                       to={`/recipes/${recipe.id}/edit`}
                       className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
