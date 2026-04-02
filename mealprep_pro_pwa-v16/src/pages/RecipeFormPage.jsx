@@ -350,7 +350,7 @@ export default function RecipeFormPage() {
               onChange={(e) => setCookTime(e.target.value)}
               placeholder="e.g. 30"
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
-            />
+/>
           </div>
         </div>
 
