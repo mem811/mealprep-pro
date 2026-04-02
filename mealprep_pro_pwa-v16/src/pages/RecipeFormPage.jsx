@@ -26,7 +26,6 @@ export default function RecipeFormPage() {
   const [sourceUrl, setSourceUrl] = useState('');
   const [tags, setTags] = useState([]);
   const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: 'cup' }]);
-  const [cookTime, setCookTime] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(isEdit);
