@@ -298,7 +298,7 @@ const confirmDelete = async () => {
                     {/* Cook Time Badge */}
                     <div className="absolute bottom-2 left-2 bg-black/55 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1">
                       <Clock size={11} />
-                      30 min
+                      {recipe.cook_time ? `${recipe.cook_time} min` : "—"}  
                     </div>
 
                     {/* Bookmark Button */}
