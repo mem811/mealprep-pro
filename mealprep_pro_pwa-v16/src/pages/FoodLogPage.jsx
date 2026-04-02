@@ -504,16 +504,16 @@ useEffect(() => {
   <input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
     value={editing.servings}
     onChange={(ev) => {
-      const s = parseFloat(ev.target.value) || 0;
-      setEditing((p) => ({
-        ...p,
-        servings: ev.target.value,
-        calories: round0((p.perServing?.calories || 0) * s),
-        protein: round0((p.perServing?.protein || 0) * s),
-        carbs: round0((p.perServing?.carbs || 0) * s),
-        fat: round0((p.perServing?.fat || 0) * s),
-      }));
-    }}
+  const s = parseFloat(ev.target.value) || 0;
+  setEditing((p) => ({
+    ...p,
+    servings: ev.target.value,
+    calories: round0((p.perServing?.calories || 0) * s),
+    protein: round0((p.perServing?.protein || 0) * s),
+    carbs: round0((p.perServing?.carbs || 0) * s),
+    fat: round0((p.perServing?.fat || 0) * s),
+  }));
+}}
     placeholder="Optional" />
 </label>
         <label className="text-xs font-semibold text-gray-600 sm:col-span-2">Serving size label
