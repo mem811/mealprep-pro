@@ -211,7 +211,7 @@ export default function RecipeDetailPage() {
   const tags = parseTags(recipe.tags);
   const steps = parseInstructions(recipe.instructions);
   const sourceName = getSourceName(recipe.source_url);
-  const proxiedImg = getRecipeImage(recipe);
+  const proxiedImage = getProxiedImage(recipe);
 
   const scaledQty = (qty) => {
     const num = parseFloat(qty);
