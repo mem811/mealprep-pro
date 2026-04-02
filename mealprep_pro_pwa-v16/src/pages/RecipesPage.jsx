@@ -29,7 +29,7 @@ function getProxiedImage(recipe) {
     return pb.getFileUrl(recipe, recipe.image_file, { thumb: '400x300' });
   }
   if (recipe.image_url) {
-    return `{{https://images.weserv.nl/?url=${encodeURIComponent(recipe.image_url}})}&w=400&fit=cover&q=80&n=-1`;
+    return `https://images.weserv.nl/?url=` + encodeURIComponent(recipe.image_url) + `&w=400&fit=cover&q=80&n=-1`;
   }
   return null;
 }
