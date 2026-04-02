@@ -268,13 +268,22 @@ useEffect(() => {
   }
 
   function requestEdit(entry) {
-    setEditing({
-      id: entry.id, meal_type: entry.meal_type || "", name: entry.name || "",
-      calories: n0(entry.calories), protein: n0(entry.protein),
-      carbs: n0(entry.carbs), fat: n0(entry.fat),
-      servings: entry.servings ?? "", notes: entry.notes || "",
-    });
-  }
+  const servings = n0(entry.servings) || 1;
+  const perServing = {
+    calories: entry.calories_per_serving ? n0(entry.calories_per_serving) : Math.round(n0(entry.calories) / servings),
+    protein: entry.protein_per_serving ? n0(entry.protein_per_serving) : Math.round(n0(entry.protein) / servings),
+    carbs: entry.carbs_per_serving ? n0(entry.carbs_per_serving) : Math.round(n0(entry.carbs) / servings),
+    fat: entry.fat_per_serving ? n0(entry.fat_per_serving) : Math.round(n0(entry.fat) / servings),
+  };
+  setEditing({
+    id: entry.id, meal_type: entry.meal_type || "", name: entry.name || "",
+    calories: n0(entry.calories), protein: n0(entry.protein),
+    carbs: n0(entry.carbs), fat: n0(entry.fat),
+    servings: entry.servings ?? "",
+    notes: entry.notes || "",
+    perServing,
+  });
+}
   async function saveEdit() {
     if (!editing?.id) return;
     try {
@@ -491,10 +500,22 @@ useEffect(() => {
             value={manualFood.meal_type} onChange={(e) => setManualFood((p) => ({ ...p, meal_type: e.target.value }))}
             placeholder="Breakfast / Lunch / Dinner / Snack" />
         </label>
-        <label className="text-xs font-semibold text-gray-600">Servings
-          <input type="number" step="0.5" min="0.5" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
-            value={manualFood.servings} onChange={(e) => setManualFood((p) => ({ ...p, servings: e.target.value }))} />
-        </label>
+       <label className="text-xs font-semibold text-gray-600">Servings
+  <input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+    value={editing.servings}
+    onChange={(ev) => {
+      const s = parseFloat(ev.target.value) || 0;
+      setEditing((p) => ({
+        ...p,
+        servings: ev.target.value,
+        calories: round0((p.perServing?.calories || 0) * s),
+        protein: round0((p.perServing?.protein || 0) * s),
+        carbs: round0((p.perServing?.carbs || 0) * s),
+        fat: round0((p.perServing?.fat || 0) * s),
+      }));
+    }}
+    placeholder="Optional" />
+</label>
         <label className="text-xs font-semibold text-gray-600 sm:col-span-2">Serving size label
             <input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               value={manualFood.serving_size_label}
