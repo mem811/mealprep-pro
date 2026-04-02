@@ -26,6 +26,7 @@ export default function RecipeFormPage() {
   const [sourceUrl, setSourceUrl] = useState('');
   const [tags, setTags] = useState([]);
   const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: 'cup' }]);
+  const [cookTime, setCookTime] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(isEdit);
@@ -48,6 +49,7 @@ export default function RecipeFormPage() {
           const record = await pb.collection('recipes').getOne(id);
           setTitle(record.title || '');
           setServings(record.servings || 4);
+          setCookTime(record.cook_time || '');
           setCookTime(record.cook_time || '');
           setInstructions(record.instructions || '');
           setImageUrl(record.image_url || '');
@@ -138,6 +140,7 @@ export default function RecipeFormPage() {
       setTitle(data.title || '');
       setServings(data.servings || 4);
       setCookTime(data.cook_time || '');
+      setCookTime(data.cook_time || '');
       setImageUrl(data.image_url || '');
       setSourceUrl(data.source_url || importUrl.trim());
 
@@ -199,32 +202,32 @@ export default function RecipeFormPage() {
       let payload;
 
       if (imageFile) {
-        payload = new FormData();
-        payload.append('user', pb.authStore.model.id);
-        payload.append('title', title.trim());
-        payload.append('servings', Number(servings));
-        payload.append('cook_time', Number(cookTime) || 0);
-        payload.append('instructions', instructions.trim());
-        payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
-        payload.append('tags', JSON.stringify(tags));
-        payload.append('image_file', imageFile);
-        payload.append('image_url', '');
-        if (sourceUrl) payload.append('source_url', sourceUrl);
-        if (nutrition) payload.append('nutrition', nutrition);
-      } else {
-        payload = {
-          user: pb.authStore.model.id,
-          title: title.trim(),
-          servings: Number(servings),
-          cook_time: Number(cookTime) || 0,
-          instructions: instructions.trim(),
-          ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
-          tags: JSON.stringify(tags),
-          ...(imageUrl ? { image_url: imageUrl } : {}),
-          ...(sourceUrl ? { source_url: sourceUrl } : {}),
-          ...(nutrition ? { nutrition } : {}),
-        };
-      }
+  payload = new FormData();
+  payload.append('user', pb.authStore.model.id);
+  payload.append('title', title.trim());
+  payload.append('servings', Number(servings));
+  payload.append('cook_time', Number(cookTime) || 0);  // ← ADD THIS
+  payload.append('instructions', instructions.trim());
+  payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
+  payload.append('tags', JSON.stringify(tags));
+  payload.append('image_file', imageFile);
+  payload.append('image_url', '');
+  if (sourceUrl) payload.append('source_url', sourceUrl);
+  if (nutrition) payload.append('nutrition', nutrition);
+} else {
+  payload = {
+    user: pb.authStore.model.id,
+    title: title.trim(),
+    servings: Number(servings),
+    cook_time: Number(cookTime) || 0,  // ← ADD THIS
+    instructions: instructions.trim(),
+    ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
+    tags: JSON.stringify(tags),
+    ...(imageUrl ? { image_url: imageUrl } : {}),
+    ...(sourceUrl ? { source_url: sourceUrl } : {}),
+    ...(nutrition ? { nutrition } : {}),
+  };
+}
 
       if (isEdit) {
         await pb.collection('recipes').update(id, payload);
