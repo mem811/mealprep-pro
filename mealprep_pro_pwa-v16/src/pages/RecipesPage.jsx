@@ -52,6 +52,7 @@ function getSourceSiteName(url) {
   const [selectedTab, setSelectedTab] = useState('All Recipes');
   const [togglingFav, setTogglingFav] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [minRating, setMinRating] = useState(0);
 
   const fetchRecipes = async () => {
     try {
@@ -229,6 +230,23 @@ const confirmDelete = async () => {
             </button>
           )}
         </div>
+      <div className="flex items-center gap-2 mb-4">
+  <span className="text-sm font-semibold text-gray-600">Filter by rating:</span>
+  {[0, 1, 2, 3, 4, 5].map((r) => (
+    <button
+      key={r}
+      onClick={() => setMinRating(r)}
+      className={
+        "px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
+        (minRating === r
+          ? "bg-emerald-600 text-white border-emerald-600"
+          : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")
+      }
+    >
+      {r === 0 ? "All" : "★".repeat(r)}
+    </button>
+  ))}
+</div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredRecipes.map((recipe) => {
