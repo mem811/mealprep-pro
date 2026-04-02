@@ -114,8 +114,14 @@ const confirmDelete = async () => {
 
   const filteredRecipes = recipes.filter((r) => {
     const matchesSearch = r.title?.toLowerCase().includes(search.toLowerCase());
-    if (selectedTab === 'All Recipes') return matchesSearch;
-    if (selectedTab === 'Favorites') return matchesSearch && !!r.favorited;
+    if (selectedTab === 'All Recipes') {
+    if (minRating > 0 && (r.rating || 0) < minRating) return false;
+    return matchesSearch;
+    }  
+      if (selectedTab === 'Favorites') {
+      if (minRating > 0 && (r.rating || 0) < minRating) return false;
+      return matchesSearch && !!r.favorited;
+    }
 
     let recipeTags = [];
     if (typeof r.tags === 'string') {
@@ -126,6 +132,7 @@ const confirmDelete = async () => {
     const matchesTag = recipeTags.some(
       (tag) => tag.toLowerCase() === selectedTab.toLowerCase()
     );
+    if (minRating > 0 && (r.rating || 0) < minRating) return false;
     if (minRating > 0 && (r.rating || 0) < minRating) return false;
     return matchesSearch && matchesTag;
   });
