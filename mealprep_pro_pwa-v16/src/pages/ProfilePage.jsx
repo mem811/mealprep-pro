@@ -7,6 +7,7 @@ import {
   ShieldCheck, Loader2
 } from 'lucide-react';
 import { getUserGoals, saveUserGoals } from "../lib/userGoals";
+import { useState, useEffect } from 'react';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
