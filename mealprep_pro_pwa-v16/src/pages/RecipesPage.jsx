@@ -126,6 +126,7 @@ const confirmDelete = async () => {
     const matchesTag = recipeTags.some(
       (tag) => tag.toLowerCase() === selectedTab.toLowerCase()
     );
+    if (minRating > 0 && (r.rating || 0) < minRating) return false;
     return matchesSearch && matchesTag;
   });
 
@@ -198,6 +199,25 @@ const confirmDelete = async () => {
         })}
       </div>
 
+      {/* Rating Filter */}
+<div className="flex items-center gap-2 mb-4">
+  <span className="text-sm font-semibold text-gray-600">Filter by rating:</span>
+  {[0, 1, 2, 3, 4, 5].map((r) => (
+    <button
+      key={r}
+      onClick={() => setMinRating(r)}
+      className={
+        "px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
+        (minRating === r
+          ? "bg-emerald-600 text-white border-emerald-600"
+          : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")
+      }
+    >
+      {r === 0 ? "All" : "★".repeat(r)}
+    </button>
+  ))}
+</div>
+
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">
           {error}
@@ -230,23 +250,6 @@ const confirmDelete = async () => {
             </button>
           )}
         </div>
-      <div className="flex items-center gap-2 mb-4">
-  <span className="text-sm font-semibold text-gray-600">Filter by rating:</span>
-  {[0, 1, 2, 3, 4, 5].map((r) => (
-    <button
-      key={r}
-      onClick={() => setMinRating(r)}
-      className={
-        "px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
-        (minRating === r
-          ? "bg-emerald-600 text-white border-emerald-600"
-          : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")
-      }
-    >
-      {r === 0 ? "All" : "★".repeat(r)}
-    </button>
-  ))}
-</div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredRecipes.map((recipe) => {
