@@ -57,7 +57,7 @@ export default function FoodLogPage() {
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [librarySearch, setLibrarySearch] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualFood, setManualFood] = useState({ name: "", meal_type: "Snack", calories: "", protein: "", carbs: "", fat: "", servings: "1", notes: "" });
+  const [manualFood, setManualFood] = useState({ name: "", meal_type: "Snack", calories: "", protein: "", carbs: "", fat: "", servings: "1", serving_size_label: "", notes: "" });
   const [savingManual, setSavingManual] = useState(false);
 
   const isMobile = useMemo(() => {
@@ -497,6 +497,12 @@ useEffect(() => {
           <input type="number" step="0.5" min="0.5" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             value={manualFood.servings} onChange={(e) => setManualFood((p) => ({ ...p, servings: e.target.value }))} />
         </label>
+        <label className="text-xs font-semibold text-gray-600 sm:col-span-2">Serving size label
+            <input className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              value={manualFood.serving_size_label}
+              onChange={(e) => setManualFood((p) => ({ ...p, serving_size_label: e.target.value }))}
+              placeholder="e.g. 1 cup, 2 tbsp, 1 slice (optional)" />
+          </label>
         <label className="text-xs font-semibold text-gray-600">Calories
           <input type="number" className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             value={manualFood.calories} onChange={(e) => setManualFood((p) => ({ ...p, calories: e.target.value }))} placeholder="kcal" />
@@ -551,7 +557,11 @@ useEffect(() => {
           </div>
         </div>
       )}
-
+              {manualFood.serving_size_label && (
+              <div className="mt-1 text-xs text-emerald-700 font-medium">
+                1 serving = {manualFood.serving_size_label}
+              </div>
+            )}
       {/* Add food modal */}
       {addFood && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
