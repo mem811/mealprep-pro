@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
-import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat, Clock } from 'lucide-react';
 
 const TAG_OPTIONS = [
   'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Sides', 'Soups',
@@ -18,6 +18,7 @@ export default function RecipeFormPage() {
 
   const [title, setTitle] = useState('');
   const [servings, setServings] = useState(4);
+  const [cookTime, setCookTime] = useState('');
   const [instructions, setInstructions] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imageFile, setImageFile] = useState(null);
@@ -47,6 +48,7 @@ export default function RecipeFormPage() {
           const record = await pb.collection('recipes').getOne(id);
           setTitle(record.title || '');
           setServings(record.servings || 4);
+          setCookTime(record.cook_time || '');
           setInstructions(record.instructions || '');
           setImageUrl(record.image_url || '');
           setSourceUrl(record.source_url || '');
@@ -135,6 +137,7 @@ export default function RecipeFormPage() {
 
       setTitle(data.title || '');
       setServings(data.servings || 4);
+      setCookTime(data.cook_time || '');
       setImageUrl(data.image_url || '');
       setSourceUrl(data.source_url || importUrl.trim());
 
@@ -200,6 +203,7 @@ export default function RecipeFormPage() {
         payload.append('user', pb.authStore.model.id);
         payload.append('title', title.trim());
         payload.append('servings', Number(servings));
+        payload.append('cook_time', Number(cookTime) || 0);
         payload.append('instructions', instructions.trim());
         payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
         payload.append('tags', JSON.stringify(tags));
@@ -212,6 +216,7 @@ export default function RecipeFormPage() {
           user: pb.authStore.model.id,
           title: title.trim(),
           servings: Number(servings),
+          cook_time: Number(cookTime) || 0,
           instructions: instructions.trim(),
           ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
           tags: JSON.stringify(tags),
@@ -306,6 +311,7 @@ export default function RecipeFormPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+
         {/* Title */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">Recipe Title *</label>
@@ -319,23 +325,37 @@ export default function RecipeFormPage() {
           />
         </div>
 
-        {/* Servings */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Servings</label>
-          <input
-            type="number"
-            min="1"
-            value={servings}
-            onChange={(e) => setServings(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
-          />
+        {/* Servings + Cook Time */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Servings</label>
+            <input
+              type="number"
+              min="1"
+              value={servings}
+              onChange={(e) => setServings(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <span className="flex items-center gap-1"><Clock size={13} /> Cook Time (min)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={cookTime}
+              onChange={(e) => setCookTime(e.target.value)}
+              placeholder="e.g. 30"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+            />
+          </div>
         </div>
 
         {/* Image */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">Recipe Image</label>
 
-          {/* File upload */}
           <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors text-sm text-gray-500 hover:text-green-600 mb-2">
             <ChefHat size={16} />
             {imageFile ? imageFile.name : 'Upload a photo from your device'}
@@ -354,14 +374,12 @@ export default function RecipeFormPage() {
             />
           </label>
 
-          {/* OR divider */}
           <div className="flex items-center gap-2 my-2">
             <div className="flex-1 h-px bg-gray-200" />
             <span className="text-xs text-gray-400 font-medium">or paste URL</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
-          {/* URL input */}
           <input
             type="url"
             value={imageUrl}
@@ -370,11 +388,10 @@ export default function RecipeFormPage() {
             className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
           />
 
-          {/* Preview */}
           {(imagePreview || imageUrl) && (
             <div className="mt-2 h-32 rounded-xl overflow-hidden bg-gray-100 relative">
               <img
-                src={imagePreview || `https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}&w=400&h=200&fit=cover&q=80`}
+                src={imagePreview || `https://images.weserv.nl/?url=` + encodeURIComponent(imageUrl) + `&w=400&h=200&fit=cover&q=80`}
                 alt="Preview"
                 className="w-full h-full object-cover"
                 onError={(e) => { e.target.style.display = 'none'; }}
