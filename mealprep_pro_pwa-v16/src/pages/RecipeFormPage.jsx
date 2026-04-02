@@ -18,6 +18,7 @@ export default function RecipeFormPage() {
 
   const [title, setTitle] = useState('');
   const [servings, setServings] = useState(4);
+  const [prepTime, setPrepTime] = useState('');
   const [cookTime, setCookTime] = useState('');
   const [instructions, setInstructions] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -48,7 +49,7 @@ export default function RecipeFormPage() {
           const record = await pb.collection('recipes').getOne(id);
           setTitle(record.title || '');
           setServings(record.servings || 4);
-          setCookTime(record.cook_time || '');
+          setPrepTime(record.prep_time || '');
           setCookTime(record.cook_time || '');
           setInstructions(record.instructions || '');
           setImageUrl(record.image_url || '');
@@ -138,7 +139,7 @@ export default function RecipeFormPage() {
 
       setTitle(data.title || '');
       setServings(data.servings || 4);
-      setCookTime(data.cook_time || '');
+      setPrepTime(data.prep_time || '');
       setCookTime(data.cook_time || '');
       setImageUrl(data.image_url || '');
       setSourceUrl(data.source_url || importUrl.trim());
@@ -201,32 +202,34 @@ export default function RecipeFormPage() {
       let payload;
 
       if (imageFile) {
-  payload = new FormData();
-  payload.append('user', pb.authStore.model.id);
-  payload.append('title', title.trim());
-  payload.append('servings', Number(servings));
-  payload.append('cook_time', Number(cookTime) || 0);  // ← ADD THIS
-  payload.append('instructions', instructions.trim());
-  payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
-  payload.append('tags', JSON.stringify(tags));
-  payload.append('image_file', imageFile);
-  payload.append('image_url', '');
-  if (sourceUrl) payload.append('source_url', sourceUrl);
-  if (nutrition) payload.append('nutrition', nutrition);
-} else {
-  payload = {
-    user: pb.authStore.model.id,
-    title: title.trim(),
-    servings: Number(servings),
-    cook_time: Number(cookTime) || 0,  // ← ADD THIS
-    instructions: instructions.trim(),
-    ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
-    tags: JSON.stringify(tags),
-    ...(imageUrl ? { image_url: imageUrl } : {}),
-    ...(sourceUrl ? { source_url: sourceUrl } : {}),
-    ...(nutrition ? { nutrition } : {}),
-  };
-}
+        payload = new FormData();
+        payload.append('user', pb.authStore.model.id);
+        payload.append('title', title.trim());
+        payload.append('servings', Number(servings));
+        payload.append('prep_time', Number(prepTime) || 0);
+        payload.append('cook_time', Number(cookTime) || 0);
+        payload.append('instructions', instructions.trim());
+        payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
+        payload.append('tags', JSON.stringify(tags));
+        payload.append('image_file', imageFile);
+        payload.append('image_url', '');
+        if (sourceUrl) payload.append('source_url', sourceUrl);
+        if (nutrition) payload.append('nutrition', nutrition);
+      } else {
+        payload = {
+          user: pb.authStore.model.id,
+          title: title.trim(),
+          servings: Number(servings),
+          prep_time: Number(prepTime) || 0,
+          cook_time: Number(cookTime) || 0,
+          instructions: instructions.trim(),
+          ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
+          tags: JSON.stringify(tags),
+          ...(imageUrl ? { image_url: imageUrl } : {}),
+          ...(sourceUrl ? { source_url: sourceUrl } : {}),
+          ...(nutrition ? { nutrition } : {}),
+        };
+      }
 
       if (isEdit) {
         await pb.collection('recipes').update(id, payload);
@@ -327,8 +330,8 @@ export default function RecipeFormPage() {
           />
         </div>
 
-        {/* Servings + Cook Time */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Servings + Prep Time + Cook Time */}
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Servings</label>
             <input
@@ -341,7 +344,20 @@ export default function RecipeFormPage() {
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              <span className="flex items-center gap-1"><Clock size={13} /> Cook Time (min)</span>
+              <span className="flex items-center gap-1"><Clock size={13} /> Prep (min)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={prepTime}
+              onChange={(e) => setPrepTime(e.target.value)}
+              placeholder="e.g. 15"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <span className="flex items-center gap-1"><Clock size={13} /> Cook (min)</span>
             </label>
             <input
               type="number"
@@ -350,7 +366,7 @@ export default function RecipeFormPage() {
               onChange={(e) => setCookTime(e.target.value)}
               placeholder="e.g. 30"
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
-/>
+            />
           </div>
         </div>
 
@@ -393,7 +409,7 @@ export default function RecipeFormPage() {
           {(imagePreview || imageUrl) && (
             <div className="mt-2 h-32 rounded-xl overflow-hidden bg-gray-100 relative">
               <img
-                src={imagePreview || `https://images.weserv.nl/?url=` + encodeURIComponent(imageUrl) + `&w=400&h=200&fit=cover&q=80`}
+                src={imagePreview || 'https://images.weserv.nl/?url=' + encodeURIComponent(imageUrl) + '&w=400&h=200&fit=cover&q=80'}
                 alt="Preview"
                 className="w-full h-full object-cover"
                 onError={(e) => { e.target.style.display = 'none'; }}
