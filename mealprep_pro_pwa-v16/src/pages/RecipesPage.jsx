@@ -191,14 +191,15 @@ const confirmDelete = async () => {
           const isActive = selectedTab === label;
           return (
             <button
-              key={label}
-              onClick={() => setSelectedTab(label)}
-              className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
-                isActive
-                  ? 'bg-green-500 text-white shadow-md shadow-green-200'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-            >
+                key={label}
+                onClick={() => setSelectedTab(label)}
+                style={isActive ? { background: "linear-gradient(135deg, #10b981, #059669)" } : {}}
+                className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+                  isActive
+                    ? 'text-white shadow-md shadow-green-200'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
               <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
               <span>{label}</span>
             </button>
