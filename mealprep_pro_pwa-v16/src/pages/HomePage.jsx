@@ -753,24 +753,35 @@ export default function HomePage() {
 											<thead>
 												<tr>
 													<th className="w-24" />
-													{weekDays.map(function (d, i) {
-														var isToday = fmt(d) === today;
-														return (
-															<th key={i} className="text-center pb-1">
-																<div
-																	className={
-																		"inline-flex flex-col items-center px-3 py-1.5 rounded-2xl border " +
-																		(isToday
-																			? "bg-emerald-50 text-emerald-700 border-emerald-200"
-																			: "bg-white/70 text-gray-600 border-gray-100")
-																	}
-																>
-																	<span className="text-xs font-medium">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}</span>
-																	<span className={"text-base font-bold " + (isToday ? "" : "text-gray-800")}>{d.getDate()}</span>
-																</div>
-															</th>
-														);
-													})}
+												{weekDays.map(function (d, i) {
+												  var isToday = fmt(d) === today;
+												  var dayNut = getDayNutrition(fmt(d));
+												  return (
+												    <th key={i} className="text-center pb-1">
+												      <div
+												        className={
+												          "inline-flex flex-col items-center px-3 py-1.5 rounded-2xl border " +
+												          (isToday
+												            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+												            : "bg-white/70 text-gray-600 border-gray-100")
+												        }
+												      >
+												        <span className="text-xs font-medium">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}</span>
+												        <span className={"text-base font-bold " + (isToday ? "" : "text-gray-800")}>{d.getDate()}</span>
+												        {dayNut.calories > 0 && (
+												          <span className="text-[9px] font-bold text-emerald-600 mt-0.5">
+												            🔥 {dayNut.calories}
+												          </span>
+												        )}
+												        {dayNut.protein > 0 && (
+												          <span className="text-[9px] font-semibold text-gray-400">
+												            P {dayNut.protein}g
+												          </span>
+												        )}
+												      </div>
+												    </th>
+												  );
+												})}
 												</tr>
 											</thead>
 
