@@ -158,10 +158,17 @@ const confirmDelete = async () => {
             <ListFilter size={15} />
             Sort
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
-            <Filter size={15} />
-            Filter
-          </button>
+          <button
+              key={r}
+              onClick={() => setMinRating(r)}
+              style={minRating === r ? { background: "linear-gradient(135deg, #10b981, #059669)" } : {}}
+              className={
+                "px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
+                (minRating === r
+                  ? "text-white border-emerald-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")
+              }
+            >
           <Link
             to="/recipes/new"
             className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
@@ -344,11 +351,11 @@ const confirmDelete = async () => {
                       <Edit size={14} />
                     </Link>
                    <button
-                  onClick={() => handleDeleteClick(recipe.id)}
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-  <Trash2 size={14} />
-</button>
+                      onClick={() => handleDeleteClick(recipe.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               </div>
