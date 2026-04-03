@@ -429,9 +429,18 @@ export default function HomePage() {
     return { meal, items: slots[today + "__" + meal] || [] };
   });
 
-  var pageBg = "min-h-screen bg-gradient-to-b from-emerald-50/70 via-teal-50/30 to-white";
-  var shellCard = "bg-white/80 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-xl shadow-emerald-100/50";
-  var softBtn = "px-3 py-2 rounded-2xl bg-white/90 border border-emerald-100 text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors";
+  var pageBg =
+  "min-h-screen bg-gradient-to-b from-emerald-50/70 via-teal-50/30 to-white " +
+  "dark:from-gray-950 dark:via-gray-900 dark:to-gray-950";
+
+var shellCard =
+  "bg-white/80 backdrop-blur rounded-[28px] border border-emerald-100/70 shadow-xl shadow-emerald-100/50 " +
+  "dark:bg-gray-900/80 dark:border-gray-700/70 dark:shadow-none";
+
+var softBtn =
+  "px-3 py-2 rounded-2xl bg-white/90 border border-emerald-100 text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors " +
+  "dark:bg-gray-800 dark:border-gray-700 dark:text-emerald-400 dark:hover:bg-gray-700";
+
   var todayCardStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
   var slotCardStyle = { backgroundColor: "rgba(255,255,255,0.15)" };
   var nothingTextStyle = { color: "rgba(255,255,255,0.55)" };
