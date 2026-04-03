@@ -153,32 +153,25 @@ const confirmDelete = async () => {
           <h1 className="text-2xl font-bold text-gray-900">My Recipes</h1>
           <span className="text-gray-400 text-sm font-medium">· {filteredRecipes.length} recipes</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
-            <ListFilter size={15} />
-            Sort
-          </button>
-          <button
-              key={r}
-              onClick={() => setMinRating(r)}
-              style={minRating === r ? gradientStyle : {}}
-              className={
-                "px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
-                (minRating === r
-                  ? "text-white border-emerald-600"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")
-              }
-            >
-         <Link
-              to="/recipes/new"
-              style={gradientStyle}
-              className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
-            >
-              <Plus size={16} />
-              Add Recipe
-            </Link>
-        </div>
-      </div>
+          <div className="flex items-center gap-2">
+    <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
+      <ListFilter size={15} />
+      Sort
+    </button>
+    <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
+      <Filter size={15} />
+      Filter
+    </button>
+    <Link
+      to="/recipes/new"
+      style={gradientStyle}
+      className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
+    >
+      <Plus size={16} />
+      Add Recipe
+    </Link>
+  </div>
+</div>
 
       {/* Search Bar */}
       <div className="relative mb-5">
