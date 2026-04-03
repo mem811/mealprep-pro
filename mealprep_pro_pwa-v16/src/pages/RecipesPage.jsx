@@ -4,7 +4,7 @@ import pb from "../lib/pb";
 import {
   Plus, Search, ListFilter, Filter, Star, X, Utensils, Clock,
   LayoutGrid, Coffee, UtensilsCrossed, Moon, Cake, Salad, Soup,
-  Leaf, Wheat, Dumbbell, Bookmark, Flame
+  Leaf, Wheat, Dumbbell, Heart, Flame
 } from "lucide-react";
 
 var RECIPE_FILTERS = [
@@ -21,7 +21,7 @@ var RECIPE_FILTERS = [
   { label: "Gluten-Free", icon: Wheat },
   { label: "High-Protein", icon: Dumbbell },
   { label: "Bread", icon: Wheat },
-  { label: "Favorites", icon: Bookmark },
+  { label: "Favorites", icon: Heart },
 ];
 
 var SORT_OPTIONS = [
@@ -48,17 +48,17 @@ function parseNutrition(n) {
 var gradientStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
 
 export default function RecipesPage() {
-  const [recipes, setRecipes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTab, setSelectedTab] = useState("All Recipes");
-  const [minRating, setMinRating] = useState(0);
-  const [sortOption, setSortOption] = useState("newest");
-  const [showSortMenu, setShowSortMenu] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [maxCookTime, setMaxCookTime] = useState("");
-  const [hasImageOnly, setHasImageOnly] = useState(false);
+  var [recipes, setRecipes] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [error, setError] = useState("");
+  var [searchQuery, setSearchQuery] = useState("");
+  var [selectedTab, setSelectedTab] = useState("All Recipes");
+  var [minRating, setMinRating] = useState(0);
+  var [sortOption, setSortOption] = useState("newest");
+  var [showSortMenu, setShowSortMenu] = useState(false);
+  var [showFilters, setShowFilters] = useState(false);
+  var [maxCookTime, setMaxCookTime] = useState("");
+  var [hasImageOnly, setHasImageOnly] = useState(false);
 
   useEffect(function () {
     async function fetchRecipes() {
@@ -93,11 +93,29 @@ export default function RecipesPage() {
     }
   };
 
+  var toggleFavorite = async function (e, recipeId) {
+    e.preventDefault();
+    e.stopPropagation();
+    var recipe = recipes.find(function (r) { return r.id === recipeId; });
+    if (!recipe) return;
+    var newVal = !recipe.favorite;
+    try {
+      await pb.collection("recipes").update(recipeId, { favorite: newVal });
+      setRecipes(function (prev) {
+        return prev.map(function (r) {
+          return r.id === recipeId ? Object.assign({}, r, { favorite: newVal }) : r;
+        });
+      });
+    } catch (err) {
+      console.error("Toggle favorite error:", err);
+    }
+  };
+
   // ── Filtering ──
   var filteredRecipes = recipes;
 
   if (selectedTab === "Favorites") {
-    filteredRecipes = filteredRecipes.filter(function (r) { return r.rating >= 4; });
+    filteredRecipes = filteredRecipes.filter(function (r) { return r.favorite; });
   } else if (selectedTab !== "All Recipes") {
     filteredRecipes = filteredRecipes.filter(function (r) {
       var tags = [];
@@ -349,6 +367,18 @@ export default function RecipesPage() {
                     </div>
                   )}
 
+                  {/* Heart / Favorite */}
+                  <button
+                    onClick={function (e) { toggleFavorite(e, recipe.id); }}
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm transition-colors z-10 hover:scale-110"
+                  >
+                    <Heart
+                      size={16}
+                      className={recipe.favorite ? "text-red-500 fill-red-500" : "text-gray-400"}
+                    />
+                  </button>
+
+                  {/* Cook time badge */}
                   {recipe.cook_time > 0 && (
                     <div className="absolute top-2 left-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs font-bold text-gray-700 px-2 py-1 rounded-full">
                       <Clock size={12} />
@@ -356,13 +386,15 @@ export default function RecipesPage() {
                     </div>
                   )}
 
+                  {/* Rating badge */}
                   {recipe.rating > 0 && (
-                    <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm text-xs font-bold text-amber-600 px-2 py-1 rounded-full">
+                    <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm text-xs font-bold text-amber-600 px-2 py-1 rounded-full">
                       <Star size={12} fill="currentColor" />
                       {recipe.rating}
                     </div>
                   )}
 
+                  {/* Calorie badge */}
                   {nut.calories > 0 && (
                     <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
                       🔥 {Math.round(nut.calories)} cal
