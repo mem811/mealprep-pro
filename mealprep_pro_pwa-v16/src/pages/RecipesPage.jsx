@@ -144,7 +144,7 @@ const confirmDelete = async () => {
       </div>
     );
   }
-
+  var gradientStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
       {/* Header */}
@@ -161,7 +161,7 @@ const confirmDelete = async () => {
           <button
               key={r}
               onClick={() => setMinRating(r)}
-              style={minRating === r ? {{ background: "linear-gradient(135deg, #10b981, #059669)" }}
+              style={minRating === r ? gradientStyle : {}}
               className={
                 "px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
                 (minRating === r
@@ -171,7 +171,7 @@ const confirmDelete = async () => {
             >
          <Link
               to="/recipes/new"
-              style= {{ background: "linear-gradient(135deg, #10b981, #059669)" }}
+              style={gradientStyle}
               className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
             >
               <Plus size={16} />
