@@ -9,11 +9,12 @@ export default function Navbar() {
   const { user } = useAuth();
 
   const links = [
+    
   { to: '/', label: 'Planner' },
+  { to: '/food-log', label: 'Food Log' },  // ← ADD
   { to: '/recipes', label: 'Recipes' },
   { to: '/grocery-list', label: 'Grocery List' },
-  { href: '/food-log', label: 'Food Log', icon: Utensils },  // ← ADD
-  { to: '/food-log', label: 'Food Log' },  // ← ADD
+  
 ];	
 
   return (
