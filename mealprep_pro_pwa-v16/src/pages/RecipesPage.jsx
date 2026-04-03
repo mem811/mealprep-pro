@@ -161,7 +161,7 @@ const confirmDelete = async () => {
           <button
               key={r}
               onClick={() => setMinRating(r)}
-              style={minRating === r ? { background: "linear-gradient(135deg, #10b981, #059669)" } : {}}
+              style={minRating === r ? {{ background: "linear-gradient(135deg, #10b981, #059669)" } : }}
               className={
                 "px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
                 (minRating === r
