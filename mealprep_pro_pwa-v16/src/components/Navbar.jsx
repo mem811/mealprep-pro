@@ -25,15 +25,16 @@ export default function Navbar() {
       </Link>
       <nav className="flex items-center gap-1">
         {links.map(({ to, label }) => (
-          <Link
-            key={to}
-            to={to}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              location.pathname === to
-                ? 'bg-green-400 text-white'
-                : 'text-gray-600 hover:bg-green-50 hover:text-green-600'
-            }`}
-          >
+        <Link
+          key={to}
+          to={to}
+          style={location.pathname === to ? { background: "linear-gradient(135deg, #10b981, #059669)" } : {}}
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+            location.pathname === to
+              ? 'text-white'
+              : 'text-gray-600 hover:bg-green-50 hover:text-green-600'
+          }`}
+        >
             {label}
           </Link>
         ))}
