@@ -82,3 +82,21 @@ export default function Navbar() {
     </>
   );
 }
+
+import { useDarkMode } from "../lib/useDarkMode";
+import { Moon, Sun } from "lucide-react";
+
+// Inside your Navbar component:
+const [isDark, toggleDark] = useDarkMode();
+
+// The button (put this in your nav actions area):
+<button
+  onClick={toggleDark}
+  className="w-9 h-9 rounded-2xl flex items-center justify-center border border-emerald-100 bg-white/80 hover:bg-emerald-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
+  title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+>
+  {isDark
+    ? <Sun size={16} className="text-amber-400" />
+    : <Moon size={16} className="text-emerald-600" />
+  }
+</button>
