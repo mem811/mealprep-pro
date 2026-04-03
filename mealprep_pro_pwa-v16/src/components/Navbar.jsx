@@ -20,7 +20,7 @@ export default function Navbar() {
   return (
     <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-40">
       <Link to="/" className="flex items-center gap-2">
-       <div className="w-8 h-8 rounded-lg flex items-center justify-center" style= background: "linear-gradient(135deg, #10b981, #059669)" >
+       <div className="w-8 h-8 rounded-lg flex items-center justify-center" style= {{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
           <Leaf size={18} className="text-white" />
         </div>
         <span className="font-display font-semibold text-xl text-gray-900">MealPrep Pro</span>
