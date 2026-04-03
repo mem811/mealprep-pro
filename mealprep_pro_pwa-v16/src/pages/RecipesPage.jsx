@@ -171,8 +171,10 @@ const confirmDelete = async () => {
             >
           <Link
             to="/recipes/new"
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
-          >
+            style= background: "linear-gradient(135deg, #10b981, #059669)" 
+            className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
+            >
+          </Link>
             <Plus size={16} />
             Add Recipe
           </Link>
