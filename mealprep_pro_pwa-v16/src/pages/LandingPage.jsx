@@ -3,7 +3,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-
 export default function LandingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -17,10 +16,10 @@ export default function LandingPage() {
 
       {/* NAV */}
       <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
-        <span className="text-xl font-bold text-green-600">🥗 Mealplanner.cloud</span>
+        <span className="text-xl font-bold text-emerald-600">🥗 Mealplanner.cloud</span>
         <div className="flex gap-4 items-center">
           <a href="/auth" className="text-sm text-gray-500 hover:text-gray-800">Log in</a>
-          <a href="/auth" className="text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+          <a href="/auth" className="text-sm bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700">
             Get started free
           </a>
         </div>
@@ -36,19 +35,10 @@ export default function LandingPage() {
         </p>
         <a
           href="/auth"
-          className="inline-block bg-green-600 text-white text-lg px-8 py-4 rounded-xl hover:bg-green-700 transition"
+          className="inline-block bg-emerald-600 text-white text-lg px-8 py-4 rounded-xl hover:bg-emerald-700 transition"
         >
           Start free → no credit card required
         </a>
-      </section>
-      
-      {/* APP SCREENSHOT */}
-      <section className="px-6 pb-16 max-w-5xl mx-auto">
-        <img
-          src="/app-screenshot.png"
-          alt="Mealplanner.cloud app screenshot"
-          className="rounded-2xl shadow-2xl w-full"
-        />
       </section>
 
       {/* PROBLEM */}
@@ -62,63 +52,58 @@ export default function LandingPage() {
             takeout by Thursday anyway. Most meal planning apps are bloated fitness trackers — built
             for fitness bros, not real home cooks.
           </p>
-          <p className="text-green-600 font-bold text-xl mt-6">Mealplanner.cloud fixes that.</p>
+          <p className="text-emerald-600 font-bold text-xl mt-6">Mealplanner.cloud fixes that.</p>
         </div>
       </section>
 
-      {/* FEATURES */}
-<section className="px-6 py-20 max-w-5xl mx-auto space-y-24">
-  <h2 className="text-3xl font-bold text-center">How it works</h2>
+      {/* FEATURES WITH SCREENSHOTS */}
+      <section className="px-6 py-20 max-w-5xl mx-auto space-y-24">
+        <h2 className="text-3xl font-bold text-center">How it works</h2>
 
-  {/* Feature 1 */}
-  <div className="flex flex-col md:flex-row items-center gap-12">
-    <div className="flex-1">
-      <div className="text-3xl mb-3">📅</div>
-      <h3 className="text-2xl font-bold mb-3">Plan your week in seconds</h3>
-      <p className="text-gray-500 text-lg">Drag your favorite recipes onto a simple weekly grid — breakfast, lunch, dinner. Change your mind? Just drag again.</p>
-    </div>
-    <div className="flex-1">
-      <img src="/screenshot-planner.png" alt="Meal planner" className="rounded-2xl shadow-xl w-full" />
-    </div>
-  </div>
+        <div className="flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1">
+            <div className="text-3xl mb-3">📅</div>
+            <h3 className="text-2xl font-bold mb-3">Plan your week in seconds</h3>
+            <p className="text-gray-500 text-lg">Drag your favorite recipes onto a simple weekly grid — breakfast, lunch, dinner. Change your mind? Just drag again.</p>
+          </div>
+          <div className="flex-1">
+            <img src="/screenshot-planner.png" alt="Meal planner" className="rounded-2xl shadow-xl w-full" />
+          </div>
+        </div>
 
-  {/* Feature 2 */}
-  <div className="flex flex-col md:flex-row-reverse items-center gap-12">
-    <div className="flex-1">
-      <div className="text-3xl mb-3">🗂</div>
-      <h3 className="text-2xl font-bold mb-3">Save your recipes, your way</h3>
-      <p className="text-gray-500 text-lg">Add recipes manually or import straight from any website with one click. Organized, searchable, forever yours.</p>
-    </div>
-    <div className="flex-1">
-      <img src="/screenshot-recipes.png" alt="Recipe library" className="rounded-2xl shadow-xl w-full" />
-    </div>
-  </div>
+        <div className="flex flex-col md:flex-row-reverse items-center gap-12">
+          <div className="flex-1">
+            <div className="text-3xl mb-3">🗂</div>
+            <h3 className="text-2xl font-bold mb-3">Save your recipes, your way</h3>
+            <p className="text-gray-500 text-lg">Add recipes manually or import straight from any website with one click. Organized, searchable, forever yours.</p>
+          </div>
+          <div className="flex-1">
+            <img src="/screenshot-recipes.png" alt="Recipe library" className="rounded-2xl shadow-xl w-full" />
+          </div>
+        </div>
 
-  {/* Feature 3 */}
-  <div className="flex flex-col md:flex-row items-center gap-12">
-    <div className="flex-1">
-      <div className="text-3xl mb-3">🛒</div>
-      <h3 className="text-2xl font-bold mb-3">Grocery list, auto-generated</h3>
-      <p className="text-gray-500 text-lg">Every ingredient from every meal, combined and sorted by category. No more forgotten items at the store.</p>
-    </div>
-    <div className="flex-1">
-      <img src="/screenshot-grocery.png" alt="Grocery list" className="rounded-2xl shadow-xl w-full" />
-    </div>
-  </div>
+        <div className="flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1">
+            <div className="text-3xl mb-3">🛒</div>
+            <h3 className="text-2xl font-bold mb-3">Grocery list, auto-generated</h3>
+            <p className="text-gray-500 text-lg">Every ingredient from every meal, combined and sorted by category. No more forgotten items at the store.</p>
+          </div>
+          <div className="flex-1">
+            <img src="/screenshot-grocery.png" alt="Grocery list" className="rounded-2xl shadow-xl w-full" />
+          </div>
+        </div>
 
-  {/* Feature 4 */}
-  <div className="flex flex-col md:flex-row-reverse items-center gap-12">
-    <div className="flex-1">
-      <div className="text-3xl mb-3">🔥</div>
-      <h3 className="text-2xl font-bold mb-3">Track what you eat</h3>
-      <p className="text-gray-500 text-lg">Log your meals and track calories, protein, carbs and fat. See your nutrition at a glance every day.</p>
-    </div>
-    <div className="flex-1">
-      <img src="/screenshot-food-log.png" alt="Food log" className="rounded-2xl shadow-xl w-full" />
-    </div>
-  </div>
-
-</section>
+        <div className="flex flex-col md:flex-row-reverse items-center gap-12">
+          <div className="flex-1">
+            <div className="text-3xl mb-3">🔥</div>
+            <h3 className="text-2xl font-bold mb-3">Track what you eat</h3>
+            <p className="text-gray-500 text-lg">Log your meals and track calories, protein, carbs and fat. See your nutrition at a glance every day.</p>
+          </div>
+          <div className="flex-1">
+            <img src="/screenshot-food-log.png" alt="Food log" className="rounded-2xl shadow-xl w-full" />
+          </div>
+        </div>
+      </section>
 
       {/* PRICING */}
       <PricingTable />
@@ -145,7 +130,7 @@ export default function LandingPage() {
         <p className="text-gray-500 mb-8">Join home cooks who plan smarter every week.</p>
         <a
           href="/auth"
-          className="inline-block bg-green-600 text-white text-lg px-8 py-4 rounded-xl hover:bg-green-700 transition"
+          className="inline-block bg-emerald-600 text-white text-lg px-8 py-4 rounded-xl hover:bg-emerald-700 transition"
         >
           Get started free →
         </a>
