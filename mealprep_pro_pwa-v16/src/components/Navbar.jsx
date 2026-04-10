@@ -9,17 +9,15 @@ export default function Navbar() {
   const { user } = useAuth();
 
   const links = [
-    
-  { to: '/', label: 'Planner' },
-  { to: '/food-log', label: 'Food Log' },  // ← ADD
-  { to: '/recipes', label: 'Recipes' },
-  { to: '/grocery-list', label: 'Grocery List' },
-  
-];	
+  { to: '/app', label: 'Planner' },
+  { to: '/app/food-log', label: 'Food Log' },
+  { to: '/app/recipes', label: 'Recipes' },
+  { to: '/app/grocery-list', label: 'Grocery List' },
+  ];
 
   return (
     <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-40">
-      <Link to="/" className="flex items-center gap-2">
+      <Link to="/app" className="flex items-center gap-2">
        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style= {{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
           <Leaf size={18} className="text-white" />
         </div>
@@ -32,7 +30,7 @@ export default function Navbar() {
           to={to}
           style={location.pathname === to ? { background: "linear-gradient(135deg, #10b981, #059669)" } : {}}
           className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-            location.pathname === to
+            location.pathname === to || location.pathname.startsWith(to + '/')
               ? 'text-white'
               : 'text-gray-600 hover:bg-green-50 hover:text-green-600'
           }`}
