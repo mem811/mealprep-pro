@@ -20,8 +20,8 @@ export default function LandingPage() {
       <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
         <span className="text-xl font-bold text-green-600">🥗 Mealplanner.cloud</span>
         <div className="flex gap-4 items-center">
-          <a href="/login" className="text-sm text-gray-500 hover:text-gray-800">Log in</a>
-          <a href="/signup" className="text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+          <a href="/auth" className="text-sm text-gray-500 hover:text-gray-800">Log in</a>
+          <a href="/auth" className="text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
             Get started free
           </a>
         </div>
