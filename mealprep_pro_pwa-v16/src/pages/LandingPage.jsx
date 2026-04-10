@@ -1,4 +1,5 @@
 // import PricingTable from '../components/landing/PricingTable'
+import PricingTable from '../components/landing/PricingTable';
 
 export default function LandingPage() {
   return (
