@@ -15,10 +15,10 @@ export default function Navbar() {
 
   const links = [
                   { href: '/', label: 'Planner', icon: Calendar },
-                  { href: '/food-log', label: 'Food Log', icon: Utensils },  // ← ADD
-                  { href: '/recipes', label: 'Recipes', icon: BookOpen },
-                  { href: '/grocery-list', label: 'Groceries', icon: ShoppingCart },
-                  { href: '/profile', label: 'Profile', icon: User },
+                  { href: '/app/food-log', label: 'Food Log', icon: Utensils },  // ← ADD
+                  { href: '/app/recipes', label: 'Recipes', icon: BookOpen },
+                  { href: '/app/grocery-list', label: 'Groceries', icon: ShoppingCart },
+                  { href: '/app/profile', label: 'Profile', icon: User },
                 ];
 
   return (
