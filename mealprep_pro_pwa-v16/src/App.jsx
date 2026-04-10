@@ -10,6 +10,7 @@ import RecipeDetailPage from './pages/RecipeDetailPage';
 import GroceryListPage from './pages/GroceryListPage';
 import ProfilePage from './pages/ProfilePage';
 import FoodLogPage from './pages/FoodLogPage.jsx';
+import LandingPage from './pages/LandingPage'
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ function AppRoutes() {
         <Route path="grocery-list" element={<GroceryListPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="food-log" element={<FoodLogPage />} />
+        <Route path="/" element={<LandingPage />} />
       </Route>
     </Routes>
   );
