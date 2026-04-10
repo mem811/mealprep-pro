@@ -13,6 +13,7 @@ export default function Navbar() {
   { to: '/app/food-log', label: 'Food Log' },
   { to: '/app/recipes', label: 'Recipes' },
   { to: '/app/grocery-list', label: 'Grocery List' },
+  { to: '/app/profile', icon: User, label: 'Profile' },
   ];
 
   return (
