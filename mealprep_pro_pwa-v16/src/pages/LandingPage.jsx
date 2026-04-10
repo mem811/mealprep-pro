@@ -67,23 +67,58 @@ export default function LandingPage() {
       </section>
 
       {/* FEATURES */}
-      <section className="px-6 py-20 max-w-5xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-12">How it works</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-          {[
-            { icon: '🗂', title: 'Save your recipes, your way', desc: 'Add manually or import from any recipe website in one click. Organized, searchable, forever yours.' },
-            { icon: '📅', title: 'Plan your week in seconds', desc: 'Drag recipes onto a simple weekly grid — breakfast, lunch, dinner. Change your mind? Just drag again.' },
-            { icon: '🛒', title: 'Grocery list, auto-generated', desc: 'Every ingredient from every meal, combined and sorted by category. No more forgotten items.' },
-            { icon: '📱', title: 'Works like a real app', desc: 'Install on your phone straight from the browser. No app store. Always up to date.' },
-          ].map(({ icon, title, desc }) => (
-            <div key={title} className="bg-gray-50 rounded-2xl p-6">
-              <div className="text-3xl mb-3">{icon}</div>
-              <h3 className="font-semibold text-lg mb-1">{title}</h3>
-              <p className="text-gray-500">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+<section className="px-6 py-20 max-w-5xl mx-auto space-y-24">
+  <h2 className="text-3xl font-bold text-center">How it works</h2>
+
+  {/* Feature 1 */}
+  <div className="flex flex-col md:flex-row items-center gap-12">
+    <div className="flex-1">
+      <div className="text-3xl mb-3">📅</div>
+      <h3 className="text-2xl font-bold mb-3">Plan your week in seconds</h3>
+      <p className="text-gray-500 text-lg">Drag your favorite recipes onto a simple weekly grid — breakfast, lunch, dinner. Change your mind? Just drag again.</p>
+    </div>
+    <div className="flex-1">
+      <img src="/screenshot-planner.png" alt="Meal planner" className="rounded-2xl shadow-xl w-full" />
+    </div>
+  </div>
+
+  {/* Feature 2 */}
+  <div className="flex flex-col md:flex-row-reverse items-center gap-12">
+    <div className="flex-1">
+      <div className="text-3xl mb-3">🗂</div>
+      <h3 className="text-2xl font-bold mb-3">Save your recipes, your way</h3>
+      <p className="text-gray-500 text-lg">Add recipes manually or import straight from any website with one click. Organized, searchable, forever yours.</p>
+    </div>
+    <div className="flex-1">
+      <img src="/screenshot-recipes.png" alt="Recipe library" className="rounded-2xl shadow-xl w-full" />
+    </div>
+  </div>
+
+  {/* Feature 3 */}
+  <div className="flex flex-col md:flex-row items-center gap-12">
+    <div className="flex-1">
+      <div className="text-3xl mb-3">🛒</div>
+      <h3 className="text-2xl font-bold mb-3">Grocery list, auto-generated</h3>
+      <p className="text-gray-500 text-lg">Every ingredient from every meal, combined and sorted by category. No more forgotten items at the store.</p>
+    </div>
+    <div className="flex-1">
+      <img src="/screenshot-grocery.png" alt="Grocery list" className="rounded-2xl shadow-xl w-full" />
+    </div>
+  </div>
+
+  {/* Feature 4 */}
+  <div className="flex flex-col md:flex-row-reverse items-center gap-12">
+    <div className="flex-1">
+      <div className="text-3xl mb-3">🔥</div>
+      <h3 className="text-2xl font-bold mb-3">Track what you eat</h3>
+      <p className="text-gray-500 text-lg">Log your meals and track calories, protein, carbs and fat. See your nutrition at a glance every day.</p>
+    </div>
+    <div className="flex-1">
+      <img src="/screenshot-food-log.png" alt="Food log" className="rounded-2xl shadow-xl w-full" />
+    </div>
+  </div>
+
+</section>
 
       {/* PRICING */}
       <PricingTable />
