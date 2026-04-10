@@ -30,7 +30,7 @@ function AppRoutes() {
         <Route index element={<HomePage />} />
         <Route path="recipes" element={<RecipesPage />} />
         <Route path="recipes/new" element={<RecipeFormPage />} />
-        <Route path="recipes/:id/edit" element={<RecipeFormPage />} />
+        <Route path="recipes/:id/edit" element={<RecipeFormPage />} /> 
         <Route path="recipes/:id" element={<RecipeDetailPage />} />
         <Route path="grocery-list" element={<GroceryListPage />} />
         <Route path="profile" element={<ProfilePage />} />
