@@ -1,4 +1,3 @@
-// import PricingTable from '../components/landing/PricingTable'
 import PricingTable from '../components/landing/PricingTable';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +35,7 @@ export default function LandingPage() {
           Save your recipes, build your week, and get a ready-to-shop grocery list — in minutes.
         </p>
         <a
-          href="/signup"
+          href="/auth"
           className="inline-block bg-green-600 text-white text-lg px-8 py-4 rounded-xl hover:bg-green-700 transition"
         >
           Start free → no credit card required
@@ -101,7 +100,7 @@ export default function LandingPage() {
         <h2 className="text-3xl font-bold mb-4">Ready to actually stick to your meal plan?</h2>
         <p className="text-gray-500 mb-8">Join home cooks who plan smarter every week.</p>
         <a
-          href="/signup"
+          href="/auth"
           className="inline-block bg-green-600 text-white text-lg px-8 py-4 rounded-xl hover:bg-green-700 transition"
         >
           Get started free →
@@ -111,7 +110,7 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer className="text-center text-gray-400 text-sm py-6 border-t">
-        © 2026 Mealplanner.cloud · <a href="/login" className="hover:underline">Log in</a>
+        © 2026 Mealplanner.cloud · <a href="/auth" className="hover:underline">Log in</a>
       </footer>
 
     </div>
