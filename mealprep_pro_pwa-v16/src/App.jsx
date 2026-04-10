@@ -20,10 +20,11 @@ function PrivateRoute({ children }) {
 function AppRoutes() {
   const { user } = useAuth();
   return (
-    <Routes>
-      {/* PUBLIC routes */}
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
+     {/* PUBLIC */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
+        <Route path="/signup" element={<Navigate to="/auth" replace />} />
+        <Route path="/login" element={<Navigate to="/auth" replace />} />
 
       {/* PRIVATE app routes */}
       <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
