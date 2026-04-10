@@ -41,6 +41,15 @@ export default function LandingPage() {
           Start free → no credit card required
         </a>
       </section>
+      
+      {/* APP SCREENSHOT */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <img
+          src="/app-screenshot.png"
+          alt="Mealplanner.cloud app screenshot"
+          className="rounded-2xl shadow-2xl w-full"
+        />
+      </section>
 
       {/* PROBLEM */}
       <section className="bg-gray-50 px-6 py-16 text-center">
