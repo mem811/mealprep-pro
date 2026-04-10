@@ -20,25 +20,26 @@ function PrivateRoute({ children }) {
 function AppRoutes() {
   const { user } = useAuth();
   return (
-     {/* PUBLIC */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
-        <Route path="/signup" element={<Navigate to="/auth" replace />} />
-        <Route path="/login" element={<Navigate to="/auth" replace />} />
+  <Routes>
+    {/* PUBLIC */}
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
+    <Route path="/signup" element={<Navigate to="/auth" replace />} />
+    <Route path="/login" element={<Navigate to="/auth" replace />} />
 
-      {/* PRIVATE app routes */}
-      <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index element={<HomePage />} />
-        <Route path="recipes" element={<RecipesPage />} />
-        <Route path="recipes/new" element={<RecipeFormPage />} />
-        <Route path="recipes/:id/edit" element={<RecipeFormPage />} /> 
-        <Route path="recipes/:id" element={<RecipeDetailPage />} />
-        <Route path="grocery-list" element={<GroceryListPage />} />
-        <Route path="profile" element={<ProfilePage />} />
-        <Route path="food-log" element={<FoodLogPage />} />
-      </Route>
-    </Routes>
-  );
+    {/* PRIVATE */}
+    <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
+      <Route index element={<HomePage />} />
+      <Route path="recipes" element={<RecipesPage />} />
+      <Route path="recipes/new" element={<RecipeFormPage />} />
+      <Route path="recipes/:id/edit" element={<RecipeFormPage />} />
+      <Route path="recipes/:id" element={<RecipeDetailPage />} />
+      <Route path="grocery-list" element={<GroceryListPage />} />
+      <Route path="profile" element={<ProfilePage />} />
+      <Route path="food-log" element={<FoodLogPage />} />
+    </Route>
+  </Routes>
+);
 }
 
 export default function App() {
