@@ -40,7 +40,7 @@ export default function Navbar() {
           </Link>
         ))}
       </nav>
-      <Link to="/profile" className="flex items-center gap-2">
+      <Link to="/app/profile" className="flex items-center gap-2">
         <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-semibold text-sm">
           {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
         </div>
