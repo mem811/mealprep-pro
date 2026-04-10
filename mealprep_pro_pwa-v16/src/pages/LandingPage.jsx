@@ -1,7 +1,18 @@
 // import PricingTable from '../components/landing/PricingTable'
 import PricingTable from '../components/landing/PricingTable';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
 
 export default function LandingPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (user) navigate('/app');
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
 
