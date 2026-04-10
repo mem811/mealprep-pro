@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Leaf } from 'lucide-react';
+import { Leaf, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Moon, Sun, Utensils } from "lucide-react";
 
