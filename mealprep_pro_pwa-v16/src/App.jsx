@@ -10,7 +10,7 @@ import RecipeDetailPage from './pages/RecipeDetailPage';
 import GroceryListPage from './pages/GroceryListPage';
 import ProfilePage from './pages/ProfilePage';
 import FoodLogPage from './pages/FoodLogPage.jsx';
-import LandingPage from './pages/LandingPage'
+import LandingPage from './pages/LandingPage';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -21,8 +21,12 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
-      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
-      <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+      {/* PUBLIC routes */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
+
+      {/* PRIVATE app routes */}
+      <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<HomePage />} />
         <Route path="recipes" element={<RecipesPage />} />
         <Route path="recipes/new" element={<RecipeFormPage />} />
@@ -31,7 +35,6 @@ function AppRoutes() {
         <Route path="grocery-list" element={<GroceryListPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="food-log" element={<FoodLogPage />} />
-        <Route path="/" element={<LandingPage />} />
       </Route>
     </Routes>
   );
