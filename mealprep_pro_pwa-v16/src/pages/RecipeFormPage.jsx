@@ -267,7 +267,7 @@ export default function RecipeFormPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/recipes" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+        <Link to="/app/recipes" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
           <ArrowLeft size={20} className="text-gray-600" />
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">
@@ -534,7 +534,7 @@ export default function RecipeFormPage() {
         {duplicateRecipe && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
             <p className="font-semibold mb-1">Looks like you already have this recipe!</p>
-            <Link to={`/recipes/${duplicateRecipe.id}`} className="text-green-600 underline font-medium">
+            <Link to={`/app/recipes/${duplicateRecipe.id}`} className="text-green-600 underline font-medium">
               View existing recipe →
             </Link>
           </div>
