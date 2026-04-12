@@ -196,7 +196,7 @@ export default function RecipeDetailPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 text-center">
         <p className="text-red-500 text-lg font-semibold mb-4">{error || 'Recipe not found.'}</p>
-        <button onClick={function () { navigate('/recipes'); }} className="text-emerald-600 font-medium hover:underline">
+        <button onClick={function () { navigate('/app/recipes'); }} className="text-emerald-600 font-medium hover:underline">
           ← Back to Recipes
         </button>
       </div>
@@ -215,14 +215,14 @@ export default function RecipeDetailPage() {
       {/* Top Bar */}
       <div className="flex items-center justify-between mb-6">
         <button
-          onClick={function () { navigate('/recipes'); }}
+          onClick={function () { navigate('/app/recipes'); }}
           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-medium transition-colors"
         >
           <ArrowLeft size={16} />
           Back
         </button>
         <Link
-          to={"/recipes/" + recipe.id + "/edit"}
+          to={"/app/recipes/" + recipe.id + "/edit"}
           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 text-sm font-medium border border-gray-200 px-3 py-1.5 rounded-xl transition-colors"
         >
           <Pencil size={14} />
