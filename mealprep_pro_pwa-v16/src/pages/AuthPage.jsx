@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Leaf, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export default function AuthPage() {
@@ -28,29 +28,54 @@ export default function AuthPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const [searchParams] = useSearchParams();
 
-    try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        if (!fullName.trim()) {
-          setError('Full name is required.');
-          setLoading(false);
-          return;
-        }
-        await register(email, password, fullName.trim());
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
+
+  try {
+    let loggedInUser;
+    if (isLogin) {
+      loggedInUser = await login(email, password);
+    } else {
+      if (!fullName.trim()) {
+        setError('Full name is required.');
+        setLoading(false);
+        return;
       }
-      navigate('/');
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
+      loggedInUser = await register(email, password, fullName.trim());
     }
-  };
+
+    const plan = searchParams.get('plan');
+    const interval = searchParams.get('interval');
+
+    if (plan === 'pro' && loggedInUser) {
+      const priceId = interval === 'yearly'
+        ? import.meta.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID
+        : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
+
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          userId: loggedInUser.id,
+          userEmail: loggedInUser.email,
+        }),
+      });
+      const { url } = await res.json();
+      window.location.href = url;
+    } else {
+      navigate('/');
+    }
+  } catch (err) {
+    setError(getErrorMessage(err));
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-4">
