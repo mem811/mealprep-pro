@@ -224,7 +224,7 @@ export default function RecipesPage() {
 
           {/* Add Recipe */}
           <Link
-            to="/recipes/new"
+            to="/app/recipes/new"
             style={gradientStyle}
             className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
           >
