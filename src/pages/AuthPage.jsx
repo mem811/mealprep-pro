@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { motion, AnimatePresence } from 'framer-motion';
+import pb from '../lib/pb';
 
 const { FiMail, FiLock, FiArrowRight, FiBox, FiUser, FiAlertCircle, FiLoader } = FiIcons;
 
@@ -19,38 +20,59 @@ export default function AuthPage() {
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (loading) return;
+  e.preventDefault();
+  if (loading) return;
 
-    setLoading(true);
-    setError('');
+  setLoading(true);
+  setError('');
 
-    try {
-      let result;
-      if (isLogin) {
-        result = await login(email, password);
-      } else {
-        if (!name.trim()) {
-          throw new Error('Please enter your full name');
-        }
-        result = await register(email, password, name);
+  try {
+    let result;
+    if (isLogin) {
+      result = await login(email, password);
+    } else {
+      if (!name.trim()) {
+        throw new Error('Please enter your full name');
       }
+      result = await register(email, password, name);
+    }
 
-      if (result?.error) {
-        // PocketBase errors often have a response object with a message
-        const msg = result.error.response?.message || result.error.message || 'Authentication failed. Please check your credentials.';
-        setError(msg);
+    if (result?.error) {
+      const msg = result.error.response?.message || result.error.message || 'Authentication failed. Please check your credentials.';
+      setError(msg);
+    } else {
+      // Check if they came from "Try Pro" button
+      const params = new URLSearchParams(window.location.search);
+      const plan = params.get('plan');
+      const interval = params.get('interval');
+
+      if (plan === 'pro') {
+        const loggedInUser = result?.user ?? pb.authStore.model;
+        const priceId = interval === 'yearly'
+          ? import.meta.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID
+          : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
+
+        const res = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            priceId,
+            userId: loggedInUser.id,
+            userEmail: loggedInUser.email,
+          }),
+        });
+        const { url } = await res.json();
+        window.location.href = url;
       } else {
-        // Successful login/register
         navigate('/');
       }
-    } catch (err) {
-      setError(err.message || 'An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
     }
-  };
-
+  } catch (err) {
+    setError(err.message || 'An unexpected error occurred. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <motion.div 
