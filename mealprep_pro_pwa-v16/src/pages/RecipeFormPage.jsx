@@ -247,7 +247,7 @@ export default function RecipeFormPage() {
         await pb.collection('recipes').create(payload);
       }
 
-      navigate('/recipes');
+      navigate('/app/recipes');
     } catch (err) {
       console.error('Full error:', err.response);
       setSubmitError(err?.response?.message || err?.message || 'Failed to save recipe.');
