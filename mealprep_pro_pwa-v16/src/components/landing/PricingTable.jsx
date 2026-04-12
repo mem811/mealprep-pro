@@ -1,4 +1,35 @@
+import { useAuth } from '../../context/AuthContext';
+
 export default function PricingTable() {
+  const { user } = useAuth();
+
+  const handleProClick = async (interval) => {
+    const priceId = interval === 'yearly'
+      ? import.meta.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID
+      : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
+
+    if (!user) {
+      window.location.href = '/auth?plan=pro';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id,
+          userEmail: user.email,
+        }),
+      });
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err) {
+      console.error('Checkout error:', err);
+    }
+  };
+
   return (
     <section className="px-6 py-20 max-w-5xl mx-auto">
       <h2 className="text-3xl font-bold text-center mb-4">Simple, honest pricing</h2>
@@ -39,7 +70,7 @@ export default function PricingTable() {
           </div>
           <div className="text-sm font-semibold text-emerald-600 uppercase tracking-wide mb-2">Pro</div>
           <div className="text-4xl font-bold mb-1">$6<span className="text-lg font-normal text-gray-400">/mo</span></div>
-          <div className="text-gray-400 text-sm mb-6">or $50/yr — save 30%</div>
+          <div className="text-gray-400 text-sm mb-2">or $50/yr — save 30%</div>
           <ul className="space-y-3 text-sm text-gray-600 mb-8">
             {[
               'Everything in Free',
@@ -56,16 +87,27 @@ export default function PricingTable() {
               </li>
             ))}
           </ul>
-          <a
-            href="/auth?plan=pro"
-            className="block text-center bg-emerald-600 text-white rounded-xl py-3 hover:bg-emerald-700 transition font-semibold"
+
+          {/* MONTHLY BUTTON */}
+          <button
+            onClick={() => handleProClick('monthly')}
+            className="w-full text-center bg-emerald-600 text-white rounded-xl py-3 hover:bg-emerald-700 transition font-semibold mb-2"
           >
             Try Pro free for 14 days →
-          </a>
+          </button>
+
+          {/* YEARLY BUTTON */}
+          <button
+            onClick={() => handleProClick('yearly')}
+            className="w-full text-center border border-emerald-500 text-emerald-600 rounded-xl py-3 hover:bg-emerald-50 transition text-sm"
+          >
+            Save 30% with yearly ($50/yr)
+          </button>
+
           <p className="text-xs text-center text-gray-400 mt-2">No credit card required</p>
         </div>
 
       </div>
     </section>
-  )
+  );
 }
