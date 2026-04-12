@@ -13,14 +13,13 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const getErrorMessage = (err) => {
     console.log('Full PocketBase error object:', err);
-
     if (err?.response?.message) return err.response.message;
     if (err?.data?.message) return err.data.message;
     if (err?.message) return err.message;
-
     try {
       return JSON.stringify(err, null, 2);
     } catch {
@@ -28,54 +27,55 @@ export default function AuthPage() {
     }
   };
 
-  const [searchParams] = useSearchParams();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
-  setLoading(true);
+    try {
+      let loggedInUser;
 
-  try {
-    let loggedInUser;
-    if (isLogin) {
-      loggedInUser = await login(email, password);
-    } else {
-      if (!fullName.trim()) {
-        setError('Full name is required.');
-        setLoading(false);
-        return;
+      if (isLogin) {
+        const result = await login(email, password);
+        loggedInUser = result.user;
+      } else {
+        if (!fullName.trim()) {
+          setError('Full name is required.');
+          setLoading(false);
+          return;
+        }
+        const result = await register(email, password, fullName.trim());
+        loggedInUser = result.user;
       }
-      loggedInUser = await register(email, password, fullName.trim());
+
+      const plan = searchParams.get('plan');
+      const interval = searchParams.get('interval');
+
+      if (plan === 'pro' && loggedInUser) {
+        const priceId = interval === 'yearly'
+          ? import.meta.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID
+          : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
+
+        const res = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            priceId,
+            userId: loggedInUser.id,
+            userEmail: loggedInUser.email,
+          }),
+        });
+        const { url } = await res.json();
+        window.location.href = url;
+      } else {
+        navigate('/');
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
     }
-
-    const plan = searchParams.get('plan');
-    const interval = searchParams.get('interval');
-
-    if (plan === 'pro' && loggedInUser) {
-      const priceId = interval === 'yearly'
-        ? import.meta.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID
-        : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
-
-      const res = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceId,
-          userId: loggedInUser.id,
-          userEmail: loggedInUser.email,
-        }),
-      });
-      const { url } = await res.json();
-      window.location.href = url;
-    } else {
-      navigate('/');
-    }
-  } catch (err) {
-    setError(getErrorMessage(err));
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-4">
