@@ -9,7 +9,7 @@ export default function PricingTable() {
       : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
 
     if (!user) {
-      window.location.href = '/auth?plan=pro';
+      window.location.href = `/auth?plan=pro&interval=${interval}`;
       return;
     }
 
