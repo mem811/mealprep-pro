@@ -4,7 +4,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export const config = {
   api: {
-    bodyParser: false, // Stripe needs the raw body to verify the signature
+    bodyParser: false,
   },
 };
 
@@ -38,56 +38,49 @@ export default async function handler(req, res) {
   }
 
   if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-  const userId = session.metadata?.userId;
+    const session = event.data.object;
+    const userId = session.metadata?.userId;
 
-  if (userId) {
-    try {
-      // Step 1: Get PocketBase admin token
-      const authRes = await fetch(
-        `${process.env.POCKETBASE_URL}/api/admins/auth-with-password`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identity: process.env.POCKETBASE_ADMIN_EMAIL,
-            password: process.env.POCKETBASE_ADMIN_PASSWORD,
-          }),
+    if (userId) {
+      try {
+        const authRes = await fetch(
+          `${process.env.POCKETBASE_URL}/api/admins/auth-with-password`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              identity: process.env.POCKETBASE_ADMIN_EMAIL,
+              password: process.env.POCKETBASE_ADMIN_PASSWORD,
+            }),
+          }
+        );
+        const { token } = await authRes.json();
+
+        const pbRes = await fetch(
+          `${process.env.POCKETBASE_URL}/api/collections/users/records/${userId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ plan: 'pro' }),
+          }
+        );
+
+        if (!pbRes.ok) {
+          const err = await pbRes.json();
+          console.error('PocketBase update failed:', err);
+          return res.status(500).json({ error: 'Failed to update user plan' });
         }
-      );
-      const { token } = await authRes.json();
 
-      // Step 2: Update user plan to pro
-      const pbRes = await fetch(
-        `${process.env.POCKETBASE_URL}/api/collections/users/records/${userId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ plan: 'pro' }),
-        }
-      );
-
-      if (!pbRes.ok) {
-        const err = await pbRes.json();
-        console.error('PocketBase update failed:', err);
-        return res.status(500).json({ error: 'Failed to update user plan' });
+        console.log(`User ${userId} upgraded to Pro`);
+      } catch (err) {
+        console.error('Error updating PocketBase:', err);
+        return res.status(500).json({ error: err.message });
       }
-
-      console.log(`User ${userId} upgraded to Pro`);
-    } catch (err) {
-      console.error('Error updating PocketBase:', err);
-      return res.status(500).json({ error: err.message });
-    }
-  }
-}
-
-res.status(200).json({ received: true });
-}
     }
   }
 
-  res.status(200).json({ received: true });
+  return res.status(200).json({ received: true });
 }
