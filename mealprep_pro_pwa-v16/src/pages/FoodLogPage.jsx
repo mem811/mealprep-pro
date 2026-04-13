@@ -382,7 +382,7 @@ export default function FoodLogPage() {
           ["Protein", Math.round(totals.protein), "g", goals?.protein],
           ["Carbs", Math.round(totals.carbs), "g", goals?.carbs],
           ["Fat", Math.round(totals.fat), "g", goals?.fat],
-          ["WW", getWWPoints(totals.calories, totals.fat) ?? 0, " pts", null],
+          ["WW", getWWPoints(totals.calories, totals.fat) ?? 0, " pts", goals?.ww_points],
         ].map(([label, val, unit, goal]) => {
           const pct = goal > 0 ? Math.min(100, Math.round((val / goal) * 100)) : null;
           const over = goal > 0 && val > goal;
