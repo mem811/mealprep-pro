@@ -53,6 +53,13 @@ var getSourceName = function (url) {
   } catch { return url; }
 };
 
+const getWWPoints = (nut) => {
+  if (!nut) return null;
+  const cal = Math.abs(parseFloat(nut.calories) || 0);
+  const fat = Math.abs(parseFloat(nut.fat) || 0);
+  if (!cal && !fat) return null;
+  return Math.max(0, Math.round(cal / 50 + fat / 12));
+  };
 export default function RecipeDetailPage() {
   var { id } = useParams();
   var navigate = useNavigate();
@@ -293,6 +300,12 @@ export default function RecipeDetailPage() {
                   <p className="text-lg font-bold text-red-400">{nutrition.fat}g</p>
                   <p className="text-[10px] text-gray-500 font-semibold">Fat</p>
                 </div>
+                {getWWPoints(nutrition) !== null && (
+                <div className="col-span-2 text-center bg-purple-50 rounded-xl py-3">
+                  <div className="text-xl font-bold text-purple-600">{getWWPoints(nutrition)}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">WW Points (est.)</div>
+                </div>
+              )}
               </div>
             ) : (
               <p className="text-xs text-gray-400 mb-4">No nutrition data yet.</p>
