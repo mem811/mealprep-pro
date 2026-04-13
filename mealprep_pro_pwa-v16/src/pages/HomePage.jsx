@@ -645,13 +645,14 @@ export default function HomePage() {
 											<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
 											<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
 											{macros&&<p className="text-[10px] text-gray-400 mt-1 font-semibold">P {macros.p}g · C {macros.c}g · F {macros.f}g</p>}
-											{wwPts!==null&&<p className="text-[10px] font-bold text-blue-500 mt-0.5">{wwPts} WW</p>}
+											//{wwPts!==null&&<p className="text-[10px] font-bold text-blue-500 mt-0.5">{wwPts} WW</p>}
 										</a>
 										<button onClick={function(e){e.preventDefault();setAddToPlannerRecipe({id:recipe.id,title:recipe.title});setAddToPlannerDay(today);setAddToPlannerMeal("lunch");}} className="mt-2 w-full text-[10px] font-bold py-1.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">+ Add to Planner</button>
 									</div>
 								);
 							})}
 						</div>
+						<p className="text-[10px] text-gray-400 italic mt-2 px-1">* WW points are estimates based on calories and fat only. For accurate tracking, use the official WW app.</p>
 					</div>
 
 					{/* Modals */}
