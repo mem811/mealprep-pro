@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [goals, setGoals] = useState({ calories: "", protein: "", carbs: "", fat: "" });
+  const [goals, setGoals] = useState({ calories: "", protein: "", carbs: "", fat: "", ww_points: "" });
   const [savingGoals, setSavingGoals] = useState(false);
   const [goalsSaved, setGoalsSaved] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -22,7 +22,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     getUserGoals().then((g) => {
-      if (g) setGoals({ calories: g.calories || "", protein: g.protein || "", carbs: g.carbs || "", fat: g.fat || "" });
+      if (g) setGoals({ calories: g.calories || "", protein: g.protein || "", carbs: g.carbs || "", fat: g.fat || "", ww_points: g.ww_points || "" });
     });
   }, []);
 
@@ -83,7 +83,8 @@ export default function ProfilePage() {
         calories: Number(goals.calories) || 0,
         protein: Number(goals.protein) || 0,
         carbs: Number(goals.carbs) || 0,
-        fat: Number(goals.fat) || 0,
+        fat: Number(goals.fat) || 0, 
+        ww_points: Number(goals.ww_points) || 0,
       });
       setGoalsSaved(true);
       setTimeout(() => setGoalsSaved(false), 2000);
@@ -192,7 +193,7 @@ export default function ProfilePage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
         <div className="text-sm font-semibold text-gray-900 mb-4">🎯 Daily Nutritional Goals</div>
         <form onSubmit={handleSaveGoals} className="grid grid-cols-2 gap-3">
-          {[["Calories", "calories", "kcal"], ["Protein", "protein", "g"], ["Carbs", "carbs", "g"], ["Fat", "fat", "g"]].map(([label, key, unit]) => (
+          {[["Calories", "calories", "kcal"], ["Protein", "protein", "g"], ["Carbs", "carbs", "g"], ["Fat", "fat", "g"], ["WW Points", "ww_points", "pts"]].map(([label, key, unit]) => (
             <label key={key} className="text-xs font-semibold text-gray-600">
               {label} ({unit})
               <input
