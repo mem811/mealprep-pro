@@ -673,7 +673,7 @@ function MealCell({date,meal,cellSlots,onAdd,onRemove,onAteThis,isLogged,saving,
 			onDrop={function(e){e.preventDefault();setIsDragOver(false);onDrop(date,meal);}}
 		>
 			{cellSlots.map(function(cs){
-				return(<DesktopRecipeCard key={cs.slotId} recipe={cs.recipe} servings={cs.servings_multiplier} macros={getMacros(cs.recipe,cs.servings_multiplier)} onRemove={function(){onRemove(cs.slotId);}} onAteThis={function(){onAteThis(date,meal,cs);}} ateDisabled={isLogged(date,meal,cs.slotId)} onDragStart={function(){onDragStart(cs.slotId,date,meal);}} />);
+				return(<DesktopRecipeCard key={cs.slotId} recipe={cs.recipe} servings={cs.servings_multiplier} onRemove={function(){onRemove(cs.slotId);}} onAteThis={function(){onAteThis(date,meal,cs);}} ateDisabled={isLogged(date,meal,cs.slotId)} onDragStart={function(){onDragStart(cs.slotId,date,meal);}} />);
 			})}
 			<button onClick={onAdd} disabled={saving} className="flex items-center justify-center w-full mt-auto py-2 rounded-2xl border border-dashed border-emerald-100/80 hover:border-emerald-300 hover:bg-emerald-50/60 transition-colors"><Plus size={14} className="text-emerald-300" /></button>
 		</div>
