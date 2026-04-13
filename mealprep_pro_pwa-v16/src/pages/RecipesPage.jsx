@@ -45,6 +45,25 @@ function parseNutrition(n) {
   try { return typeof n === "string" ? JSON.parse(n) : n; } catch { return {}; }
 }
 
+function getWWPoints(nutrition) {
+  var cal = Math.abs(parseFloat(nutrition?.calories) || 0);
+  var fat = Math.abs(parseFloat(nutrition?.fat) || 0);
+  if (!cal && !fat) return null;
+  return Math.max(0, Math.round(cal / 50 + fat / 12));
+}
+
+function fmt(d) { return d.toISOString().split("T")[0]; }
+
+function getWeekDays(base) {
+  var day = base.getDay();
+  var mon = new Date(base);
+  mon.setDate(base.getDate() - ((day + 6) % 7));
+  mon.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, function (_, i) {
+    var d = new Date(mon); d.setDate(mon.getDate() + i); return d;
+  });
+}
+
 var gradientStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
 
 export default function RecipesPage() {
@@ -59,6 +78,14 @@ export default function RecipesPage() {
   var [showFilters, setShowFilters] = useState(false);
   var [maxCookTime, setMaxCookTime] = useState("");
   var [hasImageOnly, setHasImageOnly] = useState(false);
+
+  // Add to Planner state
+  var [addToPlannerRecipe, setAddToPlannerRecipe] = useState(null);
+  var [addToPlannerMeal, setAddToPlannerMeal] = useState("lunch");
+  var [addToPlannerDay, setAddToPlannerDay] = useState(fmt(new Date()));
+  var [saving, setSaving] = useState(false);
+
+  var today = fmt(new Date());
 
   useEffect(function () {
     async function fetchRecipes() {
@@ -84,9 +111,7 @@ export default function RecipesPage() {
     if (!window.confirm("Delete this recipe?")) return;
     try {
       await pb.collection("recipes").delete(recipeId);
-      setRecipes(function (prev) {
-        return prev.filter(function (r) { return r.id !== recipeId; });
-      });
+      setRecipes(function (prev) { return prev.filter(function (r) { return r.id !== recipeId; }); });
     } catch (e) {
       console.error("Delete error:", e);
       alert("Failed to delete recipe.");
@@ -94,66 +119,73 @@ export default function RecipesPage() {
   };
 
   var toggleFavorite = async function (e, recipeId) {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     var recipe = recipes.find(function (r) { return r.id === recipeId; });
     if (!recipe) return;
     var newVal = !recipe.favorite;
     try {
       await pb.collection("recipes").update(recipeId, { favorite: newVal });
       setRecipes(function (prev) {
-        return prev.map(function (r) {
-          return r.id === recipeId ? Object.assign({}, r, { favorite: newVal }) : r;
-        });
+        return prev.map(function (r) { return r.id === recipeId ? Object.assign({}, r, { favorite: newVal }) : r; });
       });
-    } catch (err) {
-      console.error("Toggle favorite error:", err);
-    }
+    } catch (err) { console.error("Toggle favorite error:", err); }
   };
 
-  // ── Filtering ──
-  var filteredRecipes = recipes;
+  var handleAddToPlanner = async function () {
+    if (!addToPlannerRecipe) return;
+    setSaving(true);
+    try {
+      var userId = pb.authStore.model?.id;
+      if (!userId) return;
+      var targetDate = new Date(addToPlannerDay + "T00:00:00");
+      var targetWeekStart = fmt(getWeekDays(targetDate)[0]);
+      var mealPlan;
+      var existing = await pb.collection("meal_plans").getList(1, 1, {
+        filter: `user = "${userId}" && week_start_date = "${targetWeekStart}"`
+      });
+      if (existing.items.length > 0) { mealPlan = existing.items[0]; }
+      else { mealPlan = await pb.collection("meal_plans").create({ user: userId, week_start_date: targetWeekStart }); }
+      await pb.collection("meal_slots").create({
+        meal_plan: mealPlan.id,
+        date: addToPlannerDay,
+        slot: addToPlannerMeal,
+        recipe: addToPlannerRecipe.id,
+        servings_multiplier: 1,
+      });
+      setAddToPlannerRecipe(null);
+    } catch (e) {
+      console.error("Add to planner error:", e);
+      alert("Failed to add recipe to planner.");
+    } finally { setSaving(false); }
+  };
 
+  // Filtering
+  var filteredRecipes = recipes;
   if (selectedTab === "Favorites") {
     filteredRecipes = filteredRecipes.filter(function (r) { return r.favorite; });
   } else if (selectedTab !== "All Recipes") {
     filteredRecipes = filteredRecipes.filter(function (r) {
       var tags = [];
-      if (typeof r.tags === "string") {
-        try { tags = JSON.parse(r.tags); } catch { tags = []; }
-      } else if (Array.isArray(r.tags)) {
-        tags = r.tags;
-      }
-      return tags.some(function (t) {
-        return t.toLowerCase() === selectedTab.toLowerCase();
-      });
+      if (typeof r.tags === "string") { try { tags = JSON.parse(r.tags); } catch { tags = []; } }
+      else if (Array.isArray(r.tags)) { tags = r.tags; }
+      return tags.some(function (t) { return t.toLowerCase() === selectedTab.toLowerCase(); });
     });
   }
-
   if (searchQuery.trim()) {
     var q = searchQuery.toLowerCase();
-    filteredRecipes = filteredRecipes.filter(function (r) {
-      return (r.title || "").toLowerCase().includes(q);
-    });
+    filteredRecipes = filteredRecipes.filter(function (r) { return (r.title || "").toLowerCase().includes(q); });
   }
-
   if (minRating > 0) {
-    filteredRecipes = filteredRecipes.filter(function (r) {
-      return (r.rating || 0) >= minRating;
-    });
+    filteredRecipes = filteredRecipes.filter(function (r) { return (r.rating || 0) >= minRating; });
   }
-
   if (maxCookTime) {
-    filteredRecipes = filteredRecipes.filter(function (r) {
-      return r.cook_time && r.cook_time <= parseInt(maxCookTime);
-    });
+    filteredRecipes = filteredRecipes.filter(function (r) { return r.cook_time && r.cook_time <= parseInt(maxCookTime); });
   }
-
   if (hasImageOnly) {
     filteredRecipes = filteredRecipes.filter(function (r) { return r.image_url; });
   }
 
-  // ── Sorting ──
+  // Sorting
   filteredRecipes = [].concat(filteredRecipes).sort(function (a, b) {
     switch (sortOption) {
       case "oldest": return new Date(a.created) - new Date(b.created);
@@ -170,23 +202,16 @@ export default function RecipesPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-4">
         <div className="flex items-baseline gap-2">
           <h1 className="text-2xl font-bold text-gray-900">My Recipes</h1>
           <span className="text-gray-400 text-sm font-medium">· {filteredRecipes.length} recipes</span>
         </div>
-
         <div className="flex items-center gap-2">
-          {/* Sort dropdown */}
+          {/* Sort */}
           <div className="relative">
-            <button
-              onClick={function () { setShowSortMenu(function (v) { return !v; }); }}
-              className={"flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-xl transition-colors " +
-                (sortOption !== "newest"
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                  : "border-gray-200 hover:bg-gray-50 text-gray-600")}
-            >
+            <button onClick={function () { setShowSortMenu(function (v) { return !v; }); }} className={"flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-xl transition-colors " + (sortOption !== "newest" ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-gray-200 hover:bg-gray-50 text-gray-600")}>
               <ListFilter size={15} />
               {SORT_OPTIONS.find(function (o) { return o.value === sortOption; })?.label || "Sort"}
             </button>
@@ -194,14 +219,7 @@ export default function RecipesPage() {
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[180px]">
                 {SORT_OPTIONS.map(function (opt) {
                   return (
-                    <button
-                      key={opt.value}
-                      onClick={function () { setSortOption(opt.value); setShowSortMenu(false); }}
-                      className={"w-full text-left px-4 py-2 text-sm transition-colors " +
-                        (sortOption === opt.value
-                          ? "bg-emerald-50 text-emerald-700 font-semibold"
-                          : "text-gray-600 hover:bg-gray-50")}
-                    >
+                    <button key={opt.value} onClick={function () { setSortOption(opt.value); setShowSortMenu(false); }} className={"w-full text-left px-4 py-2 text-sm transition-colors " + (sortOption === opt.value ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-gray-600 hover:bg-gray-50")}>
                       {opt.label}
                     </button>
                   );
@@ -209,41 +227,23 @@ export default function RecipesPage() {
               </div>
             )}
           </div>
-
-          {/* Filter toggle */}
-          <button
-            onClick={function () { setShowFilters(function (v) { return !v; }); }}
-            className={"flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-xl transition-colors " +
-              (showFilters || maxCookTime || hasImageOnly
-                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                : "border-gray-200 hover:bg-gray-50 text-gray-600")}
-          >
-            <Filter size={15} />
-            Filter
+          {/* Filter */}
+          <button onClick={function () { setShowFilters(function (v) { return !v; }); }} className={"flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-xl transition-colors " + (showFilters || maxCookTime || hasImageOnly ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-gray-200 hover:bg-gray-50 text-gray-600")}>
+            <Filter size={15} /> Filter
           </button>
-
           {/* Add Recipe */}
-          <Link
-            to="/app/recipes/new"
-            style={gradientStyle}
-            className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm"
-          >
-            <Plus size={16} />
-            Add Recipe
+          <Link to="/app/recipes/new" style={gradientStyle} className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-medium transition-colors text-sm">
+            <Plus size={16} /> Add Recipe
           </Link>
         </div>
       </div>
 
-      {/* ── Filter Panel ── */}
+      {/* Filter Panel */}
       {showFilters && (
         <div className="flex flex-wrap items-center gap-4 mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
           <div className="flex items-center gap-2">
             <label className="text-xs font-semibold text-gray-600">Max cook time:</label>
-            <select
-              value={maxCookTime}
-              onChange={function (e) { setMaxCookTime(e.target.value); }}
-              className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white"
-            >
+            <select value={maxCookTime} onChange={function (e) { setMaxCookTime(e.target.value); }} className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white">
               <option value="">Any</option>
               <option value="15">15 min</option>
               <option value="30">30 min</option>
@@ -253,52 +253,28 @@ export default function RecipesPage() {
             </select>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hasImageOnly}
-              onChange={function (e) { setHasImageOnly(e.target.checked); }}
-              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-            />
+            <input type="checkbox" checked={hasImageOnly} onChange={function (e) { setHasImageOnly(e.target.checked); }} className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
             <span className="text-xs font-semibold text-gray-600">Has photo only</span>
           </label>
           {(maxCookTime || hasImageOnly) && (
-            <button
-              onClick={function () { setMaxCookTime(""); setHasImageOnly(false); }}
-              className="text-xs text-red-500 font-semibold hover:underline"
-            >
-              Clear filters
-            </button>
+            <button onClick={function () { setMaxCookTime(""); setHasImageOnly(false); }} className="text-xs text-red-500 font-semibold hover:underline">Clear filters</button>
           )}
         </div>
       )}
 
-      {/* ── Search Bar ── */}
+      {/* Search */}
       <div className="relative mb-5">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search recipes..."
-          value={searchQuery}
-          onChange={function (e) { setSearchQuery(e.target.value); }}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition-all"
-        />
+        <input type="text" placeholder="Search recipes..." value={searchQuery} onChange={function (e) { setSearchQuery(e.target.value); }} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition-all" />
       </div>
 
-      {/* ── Category Pills ── */}
+      {/* Category Pills */}
       <div className="flex flex-wrap gap-2 pb-2 mb-4">
         {RECIPE_FILTERS.map(function (item) {
           var Icon = item.icon;
           var isActive = selectedTab === item.label;
           return (
-            <button
-              key={item.label}
-              onClick={function () { setSelectedTab(item.label); }}
-              style={isActive ? gradientStyle : {}}
-              className={"flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all " +
-                (isActive
-                  ? "text-white shadow-md shadow-green-200"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200")}
-            >
+            <button key={item.label} onClick={function () { setSelectedTab(item.label); }} style={isActive ? gradientStyle : {}} className={"flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all " + (isActive ? "text-white shadow-md shadow-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200")}>
               <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
               <span>{item.label}</span>
             </button>
@@ -306,31 +282,21 @@ export default function RecipesPage() {
         })}
       </div>
 
-      {/* ── Rating Filter ── */}
+      {/* Rating Filter */}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-sm font-semibold text-gray-600">Filter by rating:</span>
         {[0, 1, 2, 3, 4, 5].map(function (r) {
           return (
-            <button
-              key={r}
-              onClick={function () { setMinRating(r); }}
-              style={minRating === r ? gradientStyle : {}}
-              className={"px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " +
-                (minRating === r
-                  ? "text-white border-emerald-600"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")}
-            >
+            <button key={r} onClick={function () { setMinRating(r); }} style={minRating === r ? gradientStyle : {}} className={"px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors " + (minRating === r ? "text-white border-emerald-600" : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")}>
               {r === 0 ? "All" : "\u2605".repeat(r)}
             </button>
           );
         })}
       </div>
 
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">{error}</div>
-      )}
+      {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">{error}</div>}
 
-      {/* ── Recipe Grid ── */}
+      {/* Recipe Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -346,91 +312,146 @@ export default function RecipesPage() {
           {filteredRecipes.map(function (recipe) {
             var nut = parseNutrition(recipe.nutrition);
             var proxied = getProxiedImage(recipe.image_url);
+            var wwPts = getWWPoints(nut);
 
             return (
-              <Link
-                key={recipe.id}
-                to={"/recipes/" + recipe.id}
-                className="group bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden relative"
-              >
-                {/* Image */}
-                <div className="w-full h-44 bg-emerald-50 relative overflow-hidden">
-                  {proxied ? (
-                    <img
-                      src={proxied}
-                      alt={recipe.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Utensils size={32} className="text-emerald-300" />
-                    </div>
-                  )}
+              <div key={recipe.id} className="group bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden relative flex flex-col">
 
-                  {/* Heart / Favorite */}
+                {/* Image — clicking navigates to recipe */}
+                <Link to={"/recipes/" + recipe.id} className="block">
+                  <div className="w-full h-44 bg-emerald-50 relative overflow-hidden">
+                    {proxied ? (
+                      <img src={proxied} alt={recipe.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Utensils size={32} className="text-emerald-300" />
+                      </div>
+                    )}
+                    {/* Favorite */}
+                    <button onClick={function (e) { toggleFavorite(e, recipe.id); }} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm transition-colors z-10 hover:scale-110">
+                      <Heart size={16} className={recipe.favorite ? "text-red-500 fill-red-500" : "text-gray-400"} />
+                    </button>
+                    {/* Cook time */}
+                    {recipe.cook_time > 0 && (
+                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs font-bold text-gray-700 px-2 py-1 rounded-full">
+                        <Clock size={12} /> {recipe.cook_time} min
+                      </div>
+                    )}
+                    {/* Rating */}
+                    {recipe.rating > 0 && (
+                      <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm text-xs font-bold text-amber-600 px-2 py-1 rounded-full">
+                        <Star size={12} fill="currentColor" /> {recipe.rating}
+                      </div>
+                    )}
+                    {/* Calorie badge */}
+                    {nut.calories > 0 && (
+                      <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
+                        🔥 {Math.round(nut.calories)} cal
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-3 pb-1">
+                    <h3 className="text-sm font-bold text-gray-900 line-clamp-2 mb-1">{recipe.title}</h3>
+                    {recipe.servings && <p className="text-xs text-gray-400">{recipe.servings} servings</p>}
+                    {nut.protein > 0 && (
+                      <p className="text-[10px] text-gray-400 font-semibold mt-1">
+                        P {Math.round(nut.protein)}g · C {Math.round(nut.carbs || 0)}g · F {Math.round(nut.fat || 0)}g
+                        {wwPts !== null && <span className="text-purple-500"> · {wwPts} WW</span>}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+
+                {/* Add to Planner button */}
+                <div className="px-3 pb-3 pt-2 mt-auto">
                   <button
-                    onClick={function (e) { toggleFavorite(e, recipe.id); }}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm transition-colors z-10 hover:scale-110"
+                    onClick={function (e) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setAddToPlannerRecipe({ id: recipe.id, title: recipe.title });
+                      setAddToPlannerDay(today);
+                      setAddToPlannerMeal("lunch");
+                    }}
+                    className="w-full text-[11px] font-bold py-1.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                   >
-                    <Heart
-                      size={16}
-                      className={recipe.favorite ? "text-red-500 fill-red-500" : "text-gray-400"}
-                    />
+                    + Add to Planner
                   </button>
-
-                  {/* Cook time badge */}
-                  {recipe.cook_time > 0 && (
-                    <div className="absolute top-2 left-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs font-bold text-gray-700 px-2 py-1 rounded-full">
-                      <Clock size={12} />
-                      {recipe.cook_time} min
-                    </div>
-                  )}
-
-                  {/* Rating badge */}
-                  {recipe.rating > 0 && (
-                    <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm text-xs font-bold text-amber-600 px-2 py-1 rounded-full">
-                      <Star size={12} fill="currentColor" />
-                      {recipe.rating}
-                    </div>
-                  )}
-
-                  {/* Calorie badge */}
-                  {nut.calories > 0 && (
-                    <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
-                      🔥 {Math.round(nut.calories)} cal
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="p-3">
-                  <h3 className="text-sm font-bold text-gray-900 line-clamp-2 mb-1">{recipe.title}</h3>
-                  {recipe.servings && (
-                    <p className="text-xs text-gray-400">{recipe.servings} servings</p>
-                  )}
-                  {nut.protein > 0 && (
-                    <p className="text-[10px] text-gray-400 font-semibold mt-1">
-                      P {Math.round(nut.protein)}g · C {Math.round(nut.carbs || 0)}g · F {Math.round(nut.fat || 0)}g
-                    </p>
-                  )}
                 </div>
 
                 {/* Delete */}
                 <button
-                  onClick={function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    confirmDelete(recipe.id);
-                  }}
-                  className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-white border border-gray-100 text-gray-400 hidden group-hover:flex items-center justify-center shadow-sm hover:bg-red-50 hover:text-red-500 transition-colors"
+                  onClick={function (e) { e.preventDefault(); e.stopPropagation(); confirmDelete(recipe.id); }}
+                  className="absolute bottom-10 right-3 w-7 h-7 rounded-full bg-white border border-gray-100 text-gray-400 hidden group-hover:flex items-center justify-center shadow-sm hover:bg-red-50 hover:text-red-500 transition-colors"
                 >
                   <X size={14} />
                 </button>
-              </Link>
+              </div>
             );
           })}
         </div>
       )}
+
+      {/* Add to Planner Modal */}
+      {addToPlannerRecipe && (
+        <AddToPlannerModal
+          recipe={addToPlannerRecipe}
+          selectedDay={addToPlannerDay}
+          selectedMeal={addToPlannerMeal}
+          onDayChange={setAddToPlannerDay}
+          onMealChange={setAddToPlannerMeal}
+          onConfirm={handleAddToPlanner}
+          onClose={function () { setAddToPlannerRecipe(null); }}
+          saving={saving}
+        />
+      )}
+
+    </div>
+  );
+}
+
+function AddToPlannerModal({ recipe, selectedDay, selectedMeal, onDayChange, onMealChange, onConfirm, onClose, saving }) {
+  if (!recipe) return null;
+  var days = Array.from({ length: 7 }, function (_, i) { var d = new Date(); d.setDate(d.getDate() + i); return d; });
+  var DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm">
+        <h3 className="text-base font-bold text-gray-900 mb-1">Add to Planner</h3>
+        <p className="text-xs text-gray-500 mb-4 line-clamp-1">{recipe.title}</p>
+        <p className="text-xs font-semibold text-gray-600 mb-2">Which meal?</p>
+        <div className="grid grid-cols-4 gap-2 mb-5">
+          {["breakfast", "lunch", "dinner", "snack"].map(function (m) {
+            var icons = { breakfast: "🌅", lunch: "🥗", dinner: "🍽️", snack: "🍎" };
+            return (
+              <button key={m} onClick={function () { onMealChange(m); }} className={"flex flex-col items-center py-2 rounded-2xl border-2 text-xs font-semibold transition-colors " + (selectedMeal === m ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-gray-100 text-gray-500 hover:border-emerald-200")}>
+                <span className="text-lg mb-0.5">{icons[m]}</span>
+                {m.charAt(0).toUpperCase() + m.slice(1)}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs font-semibold text-gray-600 mb-2">Which day?</p>
+        <div className="flex gap-1.5 overflow-x-auto pb-1 mb-5">
+          {days.map(function (d, i) {
+            var dateStr = d.toISOString().split("T")[0];
+            var dayName = i === 0 ? "Today" : DN[(d.getDay() + 6) % 7];
+            return (
+              <button key={dateStr} onClick={function () { onDayChange(dateStr); }} className={"flex-shrink-0 flex flex-col items-center px-2.5 py-1.5 rounded-2xl border-2 text-xs transition-colors " + (selectedDay === dateStr ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-bold" : "border-gray-100 text-gray-500 hover:border-emerald-200")}>
+                <span className="font-semibold">{dayName}</span>
+                <span>{d.getDate()}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={onConfirm} disabled={saving} className="flex-1 py-2.5 rounded-2xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">
+            {saving ? "Adding…" : "Add to Planner"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
