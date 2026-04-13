@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     if (userId) {
       try {
         const authRes = await fetch(
-          `${process.env.POCKETBASE_URL}/api/admins/auth-with-password`,
+          `${process.env.POCKETBASE_URL}/api/collections/_superusers/auth-with-password`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
