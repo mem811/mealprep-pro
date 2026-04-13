@@ -106,9 +106,10 @@ function getMacros(recipe, mult) {
 function getWWPoints(recipe) {
 	var nut = parseNutrition(recipe?.nutrition);
 	if (!nut) return null;
-	var cal=nut.calories||0, fat=nut.fat||0, fiber=nut.fiber||0;
-	if (!cal&&!fat) return null;
-	return Math.max(0, Math.round(cal/50 + fat/12 - fiber/5));
+	var cal = Math.abs(parseFloat(nut.calories) || 0);
+	var fat = Math.abs(parseFloat(nut.fat) || 0);
+	if (!cal && !fat) return null;
+	return Math.max(0, Math.round(cal / 50 + fat / 12));
 }
 
 export default function HomePage() {
