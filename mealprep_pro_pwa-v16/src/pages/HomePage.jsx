@@ -421,6 +421,7 @@ export default function HomePage() {
 								<span>P {todayNutrition.protein}g</span>
 								<span>C {todayNutrition.carbs}g</span>
 								<span>F {todayNutrition.fat}g</span>
+								<span>{Math.max(0, Math.round(todayNutrition.calories/50 + todayNutrition.fat/12))} WW</span>
 							</div>
 						)}
 					</div>
