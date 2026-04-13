@@ -136,7 +136,7 @@ export default function HomePage() {
 	var weekEnd = fmt(weekDays[6]);
 	var monthCalDays = getMonthCalendarDays(currentDate);
 
-	 Fetch range: week or full month calendar
+	// Fetch range: week or full month calendar
 	var fetchStart = view==="month" ? fmt(monthCalDays[0]) : weekStart;
 	var fetchEnd = view==="month" ? fmt(monthCalDays[monthCalDays.length-1]) : weekEnd;
 
