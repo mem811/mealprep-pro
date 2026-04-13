@@ -140,7 +140,7 @@ export default function HomePage() {
 	var fetchStart = view==="month" ? fmt(monthCalDays[0]) : weekStart;
 	var fetchEnd = view==="month" ? fmt(monthCalDays[monthCalDays.length-1]) : weekEnd;
 
-	 Period label
+	// Period label
 	var periodLabel = view==="day"
 		? new Date(today+"T00:00:00").toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})
 		: view==="week"
