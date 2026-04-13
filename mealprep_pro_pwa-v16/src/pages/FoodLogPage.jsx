@@ -23,6 +23,12 @@ function mealPillClass(mealType) {
 }
 function n0(v) { const num = Number(v); return Number.isFinite(num) ? num : 0; }
 function round0(v) { return Math.round(n0(v)); }
+function getWWPoints(cal, fat) {
+  var c = Math.abs(parseFloat(cal) || 0);
+  var f = Math.abs(parseFloat(fat) || 0);
+  if (!c && !f) return null;
+  return Math.max(0, Math.round(c / 50 + f / 12));
+  }  
 function offKcalPer100g(product) { return n0(product?.nutriments?.["energy-kcal_100g"]); }
 function offMacroPer100g(product, key) { return n0(product?.nutriments?.[`${key}_100g`]); }
 function scalePer100g(per100g, grams) { return (n0(per100g) * n0(grams)) / 100; }
@@ -275,6 +281,7 @@ export default function FoodLogPage() {
       protein: entry.protein_per_serving ? n0(entry.protein_per_serving) : Math.round(n0(entry.protein) / servings),
       carbs: entry.carbs_per_serving ? n0(entry.carbs_per_serving) : Math.round(n0(entry.carbs) / servings),
       fat: entry.fat_per_serving ? n0(entry.fat_per_serving) : Math.round(n0(entry.fat) / servings),
+      ["WW", getWWPoints(totals.calories, totals.fat) ?? 0, " pts", null],
     };
     setEditing({
       id: entry.id, meal_type: entry.meal_type || "", name: entry.name || "",
@@ -422,6 +429,9 @@ export default function FoodLogPage() {
                         <span className="mx-2 text-gray-300">•</span>C <span className="font-semibold text-gray-800">{e.carbs ?? 0}</span>g
                         <span className="mx-2 text-gray-300">•</span>F <span className="font-semibold text-gray-800">{e.fat ?? 0}</span>g
                         {e.servings ? <><span className="mx-2 text-gray-300">•</span><span>{e.servings} srv</span></> : null}
+                        {getWWPoints(e.calories, e.fat) !== null && (
+                          <><span className="mx-2 text-gray-300">•</span><span className="font-semibold text-purple-600">{getWWPoints(e.calories, e.fat)} WW</span></>
+                        )}
                       </div>
                       {e.notes ? <div className="mt-2 text-sm text-gray-700">{e.notes}</div> : null}
                     </div>
