@@ -281,7 +281,6 @@ export default function FoodLogPage() {
       protein: entry.protein_per_serving ? n0(entry.protein_per_serving) : Math.round(n0(entry.protein) / servings),
       carbs: entry.carbs_per_serving ? n0(entry.carbs_per_serving) : Math.round(n0(entry.carbs) / servings),
       fat: entry.fat_per_serving ? n0(entry.fat_per_serving) : Math.round(n0(entry.fat) / servings),
-      ["WW", getWWPoints(totals.calories, totals.fat) ?? 0, " pts", null],
     };
     setEditing({
       id: entry.id, meal_type: entry.meal_type || "", name: entry.name || "",
@@ -383,6 +382,7 @@ export default function FoodLogPage() {
           ["Protein", Math.round(totals.protein), "g", goals?.protein],
           ["Carbs", Math.round(totals.carbs), "g", goals?.carbs],
           ["Fat", Math.round(totals.fat), "g", goals?.fat],
+          ["WW", getWWPoints(totals.calories, totals.fat) ?? 0, " pts", null],
         ].map(([label, val, unit, goal]) => {
           const pct = goal > 0 ? Math.min(100, Math.round((val / goal) * 100)) : null;
           const over = goal > 0 && val > goal;
