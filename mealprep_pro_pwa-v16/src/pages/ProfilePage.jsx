@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import pb from '../lib/pb';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +17,8 @@ export default function ProfilePage() {
   const [goals, setGoals] = useState({ calories: "", protein: "", carbs: "", fat: "" });
   const [savingGoals, setSavingGoals] = useState(false);
   const [goalsSaved, setGoalsSaved] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
 
   useEffect(() => {
     getUserGoals().then((g) => {
@@ -35,17 +37,38 @@ export default function ProfilePage() {
     enabled: !!user,
   });
 
-  const upgradeMutation = useMutation({
-    mutationFn: async () => {
-      await pb.collection('users').update(user.id, { plan: 'pro' });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['auth-user'] });
-      window.location.reload();
-    },
-  });
-
   const isPro = user?.plan === 'pro';
+
+  const handleUpgrade = async (interval = 'monthly') => {
+    setCheckoutLoading(true);
+    setCheckoutError('');
+    try {
+      const priceId = interval === 'yearly'
+        ? import.meta.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID
+        : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
+
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id,
+          userEmail: user.email,
+        }),
+      });
+      const { url } = await res.json();
+      if (url) {
+        window.location.href = url;
+      } else {
+        setCheckoutError('Could not start checkout. Please try again.');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      setCheckoutError('Something went wrong. Please try again.');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -74,9 +97,7 @@ export default function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900" >
-          Profile
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
         <p className="text-sm text-gray-500 mt-0.5">Manage your account and plan</p>
       </div>
 
@@ -124,18 +145,32 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
+
+          {checkoutError && (
+            <p className="text-red-500 text-sm mb-3 text-center">{checkoutError}</p>
+          )}
+
           <button
-            onClick={() => upgradeMutation.mutate()}
-            disabled={upgradeMutation.isPending}
-            className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
+            onClick={() => handleUpgrade('monthly')}
+            disabled={checkoutLoading}
+            className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 mb-2"
           >
-            {upgradeMutation.isPending ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Upgrading…</>
+            {checkoutLoading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
             ) : (
-              <><Crown className="w-4 h-4" /> Upgrade Now</>
+              <><Crown className="w-4 h-4" /> Try Pro free for 14 days → $6/mo</>
             )}
           </button>
-          <p className="text-xs text-gray-400 text-center mt-2">Demo: click to simulate Pro upgrade</p>
+
+          <button
+            onClick={() => handleUpgrade('yearly')}
+            disabled={checkoutLoading}
+            className="w-full py-3 border border-amber-400 text-amber-700 hover:bg-amber-50 disabled:opacity-60 font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+          >
+            Save 30% with yearly — $50/yr
+          </button>
+
+          <p className="text-xs text-gray-400 text-center mt-2">No credit card required for trial</p>
         </div>
       )}
 
