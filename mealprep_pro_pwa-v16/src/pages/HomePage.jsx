@@ -644,7 +644,7 @@ export default function HomePage() {
 											<p className="text-xs font-semibold text-gray-800 line-clamp-2">{recipe.title}</p>
 											<p className="text-[10px] text-gray-400 mt-0.5">{recipe.servings} servings</p>
 											{macros&&<p className="text-[10px] text-gray-400 mt-1 font-semibold">P {macros.p}g · C {macros.c}g · F {macros.f}g</p>}
-											{wwPts!==null&&<p className="text-[10px] font-bold text-blue-500 mt-0.5">~{wwPts} WW pts (est.)</p>}
+											{wwPts!==null&&<p className="text-[10px] font-bold text-blue-500 mt-0.5">{wwPts} WW pts (est.)</p>}
 										</a>
 										<button onClick={function(e){e.preventDefault();setAddToPlannerRecipe({id:recipe.id,title:recipe.title});setAddToPlannerDay(today);setAddToPlannerMeal("lunch");}} className="mt-2 w-full text-[10px] font-bold py-1.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">+ Add to Planner</button>
 									</div>
@@ -691,7 +691,7 @@ function DesktopRecipeCard({recipe,servings,macros,onRemove,onAteThis,ateDisable
 			{proxied?(<img src={proxied} alt={recipe.title} className="w-full h-12 rounded-xl object-cover" onError={function(){setImgError(true);}} />):(<div className="w-full h-12 rounded-xl bg-emerald-50 flex items-center justify-center"><Utensils size={16} className="text-emerald-300" /></div>)}
 			<span className="text-[10px] text-gray-700 font-semibold leading-tight text-center line-clamp-1 w-full">{recipe.title}</span>
 			{macros&&(<div className="mt-0.5 flex flex-wrap items-center justify-center gap-1 text-[9px] font-bold text-gray-700"><span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">🔥 {macros.cal}</span><span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">P {macros.p}g</span><span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">C {macros.c}g</span><span className="px-2 py-0.5 rounded-full bg-white border border-emerald-100">F {macros.f}g</span></div>)}
-			{wwPts!==null&&<span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[9px] font-bold text-blue-600">~{wwPts} WW pts/srv</span>}
+			{wwPts!==null&&<span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[9px] font-bold text-blue-600">{wwPts} WW pts/srv</span>}
 			{servings>1&&<span className="text-[9px] text-emerald-700 font-bold">{servings}x</span>}
 			<button disabled={ateDisabled} onClick={function(e){e.preventDefault();e.stopPropagation();onAteThis?.();}} className={"mt-1 w-full text-[9px] font-bold py-1 rounded-xl transition-colors "+(ateDisabled?"bg-gray-200/70 text-gray-500 cursor-not-allowed":"bg-emerald-600 text-white hover:bg-emerald-700")}>{ateDisabled?"Logged":"✅ Ate this"}</button>
 			<button onClick={function(e){e.preventDefault();e.stopPropagation();onRemove();}} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-emerald-100 text-gray-500 hidden group-hover/card:flex items-center justify-center shadow-sm"><X size={12} /></button>
@@ -711,7 +711,7 @@ function MobileRecipeCard({recipe,servings,macros,onRemove}){
 				<p className="text-sm font-semibold text-gray-800 truncate">{recipe.title}</p>
 				{servings>1&&<p className="text-xs text-emerald-700 font-bold">{servings}x serving</p>}
 				{macros&&<p className="text-[10px] text-gray-500 font-semibold mt-0.5">🔥 {macros.cal} · P {macros.p}g · C {macros.c}g · F {macros.f}g</p>}
-				{wwPts!==null&&<p className="text-[10px] font-bold text-blue-500">~{wwPts} WW pts/srv (est.)</p>}
+				{wwPts!==null&&<p className="text-[10px] font-bold text-blue-500">{wwPts} WW</p>}
 			</div>
 			<button onClick={function(e){e.preventDefault();e.stopPropagation();onRemove();}} className="w-8 h-8 rounded-2xl hover:bg-red-50 flex items-center justify-center transition-colors flex-shrink-0"><X size={16} className="text-red-400" /></button>
 		</a>
