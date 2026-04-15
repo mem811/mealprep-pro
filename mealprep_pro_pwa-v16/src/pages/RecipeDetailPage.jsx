@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import pb from '../lib/pb';
 import {
   ArrowLeft, Bookmark, BookmarkCheck, Pencil, Printer,
-  Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils
+  Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Heart, Utensils
 } from 'lucide-react';
 
 var gradientStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
