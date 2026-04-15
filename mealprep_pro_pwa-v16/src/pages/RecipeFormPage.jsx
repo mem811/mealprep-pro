@@ -249,7 +249,7 @@ export default function RecipeFormPage() {
       }
       // ── Fix image URL after file upload ──
         if (imageFile && savedRecipe && savedRecipe.image_file) {
-          var fileUrl = pb.files.getURL(savedRecipe, savedRecipe.image_file);
+          var fileUrl = pb.getFileUrl(savedRecipe, savedRecipe.image_file);
           await pb.collection('recipes').update(savedRecipe.id, { image_url: fileUrl });
           console.log('Image URL set:', fileUrl);
         }
