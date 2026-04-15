@@ -8,9 +8,9 @@ import {
 
 var gradientStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
 
-var getProxiedImage = function (url) {
+var getProxiedImage = function(url) {
   if (!url) return null;
-  return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=1200&h=600&fit=cover&q=85";
+  return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=1200&fit=inside&q=85";
 };
 
 var toTitleCase = function (str) {
