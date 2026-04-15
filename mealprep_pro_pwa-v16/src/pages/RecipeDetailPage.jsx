@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import pb from '../lib/pb';
 import {
-  ArrowLeft, Heart, Pencil, Printer,
-  Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save
+  ArrowLeft, Bookmark, BookmarkCheck, Pencil, Printer,
+  Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils
 } from 'lucide-react';
 
 var gradientStyle = { background: "linear-gradient(135deg, #10b981, #059669)" };
@@ -180,7 +180,44 @@ export default function RecipeDetailPage() {
       setFetchingNutrition(false);
     }
   };
+  var handleCalcFromIngredients = async function () {
+  if (!recipe) return;
+  setFetchingNutrition(true);
+  setNutritionError('');
+  try {
+    var { fetchNutritionFromIngredients } = await import('../utils/fetchNutritionFromIngredients');
+    var ingredientList = parseIngredients(recipe.ingredients);
+    var servingCount = recipe.servings || 1;
 
+    if (ingredientList.length === 0) {
+      setNutritionError('No ingredients found. Add ingredients first.');
+      setFetchingNutrition(false);
+      return;
+    }
+
+    console.log('Calculating from', ingredientList.length, 'ingredients...');
+    var result = await fetchNutritionFromIngredients(ingredientList, servingCount);
+    console.log('Result:', result);
+
+    if (result && result.perServing) {
+      var n = {
+        calories: result.perServing.calories,
+        protein: result.perServing.protein,
+        carbs: result.perServing.carbs,
+        fat: result.perServing.fat,
+      };
+      await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
+      setNutrition(n);
+    } else {
+      setNutritionError('Could not calculate nutrition. Try manual entry.');
+    }
+  } catch (err) {
+    console.error('Calc from ingredients error:', err);
+    setNutritionError('Calculation failed. Try manual entry.');
+  } finally {
+    setFetchingNutrition(false);
+  }
+};
   var handleSaveRating = async function (newRating) {
     setRating(newRating);
     if (!recipe) return;
@@ -306,6 +343,19 @@ export default function RecipeDetailPage() {
                   <div className="text-xs text-gray-500 mt-0.5">WW Points (est.)</div>
                 </div>
               )}
+                <div className="px-5 pb-4">
+                    <button
+                      onClick={handleCalcFromIngredients}
+                      disabled={fetchingNutrition}
+                      className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-blue-600 py-2 rounded-xl font-medium transition-colors border border-gray-200 hover:border-blue-300"
+                    >
+                      {fetchingNutrition ? (
+                        <><Loader2 className="w-3 h-3 animate-spin" /> Recalculating...</>
+                      ) : (
+                        <><Utensils className="w-3 h-3" /> Recalculate from Ingredients</>
+                      )}
+                    </button>
+                  </div>
               </div>
             ) : (
               <p className="text-xs text-gray-400 mb-4">No nutrition data yet.</p>
@@ -320,6 +370,17 @@ export default function RecipeDetailPage() {
                 <><Loader2 size={14} className="animate-spin" /> Fetching...</>
               ) : (
                 <><Zap size={14} /> Re-fetch Nutrition</>
+              )}
+            </button>
+            <button
+              onClick={handleCalcFromIngredients}
+              disabled={fetchingNutrition}
+              className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-60 mt-2"
+            >
+              {fetchingNutrition ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Calculating...</>
+              ) : (
+                <><Utensils className="w-4 h-4" /> Calculate from Ingredients</>
               )}
             </button>
             {nutritionError && (
