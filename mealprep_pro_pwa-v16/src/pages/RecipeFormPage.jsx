@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
 import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat, Clock } from 'lucide-react';
+import { fetchNutritionFromIngredients } from '../utils/fetchNutritionFromIngredients';
 
 const TAG_OPTIONS = [
   'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Sides', 'Soups',
@@ -246,7 +247,45 @@ export default function RecipeFormPage() {
         }
         await pb.collection('recipes').create(payload);
       }
+      // ── Auto-calc nutrition ──
+const savedIngredients = payload.ingredients || [];
+const parsedIngredients = typeof savedIngredients === 'string' 
+  ? JSON.parse(savedIngredients) 
+  : savedIngredients;
+const servings = payload.servings || 1;
 
+if (parsedIngredients.length > 0) {
+  try {
+    const { fetchNutritionFromIngredients } = await import('../utils/fetchNutritionFromIngredients');
+    const result = await fetchNutritionFromIngredients(parsedIngredients, servings);
+    if (result?.perServing) {
+      const nutritionData = {
+        calories: result.perServing.calories,
+        protein: result.perServing.protein,
+        carbs: result.perServing.carbs,
+        fat: result.perServing.fat,
+      };
+      if (isEdit) {
+        await pb.collection('recipes').update(id, { nutrition: JSON.stringify(nutritionData) });
+      } else {
+        // For new recipes, we need the created record's ID
+        // Re-fetch the latest recipe
+        const latest = await pb.collection('recipes').getList(1, 1, {
+          filter: `user = "${pb.authStore.model.id}"`,
+          sort: '-created',
+        });
+        if (latest.items.length > 0) {
+          await pb.collection('recipes').update(latest.items[0].id, { nutrition: JSON.stringify(nutritionData) });
+        }
+      }
+      console.log('Nutrition auto-calculated:', nutritionData);
+    }
+  } catch (nutritionErr) {
+    console.error('Nutrition calc error (non-blocking):', nutritionErr);
+  }
+}
+
+navigate('/app/recipes', { replace: true });
       navigate('/app/recipes', { replace: true });
     } catch (err) {
       console.error('Full error:', err.response);
