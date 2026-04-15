@@ -247,17 +247,16 @@ export default function RecipeFormPage() {
         }
         await pb.collection('recipes').create(payload);
       }
-      // ── Auto-calc nutrition ──
-const savedIngredients = payload.ingredients || [];
-const parsedIngredients = typeof savedIngredients === 'string' 
-  ? JSON.parse(savedIngredients) 
-  : savedIngredients;
-const servings = payload.servings || 1;
+ // ── Auto-calc nutrition ──
+const ingredientList = ingredients.filter(i => i.name.trim());
+const servingCount = Number(servings) || 1;
 
-if (parsedIngredients.length > 0) {
+if (ingredientList.length > 0) {
   try {
     const { fetchNutritionFromIngredients } = await import('../utils/fetchNutritionFromIngredients');
-    const result = await fetchNutritionFromIngredients(parsedIngredients, servings);
+    console.log('Auto-calculating nutrition...', ingredientList.length, 'ingredients');
+    const result = await fetchNutritionFromIngredients(ingredientList, servingCount);
+    console.log('Nutrition result:', result);
     if (result?.perServing) {
       const nutritionData = {
         calories: result.perServing.calories,
@@ -268,8 +267,6 @@ if (parsedIngredients.length > 0) {
       if (isEdit) {
         await pb.collection('recipes').update(id, { nutrition: JSON.stringify(nutritionData) });
       } else {
-        // For new recipes, we need the created record's ID
-        // Re-fetch the latest recipe
         const latest = await pb.collection('recipes').getList(1, 1, {
           filter: `user = "${pb.authStore.model.id}"`,
           sort: '-created',
@@ -278,14 +275,13 @@ if (parsedIngredients.length > 0) {
           await pb.collection('recipes').update(latest.items[0].id, { nutrition: JSON.stringify(nutritionData) });
         }
       }
-      console.log('Nutrition auto-calculated:', nutritionData);
+      console.log('Nutrition saved:', nutritionData);
     }
   } catch (nutritionErr) {
     console.error('Nutrition calc error (non-blocking):', nutritionErr);
   }
 }
 
-navigate('/app/recipes', { replace: true });
       navigate('/app/recipes', { replace: true });
     } catch (err) {
       console.error('Full error:', err.response);
