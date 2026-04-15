@@ -247,7 +247,7 @@ export default function RecipeFormPage() {
         }
         await pb.collection('recipes').create(payload);
       }
- // ── Auto-calc nutrition ──
+// ── Auto-calc nutrition ──
 const ingredientList = ingredients.filter(i => i.name.trim());
 const servingCount = Number(servings) || 1;
 
@@ -282,7 +282,7 @@ if (ingredientList.length > 0) {
   }
 }
 
-      navigate('/app/recipes', { replace: true });
+navigate('/app/recipes', { replace: true });
     } catch (err) {
       console.error('Full error:', err.response);
       setSubmitError(err?.response?.message || err?.message || 'Failed to save recipe.');
