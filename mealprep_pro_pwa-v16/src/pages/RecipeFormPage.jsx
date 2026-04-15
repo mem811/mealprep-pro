@@ -233,7 +233,7 @@ export default function RecipeFormPage() {
       }
 
       if (isEdit) {
-        await pb.collection('recipes').update(id, payload);
+        var savedRecipe = await pb.collection('recipes').update(id, payload);
       } else {
         if (sourceUrl) {
           const existing = await pb.collection('recipes').getList(1, 1, {
@@ -245,8 +245,14 @@ export default function RecipeFormPage() {
             return;
           }
         }
-        await pb.collection('recipes').create(payload);
+        var savedRecipe = await pb.collection('recipes').create(payload);
       }
+      // ── Fix image URL after file upload ──
+        if (imageFile && savedRecipe && savedRecipe.image_file) {
+          var fileUrl = pb.files.getURL(savedRecipe, savedRecipe.image_file);
+          await pb.collection('recipes').update(savedRecipe.id, { image_url: fileUrl });
+          console.log('Image URL set:', fileUrl);
+        }
 // ── Auto-calc nutrition ──
 const ingredientList = ingredients.filter(i => i.name.trim());
 const servingCount = Number(servings) || 1;
