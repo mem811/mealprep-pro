@@ -213,7 +213,7 @@ export default function RecipeFormPage() {
         payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
         payload.append('tags', JSON.stringify(tags));
         payload.append('image_file', imageFile);
-        
+        payload.append('image_url', imageUrl || '');
         if (sourceUrl) payload.append('source_url', sourceUrl);
         if (nutrition) payload.append('nutrition', nutrition);
       } else {
