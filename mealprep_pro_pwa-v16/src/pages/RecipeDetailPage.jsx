@@ -552,35 +552,33 @@ export default function RecipeDetailPage() {
               );
             })}
           </div>
+                </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <X size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Recipe?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this recipe? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={function () { setShowDeleteModal(false); }}
+                className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                No, Keep It
+              </button>
+              <button
+                onClick={handleDeleteRecipe}
+                className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
         </div>
-         
-    {/* Delete Confirmation Modal */}
-{showDeleteModal && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-    <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
-      <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <X size={24} className="text-red-500" />
-      </div>
-      <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Recipe?</h3>
-      <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this recipe? This action cannot be undone.</p>
-      <div className="flex gap-3">
-        <button
-          onClick={function () { setShowDeleteModal(false); }}
-          className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          No, Keep It
-        </button>
-        <button
-          onClick={handleDeleteRecipe}
-          className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
-        >
-          Yes, Delete
-        </button>
-      </div>
+      )}
     </div>
-  </div>
-      </div>
-   
-)}
   );
 }
