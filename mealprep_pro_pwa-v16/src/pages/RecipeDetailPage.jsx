@@ -551,8 +551,9 @@ export default function RecipeDetailPage() {
                 </button>
               );
             })}
-          </div>
-               
+      </div>
+      </div>
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
@@ -579,6 +580,8 @@ export default function RecipeDetailPage() {
           </div>
         </div>
       )}
+
+      <div className="h-12 no-print" />
     </div>
   );
 }
