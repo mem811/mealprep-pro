@@ -33,6 +33,7 @@ var SORT_OPTIONS = [
   { value: "quickest", label: "Quickest Cook Time" },
   { value: "most-cal", label: "Most Calories" },
   { value: "least-cal", label: "Least Calories" },
+  
 ];
 
 function getProxiedImage(url) {
@@ -78,6 +79,7 @@ export default function RecipesPage() {
   var [showFilters, setShowFilters] = useState(false);
   var [maxCookTime, setMaxCookTime] = useState("");
   var [hasImageOnly, setHasImageOnly] = useState(false);
+  var [deleteRecipe, setDeleteRecipe] = useState(null);
 
   // Add to Planner state
   var [addToPlannerRecipe, setAddToPlannerRecipe] = useState(null);
@@ -107,16 +109,18 @@ export default function RecipesPage() {
     fetchRecipes();
   }, []);
 
-  var confirmDelete = async function (recipeId) {
-    if (!window.confirm("Delete this recipe?")) return;
-    try {
-      await pb.collection("recipes").delete(recipeId);
-      setRecipes(function (prev) { return prev.filter(function (r) { return r.id !== recipeId; }); });
-    } catch (e) {
-      console.error("Delete error:", e);
-      alert("Failed to delete recipe.");
-    }
-  };
+      var handleDeleteRecipe = async function () {
+      if (!deleteRecipe) return;
+      try {
+        await pb.collection("recipes").delete(deleteRecipe);
+        setRecipes(function (prev) { return prev.filter(function (r) { return r.id !== deleteRecipe; }); });
+      } catch (e) {
+        console.error("Delete error:", e);
+        alert("Failed to delete recipe.");
+      } finally {
+        setDeleteRecipe(null);
+      }
+    };
 
   var toggleFavorite = async function (e, recipeId) {
     e.preventDefault(); e.stopPropagation();
@@ -382,7 +386,7 @@ export default function RecipesPage() {
 
                 {/* Delete */}
                 <button
-                  onClick={function (e) { e.preventDefault(); e.stopPropagation(); confirmDelete(recipe.id); }}
+                  onClick={function (e) { e.preventDefault(); e.stopPropagation(); setDeleteRecipe(recipe.id); }}
                   className="absolute bottom-10 right-3 w-7 h-7 rounded-full bg-white border border-gray-100 text-gray-400 hidden group-hover:flex items-center justify-center shadow-sm hover:bg-red-50 hover:text-red-500 transition-colors"
                 >
                   <X size={14} />
@@ -392,7 +396,33 @@ export default function RecipesPage() {
           })}
         </div>
       )}
-
+      
+{/* Delete Confirmation Modal */}
+          {deleteRecipe && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X size={24} className="text-red-500" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Recipe?</h3>
+                <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this recipe? This action cannot be undone.</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={function () { setDeleteRecipe(null); }}
+                    className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    No, Keep It
+                  </button>
+                  <button
+                    onClick={handleDeleteRecipe}
+                    className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
+                  >
+                    Yes, Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
       {/* Add to Planner Modal */}
       {addToPlannerRecipe && (
         <AddToPlannerModal
