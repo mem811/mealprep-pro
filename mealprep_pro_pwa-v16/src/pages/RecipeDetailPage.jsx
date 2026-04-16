@@ -580,7 +580,6 @@ export default function RecipeDetailPage() {
       </div>
     </div>
   </div>
-  </div>
 )}
   );
 }
