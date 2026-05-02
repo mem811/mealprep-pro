@@ -1,194 +1,72 @@
-import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Leaf, Eye, EyeOff, Loader2 } from 'lucide-react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import pb from '../lib/pb';
 
-export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+const AuthContext = createContext(null);
+
+// Helper to safely get current user record (works on both old and new SDK versions)
+const getCurrentUser = () => pb.authStore.record ?? pb.authStore.model ?? null;
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(getCurrentUser());
   const [loading, setLoading] = useState(false);
-  const { login, register } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
-  const getErrorMessage = (err) => {
-    console.log('Full PocketBase error object:', err);
-    if (err?.response?.message) return err.response.message;
-    if (err?.data?.message) return err.data.message;
-    if (err?.message) return err.message;
+  useEffect(() => {
+    const unsubscribe = pb.authStore.onChange(() => {
+      setUser(getCurrentUser());
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const login = async (email, password) => {
     try {
-      return JSON.stringify(err, null, 2);
-    } catch {
-      return String(err);
+      const authData = await pb.collection('users').authWithPassword(email, password);
+      setUser(authData?.record ?? null);
+      return { error: null, user: authData?.record ?? null };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { error, user: null };
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
+  const register = async (email, password, name) => {
     try {
-      let loggedInUser;
-
-      if (isLogin) {
-        const result = await login(email, password);
-        loggedInUser = result.user;
-      } else {
-        if (!fullName.trim()) {
-          setError('Full name is required.');
-          setLoading(false);
-          return;
-        }
-        const result = await register(email, password, fullName.trim());
-        loggedInUser = result.user;
-      }
-
-      const plan = searchParams.get('plan');
-      const interval = searchParams.get('interval');
-
-      if (plan === 'pro' && loggedInUser) {
-        const priceId = interval === 'yearly'
-          ? import.meta.env.VITE_STRIPE_PRO_YEARLY_PRICE_ID
-          : import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID;
-
-        const res = await fetch('/api/create-checkout-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            priceId,
-            userId: loggedInUser.id,
-            userEmail: loggedInUser.email,
-          }),
-        });
-        const { url } = await res.json();
-        window.location.href = url;
-      } else {
-        navigate('/');
-      }
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
+      await pb.collection('users').create({
+        email,
+        password,
+        passwordConfirm: password,
+        name: name.trim(),
+        plan: 'free',
+      });
+      return await login(email, password);
+    } catch (error) {
+      console.error('Registration error:', error);
+      return { error, user: null };
     }
+  };
+
+  const logout = () => {
+    pb.authStore.clear();
+    setUser(null);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-500 rounded-2xl mb-4 shadow-lg">
-            <Leaf className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">MealPrep Pro</h1>
-          <p className="text-gray-500 mt-2">Plan smarter, eat better</p>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-xl p-8">
-          <div className="flex bg-gray-100 rounded-2xl p-1 mb-6">
-            <button
-              onClick={() => { setIsLogin(true); setError(''); }}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                isLogin ? 'bg-white text-gray-900 shadow' : 'text-gray-500'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setIsLogin(false); setError(''); }}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                !isLogin ? 'bg-white text-gray-900 shadow' : 'text-gray-500'
-              }`}
-            >
-              Sign Up
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Jane Doe"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition"
-                  required
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition pr-12"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                <p className="text-red-600 text-sm font-medium whitespace-pre-wrap break-words">{error}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  {isLogin ? 'Signing in...' : 'Creating account...'}
-                </>
-              ) : (
-                isLogin ? 'Sign In' : 'Create Account'
-              )}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-gray-500 mt-6">
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
-            <button
-              onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="text-green-600 font-semibold hover:underline"
-            >
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </button>
-          </p>
-        </div>
-      </div>
-    </div>
+    <AuthContext.Provider value=
+      user,
+      loading,
+      login,
+      register,
+      logout,
+      isPro: user?.plan === 'pro'
+    >
+      {children}
+    </AuthContext.Provider>
   );
 }
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
