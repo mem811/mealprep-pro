@@ -41,7 +41,6 @@ export default function AuthPage() {
         const msg = result.error.response?.message || result.error.message || 'Authentication failed. Please check your credentials.';
         setError(msg);
       } else {
-        // Check if they came from "Try Pro" button
         const params = new URLSearchParams(window.location.search);
         const plan = params.get('plan');
         const interval = params.get('interval');
@@ -78,11 +77,18 @@ export default function AuthPage() {
     }
   };
 
+  const motionInitial = { opacity: 0, y: 20 };
+  const motionAnimate = { opacity: 1, y: 0 };
+  const fieldInitial = { opacity: 0, height: 0 };
+  const fieldAnimate = { opacity: 1, height: 'auto' };
+  const errorInitial = { opacity: 0, scale: 0.95 };
+  const errorAnimate = { opacity: 1, scale: 1 };
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <motion.div
-        initial= opacity: 0, y: 20 
-        animate= opacity: 1, y: 0 
+        initial={motionInitial}
+        animate={motionAnimate}
         className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl border border-gray-100 w-full max-w-md"
       >
         <div className="flex flex-col items-center mb-8">
@@ -118,9 +124,9 @@ export default function AuthPage() {
           <AnimatePresence mode="wait">
             {!isLogin && (
               <motion.div
-                initial= opacity: 0, height: 0 
-                animate= opacity: 1, height: 'auto' 
-                exit= opacity: 0, height: 0 
+                initial={fieldInitial}
+                animate={fieldAnimate}
+                exit={fieldInitial}
                 className="space-y-1"
               >
                 <label className="text-xs font-bold text-gray-500 uppercase px-1">Full Name</label>
@@ -171,8 +177,8 @@ export default function AuthPage() {
 
           {error && (
             <motion.div
-              initial= opacity: 0, scale: 0.95 
-              animate= opacity: 1, scale: 1 
+              initial={errorInitial}
+              animate={errorAnimate}
               className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-start gap-3"
             >
               <SafeIcon icon={FiAlertCircle} className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
