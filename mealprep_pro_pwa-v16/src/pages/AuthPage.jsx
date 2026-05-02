@@ -49,15 +49,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const value = {
+    user,
+    loading,
+    login,
+    register,
+    logout,
+    isPro: user?.plan === 'pro',
+  };
+
   return (
-    <AuthContext.Provider value=
-      user,
-      loading,
-      login,
-      register,
-      logout,
-      isPro: user?.plan === 'pro'
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
