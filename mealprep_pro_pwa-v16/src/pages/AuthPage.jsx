@@ -1,12 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import * as FiIcons from 'react-icons/fi';
-import SafeIcon from '../common/SafeIcon';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Mail, Lock, ArrowRight, Box, User, AlertCircle, Loader2 } from 'lucide-react';
 import pb from '../lib/pb';
-
-const { FiMail, FiLock, FiArrowRight, FiBox, FiUser, FiAlertCircle, FiLoader } = FiIcons;
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -77,23 +73,12 @@ export default function AuthPage() {
     }
   };
 
-  const motionInitial = { opacity: 0, y: 20 };
-  const motionAnimate = { opacity: 1, y: 0 };
-  const fieldInitial = { opacity: 0, height: 0 };
-  const fieldAnimate = { opacity: 1, height: 'auto' };
-  const errorInitial = { opacity: 0, scale: 0.95 };
-  const errorAnimate = { opacity: 1, scale: 1 };
-
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <motion.div
-        initial={motionInitial}
-        animate={motionAnimate}
-        className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl border border-gray-100 w-full max-w-md"
-      >
+      <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl border border-gray-100 w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="bg-emerald-500 p-4 rounded-3xl shadow-lg shadow-emerald-500/30 mb-4">
-            <SafeIcon icon={FiBox} className="w-8 h-8 text-white" />
+            <Box className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">
             {isLogin ? 'Welcome Back' : 'Get Started'}
@@ -121,34 +106,27 @@ export default function AuthPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <AnimatePresence mode="wait">
-            {!isLogin && (
-              <motion.div
-                initial={fieldInitial}
-                animate={fieldAnimate}
-                exit={fieldInitial}
-                className="space-y-1"
-              >
-                <label className="text-xs font-bold text-gray-500 uppercase px-1">Full Name</label>
-                <div className="relative">
-                  <SafeIcon icon={FiUser} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    required={!isLogin}
-                    type="text"
-                    placeholder="John Doe"
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent focus:bg-white focus:border-emerald-500 rounded-2xl outline-none transition-all"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {!isLogin && (
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase px-1">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  required={!isLogin}
+                  type="text"
+                  placeholder="John Doe"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 border-transparent focus:bg-white focus:border-emerald-500 rounded-2xl outline-none transition-all"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-500 uppercase px-1">Email Address</label>
             <div className="relative">
-              <SafeIcon icon={FiMail} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 required
                 type="email"
@@ -163,7 +141,7 @@ export default function AuthPage() {
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-500 uppercase px-1">Password</label>
             <div className="relative">
-              <SafeIcon icon={FiLock} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 required
                 type="password"
@@ -176,14 +154,10 @@ export default function AuthPage() {
           </div>
 
           {error && (
-            <motion.div
-              initial={errorInitial}
-              animate={errorAnimate}
-              className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-start gap-3"
-            >
-              <SafeIcon icon={FiAlertCircle} className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
+            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
               <p className="text-rose-600 text-xs font-medium leading-relaxed">{error}</p>
-            </motion.div>
+            </div>
           )}
 
           <button
@@ -193,13 +167,13 @@ export default function AuthPage() {
           >
             {loading ? (
               <>
-                <SafeIcon icon={FiLoader} className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Authenticating...</span>
               </>
             ) : (
               <>
                 <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
-                <SafeIcon icon={FiArrowRight} className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </>
             )}
           </button>
@@ -215,7 +189,7 @@ export default function AuthPage() {
             {isLogin ? 'Sign Up Free' : 'Sign In'}
           </button>
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }
