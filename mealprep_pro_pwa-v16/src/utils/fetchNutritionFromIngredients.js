@@ -104,7 +104,9 @@ export async function fetchNutritionFromIngredients(ingredients, servings) {
       console.error('Nutrition calc failed:', res.status);
       return null;
     }
-    return await res.json();
+    const data = await res.json();
+    // n8n sometimes returns the result wrapped in an array — unwrap it
+    return Array.isArray(data) ? data[0] : data;
   } catch (err) {
     console.error('Nutrition calc error:', err);
     return null;
