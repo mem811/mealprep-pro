@@ -52,52 +52,125 @@ export default function RecipeFormPage() {
     }
   }, [id, isEdit]);
 
+  // Drops the parsed result into the form fields.
+  const applyImported = ({ title, servings, image_url, source_url, instructions, ingredients, nutrition }) => {
+    setTitle(title || '');
+    setServings(servings || 2);
+    setImageUrl(image_url || '');
+    setSourceUrl(source_url || importUrl.trim());
+    setInstructions(instructions || '');
+
+    const clean = (ingredients || []).filter(i => i.name && i.name.trim() !== '');
+    setIngredients(clean.length > 0 ? clean : [{ name: '', quantity: '', unit: 'pcs' }]);
+
+    if (nutrition) setNutrition(nutrition);
+  };
+
+  // Route 1 — our own n8n webhook. Free, no quota, and fetches with a browser
+  // User-Agent so it gets through on sites that block Spoonacular's crawler.
+  const importViaWebhook = async (url) => {
+    const endpoint = import.meta.env.VITE_N8N_RECIPE_WEBHOOK;
+    if (!endpoint) return null;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+
+    if (!res.ok) throw new Error(`webhook_${res.status}`);
+
+    const payload = await res.json();
+    const data = Array.isArray(payload) ? payload[0] : payload;
+    return data?.ok ? data : null;
+  };
+
+  // Route 2 — Spoonacular. Kept as a fallback because it can fill in nutrition
+  // for pages that publish a recipe but no nutrition block.
+  const importViaSpoonacular = async (url) => {
+    const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
+    if (!apiKey) return null;
+
+    const endpoint = `https://api.spoonacular.com/recipes/extract?url=${encodeURIComponent(url)}&addRecipeInformation=true&addRecipeNutrition=true&apiKey=${apiKey}`;
+    const res = await fetch(endpoint);
+
+    if (res.status === 402) throw new Error('quota');
+    if (res.status === 401) throw new Error('badkey');
+    if (!res.ok) throw new Error(`spoonacular_${res.status}`);
+
+    const data = await res.json();
+    if (!data?.title) return null;
+
+    const n = data.nutrition?.nutrients || [];
+    const pick = (name) => Math.round(n.find(x => x.name === name)?.amount || 0);
+
+    return {
+      title: data.title,
+      servings: data.servings || 2,
+      image_url: data.image || '',
+      source_url: url,
+      instructions: data.instructions?.replace(/<[^>]*>?/gm, '') || '',
+      ingredients: (data.extendedIngredients || []).map(ing => ({
+        name: ing.name || '',
+        quantity: ing.amount?.toString() || '',
+        unit: ing.unit || 'pcs',
+      })),
+      nutrition: {
+        calories: pick('Calories'),
+        protein: pick('Protein'),
+        carbs: pick('Carbohydrates'),
+        fat: pick('Fat'),
+      },
+    };
+  };
+
   const handleImport = async () => {
-    if (!importUrl.trim()) return;
+    const url = importUrl.trim();
+    if (!url) return;
+
     setImporting(true);
     setImportError(null);
-    
+
+    const failures = [];
+
     try {
-      const apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
-      const url = `https://api.spoonacular.com/recipes/extract?url=${encodeURIComponent(importUrl)}&addRecipeInformation=true&addRecipeNutrition=true&apiKey=${apiKey}`;
-      
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Status: ${res.status}`);
-      
-      const data = await res.json();
-      
-      setTitle(data.title || '');
-      setServings(data.servings || 2);
-      setImageUrl(data.image || '');
-      setSourceUrl(importUrl);
-      setInstructions(data.instructions?.replace(/<[^>]*>?/gm, '') || '');
-      
-      if (data.extendedIngredients) {
-        // Fix 1: Filter out blank ingredients during import
-        const filteredIngs = data.extendedIngredients
-          .filter(ing => ing.name && ing.name.trim() !== '')
-          .map(ing => ({
-            name: ing.name || '',
-            quantity: ing.amount?.toString() || '',
-            unit: ing.unit || 'pcs'
-          }));
-        setIngredients(filteredIngs.length > 0 ? filteredIngs : [{ name: '', quantity: '', unit: 'pcs' }]);
+      let result = null;
+
+      try {
+        result = await importViaWebhook(url);
+      } catch (err) {
+        console.error('Webhook import failed:', err);
+        failures.push('webhook');
       }
 
-      if (data.nutrition?.nutrients) {
-        const n = data.nutrition.nutrients;
-        setNutrition({
-          calories: Math.round(n.find(x => x.name === 'Calories')?.amount || 0),
-          protein: Math.round(n.find(x => x.name === 'Protein')?.amount || 0),
-          carbs: Math.round(n.find(x => x.name === 'Carbohydrates')?.amount || 0),
-          fat: Math.round(n.find(x => x.name === 'Fat')?.amount || 0),
-        });
+      if (!result) {
+        try {
+          result = await importViaSpoonacular(url);
+        } catch (err) {
+          console.error('Spoonacular import failed:', err);
+          if (err.message === 'quota') {
+            setImportError('Recipe import is over its daily limit. Try again tomorrow or enter it manually.');
+            return;
+          }
+          if (err.message === 'badkey') {
+            setImportError('Recipe import is misconfigured. Enter the recipe manually for now.');
+            return;
+          }
+          failures.push('spoonacular');
+        }
       }
 
+      if (!result) {
+        setImportError(
+          failures.length === 2
+            ? "Couldn't reach that site. It may be blocking imports — try copying the recipe in manually."
+            : "That page doesn't publish readable recipe data. Try entering it manually."
+        );
+        return;
+      }
+
+      applyImported(result);
       setImportUrl('');
-    } catch (err) {
-      console.error('Import Error:', err);
-      setImportError('Failed to import recipe. Please verify the URL.');
     } finally {
       setImporting(false);
     }
