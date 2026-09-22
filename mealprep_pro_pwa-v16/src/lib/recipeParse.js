@@ -191,6 +191,7 @@ export function parseRecipeText(text) {
 
   const result = {
     title: '',
+    nutrition: null,
     servings: null,
     prep_time: '',
     cook_time: '',
@@ -252,6 +253,7 @@ export function parseRecipeText(text) {
   }
 
   result.instructions = steps.filter(Boolean).join('\n');
+  result.nutrition = parseNutritionText(text);
   return result;
 }
 
@@ -262,6 +264,7 @@ export function parseRecipeText(text) {
  *   u  page URL        n  name          y  recipeYield
  *   i  ingredient strs s  step strings  m  image URL
  *   pt prepTime        ct cookTime      t  highlighted text (fallback)
+ *   nu nutrition { c, p, cb, f } as published on the page
  */
 export function parseBookmarkletPayload(p) {
   if (!p || typeof p !== 'object') return null;
@@ -289,5 +292,103 @@ export function parseBookmarkletPayload(p) {
       .join('\n'),
     image_url: typeof p.m === 'string' ? p.m : '',
     source_url: p.u || '',
+    nutrition: parseNutritionObject(p.nu),
+  };
+}
+
+// ── Nutrition ────────────────────────────────────────────────
+
+function nutritionNumber(v) {
+  if (v === undefined || v === null || v === '') return 0;
+  const m = String(v).replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : 0;
+}
+
+const round1 = (n) => Math.round(n * 10) / 10;
+
+/**
+ * Normalize published nutrition from any source into { calories, protein, carbs, fat }.
+ * Accepts a schema.org NutritionInformation block ("345 kcal", "29 g"), the
+ * browser button's short keys ({ c, p, cb, f }), or plain numbers from the importer.
+ * Returns null when there's no real calorie figure.
+ */
+export function parseNutritionObject(n) {
+  if (!n || typeof n !== 'object') return null;
+  const rawCal = n.calories ?? n.c;
+  let calories = nutritionNumber(rawCal);
+  // A few sites publish energy in kilojoules
+  if (/kj|kilojoule/i.test(String(rawCal || ''))) calories = calories / 4.184;
+  if (!(calories > 0)) return null;
+  return {
+    calories: Math.round(calories),
+    protein: round1(nutritionNumber(n.proteinContent ?? n.p ?? n.protein)),
+    carbs: round1(nutritionNumber(n.carbohydrateContent ?? n.cb ?? n.carbs)),
+    fat: round1(nutritionNumber(n.fatContent ?? n.f ?? n.fat)),
+  };
+}
+
+/**
+ * Pull a nutrition line out of pasted text, e.g. a WP Recipe Maker card:
+ * "Calories: 345kcal | Carbohydrates: 29g | Protein: 29g | Fat: 14g | Saturated Fat: 6g"
+ */
+export function parseNutritionText(text) {
+  const t = String(text || '');
+  const cal = t.match(/\bcalories\s*:?\s*([\d,]+(?:\.\d+)?)\s*(kcal|cal|kj)?/i);
+  if (!cal) return null;
+
+  const protein = t.match(/\bprotein\s*:?\s*(\d+(?:\.\d+)?)\s*g\b/i);
+  const carbs = t.match(/\b(?:total\s+)?carb(?:ohydrate)?s?\s*:?\s*(\d+(?:\.\d+)?)\s*g\b/i);
+
+  // "Fat" but not "Saturated Fat", "Trans Fat", etc.
+  let fat = null;
+  const fatRe = /(\b[a-z]+\s+)?\bfat\s*:?\s*(\d+(?:\.\d+)?)\s*g\b/gi;
+  let m;
+  while ((m = fatRe.exec(t)) !== null) {
+    const prefix = (m[1] || '').trim().toLowerCase();
+    if (!/^(saturated|trans|polyunsaturated|monounsaturated|unsaturated)$/.test(prefix)) {
+      fat = m[2];
+      break;
+    }
+  }
+
+  return parseNutritionObject({
+    calories: cal[1] + (cal[2] ? ' ' + cal[2] : ''),
+    protein: protein?.[1],
+    carbs: carbs?.[1],
+    fat,
+  });
+}
+
+/**
+ * Decide what nutrition a recipe should have after a save.
+ *
+ *   current            the nutrition it has now (parsed object or null)
+ *   servingCount       servings on the form being saved
+ *   ingredientsChanged whether the ingredient list was edited
+ *
+ * Returns { action: 'keep' | 'scale' | 'estimate', nutrition }.
+ * Numbers from the recipe (or typed in by hand) are kept while they still
+ * describe this recipe. A servings change scales them exactly — same pot,
+ * different number of bowls. Edited ingredients mean they no longer apply.
+ */
+export function decideNutrition({ current, servingCount, ingredientsChanged }) {
+  const trusted = current && (current.source === 'recipe' || current.source === 'manual');
+  if (!trusted || ingredientsChanged) return { action: 'estimate', nutrition: null };
+
+  const basis = Number(current.servings) || servingCount;
+  if (!servingCount || basis === servingCount) {
+    return { action: 'keep', nutrition: { ...current, servings: servingCount || basis } };
+  }
+  const scale = basis / servingCount;
+  return {
+    action: 'scale',
+    nutrition: {
+      ...current,
+      calories: Math.round(current.calories * scale),
+      protein: round1(current.protein * scale),
+      carbs: round1(current.carbs * scale),
+      fat: round1(current.fat * scale),
+      servings: servingCount,
+    },
   };
 }
