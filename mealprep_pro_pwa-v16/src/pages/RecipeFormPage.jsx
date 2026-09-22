@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
-import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat, Clock } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat, Clock, ClipboardPaste, ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchNutritionFromIngredients } from '../utils/fetchNutritionFromIngredients';
+import { parseRecipeText, parseBookmarkletPayload, parseIngredientLine, normalizeUnit } from '../lib/recipeParse';
+import SaveButtonInstall from '../components/SaveButtonInstall';
 
 const TAG_OPTIONS = [
   'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Sides', 'Soups',
@@ -42,6 +44,71 @@ export default function RecipeFormPage() {
 
   const userPlan = pb.authStore.model?.plan || 'free';
   const isPro = userPlan === 'pro';
+
+  const [importNotice, setImportNotice] = useState(null);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteNote, setPasteNote] = useState(null);
+
+  // Drop parsed fields into the form. Only overwrites what was actually found,
+  // so a sparse paste doesn't wipe fields the person already filled in.
+  const applyParsed = (p) => {
+    if (p.title) setTitle(p.title);
+    if (p.servings) setServings(p.servings);
+    if (p.prep_time) setPrepTime(p.prep_time);
+    if (p.cook_time) setCookTime(p.cook_time);
+    if (p.image_url) setImageUrl(p.image_url);
+    if (p.source_url) setSourceUrl(p.source_url);
+    if (p.ingredients?.length) setIngredients(p.ingredients);
+    if (p.instructions) setInstructions(p.instructions);
+  };
+
+  // Browser Save button lands here as /app/recipes/new#mpp=<recipe data>
+  useEffect(() => {
+    if (isEdit) return;
+    const match = window.location.hash.match(/^#mpp=(.+)$/);
+    if (!match) return;
+
+    // Clear it right away so a refresh doesn't re-import
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+    if (!isPro) {
+      setImportError('Saving recipes from other sites is a Pro feature. Upgrade to unlock it.');
+      return;
+    }
+
+    try {
+      let raw;
+      try { raw = JSON.parse(decodeURIComponent(match[1])); } catch { raw = JSON.parse(match[1]); }
+      const parsed = parseBookmarkletPayload(raw);
+      if (!parsed || (!parsed.title && parsed.ingredients.length === 0)) throw new Error('empty');
+      applyParsed(parsed);
+      setImportNotice('Recipe grabbed from your browser. Look it over, then save.');
+    } catch (err) {
+      console.error('Browser import error:', err);
+      setImportError("Couldn't read that recipe. Highlight the recipe text on the page and click the Save button again.");
+    }
+  }, [isEdit, isPro]);
+
+  const handlePasteParse = () => {
+    const parsed = parseRecipeText(pasteText);
+    if (!parsed.title && parsed.ingredients.length === 0 && !parsed.instructions) {
+      setPasteNote("Couldn't find a recipe in that text. Try including the ingredient list.");
+      return;
+    }
+    // If they got here after a failed URL import, keep that URL as the source
+    if (!sourceUrl && importUrl.trim()) parsed.source_url = importUrl.trim();
+
+    applyParsed(parsed);
+    setPasteNote(null);
+    setPasteText('');
+    setShowPaste(false);
+    setImportError(null);
+    const count = parsed.ingredients.length;
+    setImportNotice(
+      `Filled in ${count} ingredient${count === 1 ? '' : 's'}${parsed.instructions ? ' and the steps' : ''}. Check everything over${parsed.title ? '' : ' and add a title'}, then save.`
+    );
+  };
 
   useEffect(() => {
     if (isEdit) {
@@ -120,6 +187,7 @@ export default function RecipeFormPage() {
     }
     setImporting(true);
     setImportError(null);
+    setImportNotice(null);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -140,12 +208,9 @@ export default function RecipeFormPage() {
       const data = Array.isArray(payload) ? payload[0] : payload;
 
       // The extractor reports failure in the body, not the status code.
-      if (data?.ok === false) {
-        setImportError(data.error || 'Could not read that recipe. Try entering it manually.');
-        return;
-      }
-      if (!data?.title) {
-        setImportError("That page doesn't publish readable recipe data. Try entering it manually.");
+      if (data?.ok === false || !data?.title) {
+        setImportError("That site wouldn't let us read the recipe. Paste the recipe text below, or use the Save button while you're on the recipe page.");
+        setShowPaste(true);
         return;
       }
 
@@ -158,12 +223,12 @@ export default function RecipeFormPage() {
 
       if (data.ingredients?.length) {
         setIngredients(
-          data.ingredients.map((ing) => {
-            if (typeof ing === 'string') {
-              return { name: ing, quantity: '', unit: '' };
-            }
-            return { name: ing.name || '', quantity: String(ing.quantity || ''), unit: ing.unit || '' };
-          })
+          data.ingredients
+            .map((ing) => {
+              if (typeof ing === 'string') return parseIngredientLine(ing);
+              return { name: ing.name || '', quantity: String(ing.quantity || ''), unit: normalizeUnit(ing.unit) };
+            })
+            .filter((ing) => ing && ing.name)
         );
       }
       if (data.instructions) {
@@ -173,13 +238,15 @@ export default function RecipeFormPage() {
         setNutrition(JSON.stringify(data.nutrition));
       }
       setImportUrl('');
+      setImportNotice('Recipe imported. Look it over, then save.');
     } catch (err) {
       clearTimeout(timeout);
       if (err.name === 'AbortError') {
-        setImportError('Request timed out. Please try again.');
+        setImportError('That site took too long to respond. Try again, or paste the recipe text below.');
       } else {
-        setImportError('Failed to import recipe. Check the URL and try again.');
+        setImportError("That site wouldn't let us read the recipe. Paste the recipe text below, or use the Save button while you're on the recipe page.");
       }
+      setShowPaste(true);
     } finally {
       setImporting(false);
     }
@@ -364,8 +431,52 @@ navigate('/app/recipes', { replace: true });
           </button>
         </div>
         {importError && <p className="text-red-500 text-xs mt-2">{importError}</p>}
+        {importNotice && <p className="text-green-700 text-xs mt-2 font-medium">{importNotice}</p>}
         {!isPro && <p className="text-xs text-gray-400 mt-2">Upgrade to Pro to import recipes from any URL.</p>}
+        {isPro && <SaveButtonInstall />}
       </div>
+
+      {/* Paste recipe text — free for everyone, and the fallback when a site blocks import */}
+      {!isEdit && (
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white">
+          <button
+            type="button"
+            onClick={() => setShowPaste((s) => !s)}
+            className="w-full flex items-center gap-2 p-4 text-sm font-semibold text-gray-800"
+          >
+            <ClipboardPaste size={18} className="text-green-600" />
+            Paste recipe text
+            <span className="ml-auto text-gray-400">
+              {showPaste ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </span>
+          </button>
+          {showPaste && (
+            <div className="px-4 pb-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                Copy a recipe from any website, note, or message and paste it here. We'll sort it into
+                ingredients and steps for you to check.
+              </p>
+              <textarea
+                rows={8}
+                value={pasteText}
+                onChange={(e) => { setPasteText(e.target.value); setPasteNote(null); }}
+                placeholder={'Recipe name\n\nIngredients\n2 cups flour\n1 tsp salt\n\nInstructions\n1. Mix everything together...'}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              {pasteNote && <p className="text-red-500 text-xs">{pasteNote}</p>}
+              <button
+                type="button"
+                onClick={handlePasteParse}
+                disabled={!pasteText.trim()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ClipboardPaste size={16} />
+                Fill in the form
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
 
