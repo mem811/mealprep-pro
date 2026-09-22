@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
 import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat, Clock, ClipboardPaste, ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchNutritionFromIngredients } from '../utils/fetchNutritionFromIngredients';
-import { parseRecipeText, parseBookmarkletPayload, parseIngredientLine, normalizeUnit } from '../lib/recipeParse';
+import { parseRecipeText, parseBookmarkletPayload, parseIngredientLine, normalizeUnit, parseNutritionObject, decideNutrition } from '../lib/recipeParse';
 import SaveButtonInstall from '../components/SaveButtonInstall';
 
 const TAG_OPTIONS = [
@@ -46,6 +46,24 @@ export default function RecipeFormPage() {
   const isPro = userPlan === 'pro';
 
   const [importNotice, setImportNotice] = useState(null);
+
+  // Ingredients as they were when an existing recipe was opened, so a save
+  // can tell whether published nutrition still applies
+  const originalIngredientsKey = useRef(null);
+  const ingredientsKey = (list) => JSON.stringify(
+    (list || [])
+      .filter((i) => i && i.name && i.name.trim())
+      .map((i) => [i.name.trim().toLowerCase(), String(i.quantity ?? '').trim(), i.unit || ''])
+  );
+  const readNutrition = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+  // Nutrition published by the recipe itself, tagged so saving won't overwrite it
+  const setPublishedNutrition = (n, recipeServings) => {
+    setNutrition(n ? JSON.stringify({ ...n, source: 'recipe', servings: Number(recipeServings) || null }) : null);
+  };
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pasteNote, setPasteNote] = useState(null);
@@ -61,6 +79,7 @@ export default function RecipeFormPage() {
     if (p.source_url) setSourceUrl(p.source_url);
     if (p.ingredients?.length) setIngredients(p.ingredients);
     if (p.instructions) setInstructions(p.instructions);
+    if (p.nutrition) setPublishedNutrition(p.nutrition, p.servings);
   };
 
   // Browser Save button lands here as /app/recipes/new#mpp=<recipe data>
@@ -144,6 +163,10 @@ export default function RecipeFormPage() {
           if (parsedIngredients.length > 0) {
             setIngredients(parsedIngredients);
           }
+          originalIngredientsKey.current = ingredientsKey(parsedIngredients);
+          setNutrition(record.nutrition
+            ? (typeof record.nutrition === 'string' ? record.nutrition : JSON.stringify(record.nutrition))
+            : null);
         } catch (err) {
           console.error('Error loading recipe:', err);
           setError('Failed to load recipe.');
@@ -234,9 +257,8 @@ export default function RecipeFormPage() {
       if (data.instructions) {
         setInstructions(data.instructions);
       }
-      if (data.nutrition) {
-        setNutrition(JSON.stringify(data.nutrition));
-      }
+      // The importer sends zeros when a page publishes no nutrition
+      setPublishedNutrition(parseNutritionObject(data.nutrition), data.servings);
       setImportUrl('');
       setImportNotice('Recipe imported. Look it over, then save.');
     } catch (err) {
@@ -331,39 +353,41 @@ export default function RecipeFormPage() {
           await pb.collection('recipes').update(savedRecipe.id, { image_url: fileUrl });
           console.log('Image URL set:', fileUrl);
         }
-// ── Auto-calc nutrition ──
+// ── Nutrition ──
+// Numbers published by the recipe win over an estimate. They're kept while
+// they still describe this recipe, scaled if only the servings changed, and
+// replaced with an estimate if the ingredients were edited.
 const ingredientList = ingredients.filter(i => i.name.trim());
 const servingCount = Number(servings) || 1;
+const recipeId = savedRecipe?.id || id;
+const decision = decideNutrition({
+  current: readNutrition(nutrition),
+  servingCount,
+  ingredientsChanged: isEdit && originalIngredientsKey.current !== null
+    && originalIngredientsKey.current !== ingredientsKey(ingredientList),
+});
 
-if (ingredientList.length > 0) {
-  try {
+try {
+  if (decision.action !== 'estimate') {
+    await pb.collection('recipes').update(recipeId, { nutrition: JSON.stringify(decision.nutrition) });
+  } else if (ingredientList.length > 0) {
     const { fetchNutritionFromIngredients } = await import('../utils/fetchNutritionFromIngredients');
-    console.log('Auto-calculating nutrition...', ingredientList.length, 'ingredients');
     const result = await fetchNutritionFromIngredients(ingredientList, servingCount);
-    console.log('Nutrition result:', result);
     if (result?.perServing) {
-      const nutritionData = {
-        calories: result.perServing.calories,
-        protein: result.perServing.protein,
-        carbs: result.perServing.carbs,
-        fat: result.perServing.fat,
-      };
-      if (isEdit) {
-        await pb.collection('recipes').update(id, { nutrition: JSON.stringify(nutritionData) });
-      } else {
-        const latest = await pb.collection('recipes').getList(1, 1, {
-          filter: `user = "${pb.authStore.model.id}"`,
-          sort: '-created',
-        });
-        if (latest.items.length > 0) {
-          await pb.collection('recipes').update(latest.items[0].id, { nutrition: JSON.stringify(nutritionData) });
-        }
-      }
-      console.log('Nutrition saved:', nutritionData);
+      await pb.collection('recipes').update(recipeId, {
+        nutrition: JSON.stringify({
+          calories: result.perServing.calories,
+          protein: result.perServing.protein,
+          carbs: result.perServing.carbs,
+          fat: result.perServing.fat,
+          source: 'estimate',
+          servings: servingCount,
+        }),
+      });
     }
-  } catch (nutritionErr) {
-    console.error('Nutrition calc error (non-blocking):', nutritionErr);
   }
+} catch (nutritionErr) {
+  console.error('Nutrition save error (non-blocking):', nutritionErr);
 }
 
 navigate('/app/recipes', { replace: true });
@@ -432,6 +456,11 @@ navigate('/app/recipes', { replace: true });
         </div>
         {importError && <p className="text-red-500 text-xs mt-2">{importError}</p>}
         {importNotice && <p className="text-green-700 text-xs mt-2 font-medium">{importNotice}</p>}
+        {!isEdit && readNutrition(nutrition)?.source === 'recipe' && (
+          <p className="text-xs text-gray-500 mt-1">
+            Using the recipe's own nutrition: {readNutrition(nutrition).calories} cal per serving.
+          </p>
+        )}
         {!isPro && <p className="text-xs text-gray-400 mt-2">Upgrade to Pro to import recipes from any URL.</p>}
         {isPro && <SaveButtonInstall />}
       </div>
