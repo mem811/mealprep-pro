@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import pb from '../lib/pb';
+import { parseNutritionObject } from '../lib/recipeParse';
+
+const RECIPE_EXTRACT_WEBHOOK = 'https://n8n.srv1052955.hstgr.cloud/webhook/recipe-extract';
 import {
   ArrowLeft, Bookmark, BookmarkCheck, Pencil, Printer,
   Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils, Heart, X
@@ -136,6 +139,42 @@ export default function RecipeDetailPage() {
     setNutritionError('');
     var apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
     try {
+      // 1. The recipe's own published nutrition, via our importer
+      if (recipe.source_url) {
+        try {
+          var extractRes = await fetch(RECIPE_EXTRACT_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: recipe.source_url }),
+          });
+          if (extractRes.ok) {
+            var payload = await extractRes.json();
+            var extracted = Array.isArray(payload) ? payload[0] : payload;
+            var published = extracted && extracted.ok ? parseNutritionObject(extracted.nutrition) : null;
+            if (published) {
+              var recipeServings = Number(extracted.servings) || Number(recipe.servings) || null;
+              var ours = Number(recipe.servings) || recipeServings;
+              // If this recipe's servings differ from the source's, scale per bowl
+              var scale = recipeServings && ours ? recipeServings / ours : 1;
+              var np = {
+                calories: Math.round(published.calories * scale),
+                protein: Math.round(published.protein * scale * 10) / 10,
+                carbs: Math.round(published.carbs * scale * 10) / 10,
+                fat: Math.round(published.fat * scale * 10) / 10,
+                source: 'recipe',
+                servings: ours,
+              };
+              await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(np) });
+              setNutrition(np);
+              setFetchingNutrition(false);
+              return;
+            }
+          }
+        } catch (extractErr) {
+          console.error('Recipe nutrition lookup failed, trying Spoonacular:', extractErr);
+        }
+      }
+      // 2. Fall back to Spoonacular's estimate
       if (recipe.source_url) {
         var res = await fetch(
           "https://api.spoonacular.com/recipes/extract?url=" + encodeURIComponent(recipe.source_url) + "&addRecipeNutrition=true&apiKey=" + apiKey
@@ -148,7 +187,8 @@ export default function RecipeDetailPage() {
               calories: Math.round((nutrients.find(function(x) { return x.name === 'Calories'; }) || {}).amount || 0),
               protein: Math.round((nutrients.find(function(x) { return x.name === 'Protein'; }) || {}).amount || 0),
               carbs: Math.round((nutrients.find(function(x) { return x.name === 'Carbohydrates'; }) || {}).amount || 0),
-              fat: Math.round((nutrients.find(function(x) { return x.name === 'Fat'; }) || {}).amount || 0)
+              fat: Math.round((nutrients.find(function(x) { return x.name === 'Fat'; }) || {}).amount || 0),
+              source: 'estimate'
             };
             await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
             setNutrition(n);
@@ -167,7 +207,8 @@ export default function RecipeDetailPage() {
           calories: Math.round((nutData.calories ? nutData.calories.value : 0) || 0),
           protein: Math.round((nutData.protein ? nutData.protein.value : 0) || 0),
           carbs: Math.round((nutData.carbs ? nutData.carbs.value : 0) || 0),
-          fat: Math.round((nutData.fat ? nutData.fat.value : 0) || 0)
+          fat: Math.round((nutData.fat ? nutData.fat.value : 0) || 0),
+          source: 'estimate'
         };
         await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n2) });
         setNutrition(n2);
@@ -208,6 +249,8 @@ export default function RecipeDetailPage() {
           protein: result.perServing.protein,
           carbs: result.perServing.carbs,
           fat: result.perServing.fat,
+          source: 'estimate',
+          servings: servingCount,
         };
         await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
         setNutrition(n);
@@ -224,8 +267,9 @@ export default function RecipeDetailPage() {
 
   var handleSaveManualNutrition = async function() {
     try {
-      await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(manualNutrition) });
-      setNutrition(manualNutrition);
+      var mn = Object.assign({}, manualNutrition, { source: 'manual', servings: Number(recipe.servings) || null });
+      await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(mn) });
+      setNutrition(mn);
     } catch (err) {
       console.error('Save nutrition error:', err);
     }
@@ -538,7 +582,12 @@ export default function RecipeDetailPage() {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="px-5 py-4 border-b border-gray-100">
                     <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Nutrition Facts</h3>
-                    <p className="text-xs text-gray-400">Per serving</p>
+                    <p className="text-xs text-gray-400">
+                      Per serving
+                      {nutrition.source === 'recipe' && ' · from the recipe'}
+                      {nutrition.source === 'estimate' && ' · estimated from ingredients'}
+                      {nutrition.source === 'manual' && ' · entered by you'}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4 p-5">
                     <div className="text-center bg-green-50 rounded-xl py-3">
