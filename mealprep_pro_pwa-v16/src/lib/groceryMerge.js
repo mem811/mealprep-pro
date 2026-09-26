@@ -147,3 +147,96 @@ export function finalizeGroceryItems(map) {
     };
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// Aisle sorting
+// Same categories the pages already show. Specific phrases are checked
+// first ("peanut butter", "tomato paste"), then the last word of the
+// name — the thing it actually IS ("chicken BROTH", "cheddar CHEESE") —
+// then any other word, matched as whole words so "eggplant" isn't "egg".
+// ─────────────────────────────────────────────────────────────
+
+var PHRASES = [
+  // Pantry items that name a fresh or dairy food
+  ['peanut butter', 'Pantry'], ['almond butter', 'Pantry'], ['nut butter', 'Pantry'], ['apple butter', 'Pantry'],
+  ['coconut milk', 'Pantry'], ['coconut cream', 'Pantry'], ['evaporated milk', 'Pantry'], ['condensed milk', 'Pantry'],
+  ['cream of', 'Pantry'], ['egg noodle', 'Pantry'], ['bread crumb', 'Pantry'], ['breadcrumb', 'Pantry'], ['panko', 'Pantry'],
+  ['tomato paste', 'Pantry'], ['tomato sauce', 'Pantry'], ['canned tomato', 'Pantry'], ['diced tomato', 'Pantry'],
+  ['crushed tomato', 'Pantry'], ['sun-dried tomato', 'Pantry'], ['sun dried tomato', 'Pantry'], ['marinara', 'Pantry'],
+  ['chicken broth', 'Pantry'], ['beef broth', 'Pantry'], ['vegetable broth', 'Pantry'], ['bone broth', 'Pantry'],
+  ['chicken stock', 'Pantry'], ['beef stock', 'Pantry'], ['vegetable stock', 'Pantry'], ['bouillon', 'Pantry'],
+  ['canned tuna', 'Pantry'], ['canned chicken', 'Pantry'], ['pumpkin puree', 'Pantry'], ['canned pumpkin', 'Pantry'],
+  ['lemon juice', 'Produce'], ['lime juice', 'Produce'],
+  // Spices that name a vegetable
+  ['garlic powder', 'Spices'], ['onion powder', 'Spices'], ['chili powder', 'Spices'], ['curry powder', 'Spices'],
+  ['black pepper', 'Spices'], ['white pepper', 'Spices'], ['cayenne pepper', 'Spices'], ['red pepper flake', 'Spices'],
+  ['pepper flake', 'Spices'], ['chili flake', 'Spices'], ['garlic salt', 'Spices'], ['onion flake', 'Spices'],
+  ['dried basil', 'Spices'], ['dried oregano', 'Spices'], ['dried thyme', 'Spices'], ['dried parsley', 'Spices'],
+  ['dried rosemary', 'Spices'], ['dried dill', 'Spices'], ['bay leaf', 'Spices'], ['italian seasoning', 'Spices'],
+  ['taco seasoning', 'Spices'], ['ground ginger', 'Spices'], ['ground cinnamon', 'Spices'],
+  // Fresh peppers aren't the spice
+  ['bell pepper', 'Produce'], ['jalapeno', 'Produce'], ['jalapeño', 'Produce'], ['poblano', 'Produce'],
+  ['serrano', 'Produce'], ['habanero', 'Produce'], ['garlic clove', 'Produce'], ['green onion', 'Produce'],
+  ['sweet potato', 'Produce'], ['spaghetti squash', 'Produce'], ['butternut squash', 'Produce'],
+  // Dairy phrases
+  ['cream cheese', 'Dairy'], ['sour cream', 'Dairy'], ['heavy cream', 'Dairy'], ['whipping cream', 'Dairy'],
+  ['half and half', 'Dairy'], ['half-and-half', 'Dairy'], ['egg white', 'Dairy'], ['egg yolk', 'Dairy'],
+  ['greek yogurt', 'Dairy'], ['cottage cheese', 'Dairy'],
+  // Baking
+  ['baking powder', 'Baking'], ['baking soda', 'Baking'], ['chocolate chip', 'Baking'], ['cocoa powder', 'Baking'],
+  ['vanilla extract', 'Baking'], ['corn starch', 'Baking'], ['cornstarch', 'Baking'],
+  // Oils and sauces
+  ['olive oil', 'Pantry'], ['cooking spray', 'Pantry'], ['soy sauce', 'Pantry'], ['hot sauce', 'Pantry'],
+  ['worcestershire', 'Pantry'], ['maple syrup', 'Pantry'],
+];
+
+var WORDS = {
+  Produce: 'onion shallot leek scallion garlic tomato lettuce spinach kale arugula chard carrot potato avocado lemon lime orange grapefruit apple banana pear peach plum mango pineapple berry strawberry blueberry raspberry blackberry cherry grape melon watermelon cantaloupe celery cucumber zucchini squash broccoli cauliflower cabbage brussels mushroom ginger cilantro parsley basil mint dill rosemary sage chive corn pea asparagus radish beet eggplant pumpkin okra artichoke fennel jicama sprout greens herb salad',
+  Protein: 'chicken beef pork turkey bacon sausage ham steak lamb veal bison shrimp prawn fish salmon tuna cod tilapia halibut trout scallop crab lobster tofu tempeh seitan prosciutto pancetta chorizo pepperoni salami meatball breast thigh drumstick wing tenderloin sirloin brisket rib chop',
+  Dairy: 'butter milk cream cheese cheddar mozzarella parmesan parmigiano pecorino ricotta feta gouda provolone brie gruyere mascarpone yogurt egg buttermilk ghee kefir',
+  Baking: 'flour sugar yeast extract cocoa chocolate sprinkle molasses gelatin',
+  Spices: 'salt pepper peppercorn cinnamon paprika cumin oregano thyme nutmeg turmeric cayenne seasoning allspice cardamom coriander clove',
+  Pantry: 'oil vinegar sauce broth stock rice pasta macaroni spaghetti penne rigatoni fettuccine linguine lasagna noodle orzo couscous quinoa oat oatmeal barley bread bun roll bagel tortilla pita cracker cereal granola bean lentil chickpea honey syrup ketchup mustard mayonnaise mayo salsa soup nut almond walnut pecan cashew pistachio peanut seed raisin coffee tea wine jam jelly paste',
+};
+
+var WORD_CATEGORY = {};
+Object.keys(WORDS).forEach(function(cat) {
+  WORDS[cat].split(' ').forEach(function(w) { WORD_CATEGORY[w] = cat; });
+});
+
+// Size and prep words say nothing about the aisle
+var FILLER = /\b(fresh|freshly|frozen|large|medium|small|extra|virgin|chopped|diced|minced|sliced|grated|shredded|cubed|crumbled|ground|whole|boneless|skinless|raw|cooked|organic|unsalted|salted|sharp|mild|low|fat|free|reduced|sodium|lean|ripe|finely|roughly|thinly|packed|softened|melted|divided|optional|about|plus|more|for|to|taste|and|or|of|the|a|an)\b/g;
+
+function singular(w) {
+  if (w.length <= 3 || WORD_CATEGORY[w]) return w;   // "greens", "molasses" stay as-is
+  if (/us$/.test(w)) return w;                          // asparagus, hummus, couscous
+  if (/(lea|hal|loa)ves$/.test(w)) return w.slice(0, -3) + 'f';  // bay leaves -> bay leaf
+  if (/ies$/.test(w)) return w.slice(0, -3) + 'y';
+  if (/(oes|ches|shes|sses|xes)$/.test(w)) return w.slice(0, -2);
+  if (/s$/.test(w) && !/ss$/.test(w)) return w.slice(0, -1);
+  return w;
+}
+
+export function categorizeGroceryItem(name) {
+  var raw = String(name || '').toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')        // drop "(diced)" notes
+    .split(',')[0]                      // "garlic cloves, minced" -> "garlic cloves"
+    .replace(/[^a-z\u00e0-\u00ff\s-]/g, ' ');
+  var words = raw.split(/\s+/).filter(Boolean).map(singular);
+  var text = ' ' + words.join(' ') + ' ';
+
+  // 1. Known phrases, longest first so "cream cheese" beats "cream"
+  var best = null;
+  for (var i = 0; i < PHRASES.length; i++) {
+    var phrase = PHRASES[i][0].split(' ').map(singular).join(' ');
+    if (text.indexOf(' ' + phrase + ' ') !== -1 && (!best || phrase.length > best[0].length)) best = [phrase, PHRASES[i][1]];
+  }
+  if (best) return best[1];
+
+  // 2. The last meaningful word is what the food is
+  var core = words.join(' ').replace(FILLER, ' ').split(/\s+/).filter(Boolean);
+  for (var j = core.length - 1; j >= 0; j--) {
+    if (WORD_CATEGORY[core[j]]) return WORD_CATEGORY[core[j]];
+  }
+  return 'Other';
+}
