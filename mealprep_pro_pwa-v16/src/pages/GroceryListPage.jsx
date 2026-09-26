@@ -2,34 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import pb from '../lib/pb';
-import { addGroceryIngredient, finalizeGroceryItems } from '../lib/groceryMerge';
-
-var CATEGORY_MAP = {
-  'flour': 'Baking', 'sugar': 'Baking', 'granulated sugar': 'Baking', 'powdered sugar': 'Baking',
-  'brown sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'cornstarch': 'Baking',
-  'vanilla extract': 'Baking', 'cocoa powder': 'Baking', 'chocolate chips': 'Baking', 'yeast': 'Baking',
-  'butter': 'Dairy', 'milk': 'Dairy', 'cream': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy',
-  'sour cream': 'Dairy', 'cream cheese': 'Dairy', 'buttermilk': 'Dairy', 'heavy cream': 'Dairy',
-  'egg': 'Dairy', 'eggs': 'Dairy',
-  'chicken': 'Protein', 'beef': 'Protein', 'pork': 'Protein', 'shrimp': 'Protein', 'fish': 'Protein',
-  'salmon': 'Protein', 'turkey': 'Protein', 'bacon': 'Protein', 'sausage': 'Protein', 'tofu': 'Protein',
-  'onion': 'Produce', 'garlic': 'Produce', 'tomato': 'Produce', 'tomatoes': 'Produce',
-  'lettuce': 'Produce', 'spinach': 'Produce', 'carrot': 'Produce', 'carrots': 'Produce',
-  'potato': 'Produce', 'potatoes': 'Produce', 'avocado': 'Produce', 'lemon': 'Produce',
-  'lime': 'Produce', 'bell pepper': 'Produce', 'celery': 'Produce', 'cucumber': 'Produce',
-  'broccoli': 'Produce', 'mushrooms': 'Produce', 'ginger': 'Produce', 'cilantro': 'Produce',
-  'parsley': 'Produce', 'basil': 'Produce', 'green onion': 'Produce',
-  'salt': 'Spices', 'pepper': 'Spices', 'cinnamon': 'Spices', 'paprika': 'Spices',
-  'cumin': 'Spices', 'oregano': 'Spices', 'thyme': 'Spices', 'nutmeg': 'Spices',
-  'chili powder': 'Spices', 'cayenne': 'Spices', 'turmeric': 'Spices', 'bay leaf': 'Spices',
-  'ground cinnamon': 'Spices', 'ground nutmeg': 'Spices', 'garlic powder': 'Spices',
-  'onion powder': 'Spices', 'red pepper flakes': 'Spices', 'black pepper': 'Spices',
-  'olive oil': 'Pantry', 'vegetable oil': 'Pantry', 'soy sauce': 'Pantry', 'vinegar': 'Pantry',
-  'honey': 'Pantry', 'maple syrup': 'Pantry', 'rice': 'Pantry', 'pasta': 'Pantry',
-  'bread': 'Pantry', 'tortillas': 'Pantry', 'broth': 'Pantry', 'stock': 'Pantry',
-  'coconut milk': 'Pantry', 'canned tomatoes': 'Pantry', 'tomato paste': 'Pantry',
-  'peanut butter': 'Pantry', 'almond butter': 'Pantry'
-};
+import { addGroceryIngredient, finalizeGroceryItems, categorizeGroceryItem } from '../lib/groceryMerge';
 
 var CATEGORY_ICONS = {
   'Produce': '🥬',
@@ -43,14 +16,6 @@ var CATEGORY_ICONS = {
 
 var CATEGORY_ORDER = ['Produce', 'Protein', 'Dairy', 'Baking', 'Spices', 'Pantry', 'Other'];
 
-function categorizeItem(name) {
-  var lower = name.toLowerCase().trim();
-  if (CATEGORY_MAP[lower]) return CATEGORY_MAP[lower];
-  for (var keyword in CATEGORY_MAP) {
-    if (lower.includes(keyword) || keyword.includes(lower)) return CATEGORY_MAP[keyword];
-  }
-  return 'Other';
-}
 
 function getWeekDays(baseDate) {
   var day = baseDate.getDay();
@@ -132,7 +97,7 @@ export default function GroceryListPage() {
           ingList = recipe.ingredients;
         }
         for (var ing of ingList) {
-          addGroceryIngredient(itemMap, ing, multiplier, categorizeItem);
+          addGroceryIngredient(itemMap, ing, multiplier, categorizeGroceryItem);
         }
       }
 
