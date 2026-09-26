@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import pb from "../lib/pb";
+import { addGroceryIngredient, finalizeGroceryItems } from "../lib/groceryMerge";
 import RecipePickerModal from "../components/RecipePickerModal";
 import { createFoodLogEntry } from "../lib/foodLog";
 import { Plus, ChevronLeft, ChevronRight, X, Utensils } from "lucide-react";
@@ -224,11 +225,7 @@ export default function HomePage() {
 					if (typeof recipe.ingredients==="string"){try{ingList=JSON.parse(recipe.ingredients);}catch{ingList=[];}} 
 					else if (Array.isArray(recipe.ingredients)){ingList=recipe.ingredients;}
 					for (var ing of ingList) {
-						if (!ing?.name?.trim()) continue;
-						var ingKey=ing.name.toLowerCase().trim();
-						var qty=(parseFloat(ing.quantity)||0)*multiplier;
-						if (itemMap.has(ingKey)){itemMap.get(ingKey).qty+=qty;}
-						else{itemMap.set(ingKey,{name:ing.name.trim(),qty,unit:ing.unit||"",category:categorizeItem(ing.name)});}
+						addGroceryIngredient(itemMap, ing, multiplier, categorizeItem);
 					}
 				}
 				try{
@@ -237,7 +234,7 @@ export default function HomePage() {
 					for(var c of checksRes.items){savedChecks[c.item_key]=c.checked;}
 					setCheckedItems(savedChecks);
 				}catch{}
-				var allItems=Array.from(itemMap.values());
+				var allItems=finalizeGroceryItems(itemMap);
 				var grouped={};
 				for(var item of allItems){if(!grouped[item.category])grouped[item.category]=[];grouped[item.category].push(item);}
 				var sorted=[];
@@ -579,7 +576,7 @@ export default function HomePage() {
 																	{checkedItems[checkKey]&&(<svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>)}
 																</div>
 																<span className={"flex-1 text-xs transition-colors "+(checkedItems[checkKey]?"line-through text-gray-300":"text-gray-700")}>{item.name}</span>
-																{item.qty>0&&<span className={"text-xs flex-shrink-0 "+(checkedItems[checkKey]?"text-gray-300":"text-gray-400")}>{parseFloat(item.qty.toFixed(1))} {item.unit}</span>}
+																{item.amount&&<span className={"text-xs flex-shrink-0 "+(checkedItems[checkKey]?"text-gray-300":"text-gray-400")}>{item.amount}</span>}
 															</li>);
 														})}
 													</ul>
