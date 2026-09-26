@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import pb from '../lib/pb';
 
 var CATEGORY_MAP = {
@@ -65,15 +67,46 @@ function fmt(d) {
   return d.toISOString().split('T')[0];
 }
 
+// "2026-09-28" -> that date at local midnight (a bare date string would be
+// read as UTC midnight, which is the previous evening in US time zones)
+function parseWeekParam(value) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  if (!m) return null;
+  var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function shortDate(d) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export default function GroceryListPage() {
   var [groceryGroups, setGroceryGroups] = useState([]);
   var [checkedItems, setCheckedItems] = useState({});
   var [loading, setLoading] = useState(true);
   var [collapsedCats, setCollapsedCats] = useState({});
 
-  var weekDays = useMemo(function() { return getWeekDays(new Date()); }, []);
+  // Which week to show: ?week=YYYY-MM-DD (sent by the planner's "See all"),
+  // otherwise the current week. Kept in the address so a refresh stays put.
+  var [searchParams, setSearchParams] = useSearchParams();
+  var weekParam = searchParams.get('week') || '';
+  var weekDays = useMemo(function() {
+    return getWeekDays(parseWeekParam(weekParam) || new Date());
+  }, [weekParam]);
   var weekStart = fmt(weekDays[0]);
   var weekEnd = fmt(weekDays[6]);
+
+  var thisWeekStart = fmt(getWeekDays(new Date())[0]);
+  var weekOffset = Math.round((weekDays[0] - getWeekDays(new Date())[0]) / (7 * 24 * 60 * 60 * 1000));
+  var weekName = weekOffset === 0 ? 'This week' : weekOffset === 1 ? 'Next week' : weekOffset === -1 ? 'Last week' : null;
+  var weekRange = shortDate(weekDays[0]) + ' – ' + shortDate(weekDays[6]);
+
+  function shiftWeek(n) {
+    var d = new Date(weekDays[0]);
+    d.setDate(d.getDate() + 7 * n);
+    var target = fmt(d);
+    setSearchParams(target === thisWeekStart ? {} : { week: target });
+  }
 
   async function fetchGrocery() {
     try {
@@ -216,7 +249,34 @@ export default function GroceryListPage() {
           {'\u{1F504}'} Refresh
         </button>
       </div>
-      <p className="text-sm text-gray-500 mb-6">From this week's meal plan</p>
+      <div className="flex items-center justify-between gap-3 mt-3 mb-6">
+        <button
+          onClick={function() { shiftWeek(-1); }}
+          aria-label="Previous week"
+          className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-gray-800">{weekName || weekRange}</p>
+          {weekName && <p className="text-xs text-gray-500">{weekRange}</p>}
+          {weekOffset !== 0 && (
+            <button
+              onClick={function() { setSearchParams({}); }}
+              className="text-xs text-green-600 font-medium hover:underline mt-0.5"
+            >
+              Back to this week
+            </button>
+          )}
+        </div>
+        <button
+          onClick={function() { shiftWeek(1); }}
+          aria-label="Next week"
+          className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
 
       <div className="border border-gray-200 rounded-lg p-4 mb-6">
         <div className="flex justify-between text-sm mb-2">
