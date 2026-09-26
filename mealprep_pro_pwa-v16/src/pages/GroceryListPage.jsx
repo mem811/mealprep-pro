@@ -1,430 +1,149 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Printer } from 'lucide-react';
-import pb from '../lib/pb';
+// ─────────────────────────────────────────────────────────────
+// Combining ingredients for the grocery list.
+// Used by both the Grocery List page and the planner's shopping sidebar
+// so they always show the same amounts.
+//
+// Amounts are only added together when they can really be converted:
+// cups/tbsp/tsp combine, lb/oz/g combine, counts combine. Anything else
+// is listed side by side ("3 cloves + 1 tsp") rather than mis-added.
+// ─────────────────────────────────────────────────────────────
 
-var CATEGORY_MAP = {
-  'flour': 'Baking', 'sugar': 'Baking', 'granulated sugar': 'Baking', 'powdered sugar': 'Baking',
-  'brown sugar': 'Baking', 'baking powder': 'Baking', 'baking soda': 'Baking', 'cornstarch': 'Baking',
-  'vanilla extract': 'Baking', 'cocoa powder': 'Baking', 'chocolate chips': 'Baking', 'yeast': 'Baking',
-  'butter': 'Dairy', 'milk': 'Dairy', 'cream': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy',
-  'sour cream': 'Dairy', 'cream cheese': 'Dairy', 'buttermilk': 'Dairy', 'heavy cream': 'Dairy',
-  'egg': 'Dairy', 'eggs': 'Dairy',
-  'chicken': 'Protein', 'beef': 'Protein', 'pork': 'Protein', 'shrimp': 'Protein', 'fish': 'Protein',
-  'salmon': 'Protein', 'turkey': 'Protein', 'bacon': 'Protein', 'sausage': 'Protein', 'tofu': 'Protein',
-  'onion': 'Produce', 'garlic': 'Produce', 'tomato': 'Produce', 'tomatoes': 'Produce',
-  'lettuce': 'Produce', 'spinach': 'Produce', 'carrot': 'Produce', 'carrots': 'Produce',
-  'potato': 'Produce', 'potatoes': 'Produce', 'avocado': 'Produce', 'lemon': 'Produce',
-  'lime': 'Produce', 'bell pepper': 'Produce', 'celery': 'Produce', 'cucumber': 'Produce',
-  'broccoli': 'Produce', 'mushrooms': 'Produce', 'ginger': 'Produce', 'cilantro': 'Produce',
-  'parsley': 'Produce', 'basil': 'Produce', 'green onion': 'Produce',
-  'salt': 'Spices', 'pepper': 'Spices', 'cinnamon': 'Spices', 'paprika': 'Spices',
-  'cumin': 'Spices', 'oregano': 'Spices', 'thyme': 'Spices', 'nutmeg': 'Spices',
-  'chili powder': 'Spices', 'cayenne': 'Spices', 'turmeric': 'Spices', 'bay leaf': 'Spices',
-  'ground cinnamon': 'Spices', 'ground nutmeg': 'Spices', 'garlic powder': 'Spices',
-  'onion powder': 'Spices', 'red pepper flakes': 'Spices', 'black pepper': 'Spices',
-  'olive oil': 'Pantry', 'vegetable oil': 'Pantry', 'soy sauce': 'Pantry', 'vinegar': 'Pantry',
-  'honey': 'Pantry', 'maple syrup': 'Pantry', 'rice': 'Pantry', 'pasta': 'Pantry',
-  'bread': 'Pantry', 'tortillas': 'Pantry', 'broth': 'Pantry', 'stock': 'Pantry',
-  'coconut milk': 'Pantry', 'canned tomatoes': 'Pantry', 'tomato paste': 'Pantry',
-  'peanut butter': 'Pantry', 'almond butter': 'Pantry'
+var VOLUME_ML = { tsp: 4.92892, tbsp: 14.7868, cup: 236.588, 'fl oz': 29.5735, ml: 1, l: 1000 };
+var WEIGHT_G = { g: 1, kg: 1000, oz: 28.3495, lb: 453.592 };
+var METRIC = { ml: 1, l: 1, g: 1, kg: 1 };
+
+var ALIASES = {
+  teaspoon: 'tsp', teaspoons: 'tsp', tsps: 'tsp', t: 'tsp',
+  tablespoon: 'tbsp', tablespoons: 'tbsp', tbsps: 'tbsp', tbs: 'tbsp', tbl: 'tbsp', T: 'tbsp',
+  cups: 'cup', c: 'cup',
+  'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz', 'fl. oz': 'fl oz', floz: 'fl oz',
+  milliliter: 'ml', milliliters: 'ml', millilitre: 'ml', millilitres: 'ml',
+  liter: 'l', liters: 'l', litre: 'l', litres: 'l',
+  gram: 'g', grams: 'g', kilogram: 'kg', kilograms: 'kg',
+  ounce: 'oz', ounces: 'oz', pound: 'lb', pounds: 'lb', lbs: 'lb',
+  pieces: 'piece', pcs: 'piece', pc: 'piece', each: 'piece', whole: 'piece',
+  cloves: 'clove', slices: 'slice', cans: 'can', bunches: 'bunch',
+  packages: 'package', pkg: 'package', packet: 'package', packets: 'package',
+  pinches: 'pinch', sticks: 'stick', heads: 'head', stalks: 'stalk',
 };
 
-var CATEGORY_ICONS = {
-  'Produce': '🥬',
-  'Protein': '🥩',
-  'Dairy': '🥛',
-  'Baking': '🧁',
-  'Spices': '🧂',
-  'Pantry': '🫙',
-  'Other': '📦'
-};
-
-var CATEGORY_ORDER = ['Produce', 'Protein', 'Dairy', 'Baking', 'Spices', 'Pantry', 'Other'];
-
-function categorizeItem(name) {
-  var lower = name.toLowerCase().trim();
-  if (CATEGORY_MAP[lower]) return CATEGORY_MAP[lower];
-  for (var keyword in CATEGORY_MAP) {
-    if (lower.includes(keyword) || keyword.includes(lower)) return CATEGORY_MAP[keyword];
-  }
-  return 'Other';
+export function normalizeGroceryUnit(unit) {
+  var u = String(unit || '').trim();
+  if (!u) return 'piece';
+  if (ALIASES[u]) return ALIASES[u];
+  var lower = u.toLowerCase().replace(/\.$/, '');
+  return ALIASES[lower] || lower;
 }
 
-function getWeekDays(baseDate) {
-  var day = baseDate.getDay();
-  var monday = new Date(baseDate);
-  monday.setDate(baseDate.getDate() - ((day + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
-  return Array.from({ length: 7 }, function(_, i) {
-    var d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
+function familyOf(unit) {
+  if (VOLUME_ML[unit]) return 'volume';
+  if (WEIGHT_G[unit]) return 'weight';
+  return 'each:' + unit; // counts only combine with the same kind of count
+}
+
+/** Add one recipe ingredient (already scaled by multiplier) into the map. */
+export function addGroceryIngredient(map, ing, multiplier, categorize) {
+  if (!ing || !ing.name || !String(ing.name).trim()) return;
+  var name = String(ing.name).trim();
+  var key = name.toLowerCase();
+  var qty = (parseFloat(ing.quantity) || 0) * (Number(multiplier) || 1);
+  var unit = normalizeGroceryUnit(ing.unit);
+
+  var item = map.get(key);
+  if (!item) {
+    item = { name: name, category: categorize ? categorize(name) : 'Other', parts: {}, order: [] };
+    map.set(key, item);
+  }
+  if (!(qty > 0) || unit === 'to taste') return; // "salt to taste": listed, no amount
+
+  var fam = familyOf(unit);
+  var part = item.parts[fam];
+  if (!part) {
+    part = { base: 0, units: {}, firstUnit: unit, entries: 0 };
+    item.parts[fam] = part;
+    item.order.push(fam);
+  }
+  var factor = fam === 'volume' ? VOLUME_ML[unit] : fam === 'weight' ? WEIGHT_G[unit] : 1;
+  part.base += qty * factor;
+  part.entries += 1;
+  part.units[unit] = (part.units[unit] || 0) + qty;
+}
+
+// ── Display ──────────────────────────────────────────────────
+
+var FRACTIONS = [[0, ''], [0.25, '¼'], [1 / 3, '⅓'], [0.5, '½'], [2 / 3, '⅔'], [0.75, '¾'], [1, '']];
+
+function niceNumber(n) {
+  var whole = Math.floor(n);
+  var rest = n - whole;
+  for (var i = 0; i < FRACTIONS.length; i++) {
+    if (Math.abs(rest - FRACTIONS[i][0]) < 0.04) {
+      var w = FRACTIONS[i][0] === 1 ? whole + 1 : whole;
+      var glyph = FRACTIONS[i][1];
+      if (!glyph) return String(w);
+      return w ? w + ' ' + glyph : glyph;
+    }
+  }
+  return String(Math.round(n * 10) / 10);
+}
+
+// Round a combined total UP to something you can actually buy/measure
+function roundUpForShopping(n, step) {
+  return Math.ceil(n / step - 0.02) * step;
+}
+
+// Smallest quarter or third at or above n: 0.66 -> 2/3, 2.08 -> 2 1/4
+function niceCeil(n) {
+  var quarters = Math.ceil(n * 4 - 0.08) / 4;
+  var thirds = Math.ceil(n * 3 - 0.06) / 3;
+  return Math.min(quarters, thirds);
+}
+
+var PLURALS = { cup: 'cups', clove: 'cloves', slice: 'slices', can: 'cans', bunch: 'bunches', package: 'packages', pinch: 'pinches', stick: 'sticks', head: 'heads', stalk: 'stalks' };
+
+function withUnit(n, unit) {
+  if (unit === 'piece') return niceNumber(n);
+  var label = n > 1.01 && PLURALS[unit] ? PLURALS[unit] : unit;
+  return niceNumber(n) + ' ' + label;
+}
+
+function describePart(fam, part) {
+  var unitsUsed = Object.keys(part.units);
+  // An ingredient used once keeps the recipe's own wording ("8 tbsp butter")
+  if (part.entries === 1) return withUnit(part.units[unitsUsed[0]], unitsUsed[0]);
+
+  var allMetric = unitsUsed.every(function(u) { return METRIC[u]; });
+  if (fam === 'volume') {
+    var ml = part.base;
+    if (allMetric) return ml >= 1000 ? withUnit(roundUpForShopping(ml / 1000, 0.25), 'l') : withUnit(roundUpForShopping(ml, 5), 'ml');
+    if (ml >= VOLUME_ML.cup / 4 - 0.5) return withUnit(niceCeil(ml / VOLUME_ML.cup), 'cup');
+    if (ml >= VOLUME_ML.tbsp - 0.2) return withUnit(roundUpForShopping(ml / VOLUME_ML.tbsp, 0.5), 'tbsp');
+    return withUnit(roundUpForShopping(ml / VOLUME_ML.tsp, 0.25), 'tsp');
+  }
+  if (fam === 'weight') {
+    var g = part.base;
+    if (allMetric) return g >= 1000 ? withUnit(roundUpForShopping(g / 1000, 0.25), 'kg') : withUnit(roundUpForShopping(g, 5), 'g');
+    if (g >= WEIGHT_G.lb - 1) return withUnit(roundUpForShopping(g / WEIGHT_G.lb, 0.25), 'lb');
+    return withUnit(roundUpForShopping(g / WEIGHT_G.oz, 1), 'oz');
+  }
+  return withUnit(part.base, part.firstUnit);
+}
+
+/**
+ * Turn the map into display-ready items:
+ *   { name, category, amount: "1 ½ cups" | "3 cloves + 1 tsp" | "", qty, unit }
+ * qty/unit are kept for anything that still reads them.
+ */
+export function finalizeGroceryItems(map) {
+  return Array.from(map.values()).map(function(item) {
+    var pieces = item.order.map(function(fam) { return describePart(fam, item.parts[fam]); });
+    var first = item.order.length ? item.parts[item.order[0]] : null;
+    return {
+      name: item.name,
+      category: item.category,
+      amount: pieces.join(' + '),
+      qty: first ? first.units[first.firstUnit] || 0 : 0,
+      unit: first ? first.firstUnit : '',
+    };
   });
-}
-
-function fmt(d) {
-  return d.toISOString().split('T')[0];
-}
-
-// "2026-09-28" -> that date at local midnight (a bare date string would be
-// read as UTC midnight, which is the previous evening in US time zones)
-function parseWeekParam(value) {
-  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
-  if (!m) return null;
-  var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function shortDate(d) {
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-export default function GroceryListPage() {
-  var [groceryGroups, setGroceryGroups] = useState([]);
-  var [checkedItems, setCheckedItems] = useState({});
-  var [loading, setLoading] = useState(true);
-  var [collapsedCats, setCollapsedCats] = useState({});
-
-  // Which week to show: ?week=YYYY-MM-DD (sent by the planner's "See all"),
-  // otherwise the current week. Kept in the address so a refresh stays put.
-  var [searchParams, setSearchParams] = useSearchParams();
-  var weekParam = searchParams.get('week') || '';
-  var weekDays = useMemo(function() {
-    return getWeekDays(parseWeekParam(weekParam) || new Date());
-  }, [weekParam]);
-  var weekStart = fmt(weekDays[0]);
-  var weekEnd = fmt(weekDays[6]);
-
-  var thisWeekStart = fmt(getWeekDays(new Date())[0]);
-  var weekOffset = Math.round((weekDays[0] - getWeekDays(new Date())[0]) / (7 * 24 * 60 * 60 * 1000));
-  var weekName = weekOffset === 0 ? 'This week' : weekOffset === 1 ? 'Next week' : weekOffset === -1 ? 'Last week' : null;
-  var weekRange = shortDate(weekDays[0]) + ' – ' + shortDate(weekDays[6]);
-
-  function shiftWeek(n) {
-    var d = new Date(weekDays[0]);
-    d.setDate(d.getDate() + 7 * n);
-    var target = fmt(d);
-    setSearchParams(target === thisWeekStart ? {} : { week: target });
-  }
-
-  async function fetchGrocery() {
-    try {
-      setLoading(true);
-      var userId = pb.authStore.model?.id;
-      if (!userId) return;
-
-      var res = await pb.collection('meal_slots').getList(1, 200, {
-        filter: 'meal_plan.user = "' + userId + '" && date >= "' + weekStart + '" && date <= "' + weekEnd + '"',
-        expand: 'recipe'
-      });
-
-      var itemMap = new Map();
-      for (var slot of res.items) {
-        var recipe = slot.expand?.recipe;
-        if (!recipe) continue;
-        var multiplier = slot.servings_multiplier || 1;
-        var ingList = [];
-        if (typeof recipe.ingredients === 'string') {
-          try { ingList = JSON.parse(recipe.ingredients); } catch (err) { ingList = []; }
-        } else if (Array.isArray(recipe.ingredients)) {
-          ingList = recipe.ingredients;
-        }
-        for (var ing of ingList) {
-          if (!ing.name?.trim()) continue;
-          var ingKey = ing.name.toLowerCase().trim();
-          var qty = (parseFloat(ing.quantity) || 0) * multiplier;
-          if (itemMap.has(ingKey)) {
-            itemMap.get(ingKey).qty += qty;
-          } else {
-            itemMap.set(ingKey, {
-              name: ing.name.trim(),
-              qty: qty,
-              unit: ing.unit || '',
-              category: categorizeItem(ing.name)
-            });
-          }
-        }
-      }
-
-      try {
-        var checksRes = await pb.collection('grocery_checks').getList(1, 200, {
-          filter: 'user = "' + userId + '" && week_start = "' + weekStart + '"'
-        });
-        var savedChecks = {};
-        for (var c of checksRes.items) {
-          savedChecks[c.item_key] = c.checked;
-        }
-        setCheckedItems(savedChecks);
-      } catch (err) {
-        console.log('No saved checks found');
-      }
-
-      var allItems = Array.from(itemMap.values());
-      var grouped = {};
-      for (var item of allItems) {
-        if (!grouped[item.category]) grouped[item.category] = [];
-        grouped[item.category].push(item);
-      }
-      var sorted = [];
-      for (var cat of CATEGORY_ORDER) {
-        if (grouped[cat]) {
-          grouped[cat].sort(function(a, b) { return a.name.localeCompare(b.name); });
-          sorted.push({ category: cat, icon: CATEGORY_ICONS[cat], items: grouped[cat] });
-        }
-      }
-      setGroceryGroups(sorted);
-    } catch (err) {
-      console.error('Grocery fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(function() {
-    fetchGrocery();
-  }, [weekStart, weekEnd]);
-
-  async function toggleCheck(itemKey) {
-    var next = !checkedItems[itemKey];
-    setCheckedItems(function(prev) {
-      var copy = Object.assign({}, prev);
-      copy[itemKey] = next;
-      return copy;
-    });
-    try {
-      var userId = pb.authStore.model?.id;
-      var existing = await pb.collection('grocery_checks').getList(1, 1, {
-        filter: 'user = "' + userId + '" && week_start = "' + weekStart + '" && item_key = "' + itemKey + '"'
-      });
-      if (existing.items.length > 0) {
-        await pb.collection('grocery_checks').update(existing.items[0].id, { checked: next });
-      } else {
-        await pb.collection('grocery_checks').create({
-          user: userId,
-          week_start: weekStart,
-          item_key: itemKey,
-          checked: next
-        });
-      }
-    } catch (err) {
-      console.log('Error saving check: ' + err);
-    }
-  }
-
-  function toggleCategory(cat) {
-    setCollapsedCats(function(prev) {
-      var copy = Object.assign({}, prev);
-      copy[cat] = !prev[cat];
-      return copy;
-    });
-  }
-
-  var totalItems = 0;
-  var totalChecked = 0;
-  for (var g of groceryGroups) {
-    for (var itm of g.items) {
-      totalItems++;
-      if (checkedItems[itm.name.toLowerCase().trim()]) totalChecked++;
-    }
-  }
-  var pct = totalItems > 0 ? Math.round((totalChecked / totalItems) * 100) : 0;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <div className="print:hidden">
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-bold text-gray-800">Grocery List</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={function() { window.print(); }}
-            disabled={groceryGroups.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Printer size={15} /> Print
-          </button>
-          <button
-            onClick={fetchGrocery}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition"
-          >
-            {'\u{1F504}'} Refresh
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 mt-3 mb-6">
-        <button
-          onClick={function() { shiftWeek(-1); }}
-          aria-label="Previous week"
-          className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <div className="text-center">
-          <p className="text-sm font-semibold text-gray-800">{weekName || weekRange}</p>
-          {weekName && <p className="text-xs text-gray-500">{weekRange}</p>}
-          {weekOffset !== 0 && (
-            <button
-              onClick={function() { setSearchParams({}); }}
-              className="text-xs text-green-600 font-medium hover:underline mt-0.5"
-            >
-              Back to this week
-            </button>
-          )}
-        </div>
-        <button
-          onClick={function() { shiftWeek(1); }}
-          aria-label="Next week"
-          className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
-
-      <div className="border border-gray-200 rounded-lg p-4 mb-6">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-600">{totalChecked + ' of ' + totalItems + ' items checked'}</span>
-          <span className="text-green-600 font-medium">{pct + '%'}</span>
-        </div>
-        <div className="w-full bg-gray-100 rounded-full h-2">
-        <div
-          className="bg-green-500 h-2 rounded-full transition-all"
-          style={ { width: pct + '%' } }
-        ></div>
-        </div>
-      </div>
-
-      {groceryGroups.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-lg mb-1">No items yet</p>
-          <p className="text-sm">Add meals to your planner to generate a grocery list</p>
-        </div>
-      )}
-
-      {groceryGroups.map(function(group) {
-        var isCollapsed = collapsedCats[group.category];
-        return (
-          <div key={group.category} className="border border-gray-200 rounded-lg mb-4 overflow-hidden">
-            <div
-              className="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition"
-              onClick={function() { toggleCategory(group.category); }}
-            >
-              <span className="font-bold text-gray-700">{group.icon + ' ' + group.category}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-green-600">{group.items.length + ' items'}</span>
-                <span className="text-gray-400">{isCollapsed ? '\u25B8' : '\u25BE'}</span>
-              </div>
-            </div>
-            {!isCollapsed && (
-              <ul className="divide-y divide-gray-100">
-                {group.items.map(function(item, i) {
-                  var checkKey = item.name.toLowerCase().trim();
-                  var isChecked = !!checkedItems[checkKey];
-                  return (
-                    <li
-                      key={i}
-                      className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={function() { toggleCheck(checkKey); }}
-                    >
-                      <div className={'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ' + (isChecked ? 'bg-green-500 border-green-500' : 'border-gray-300')}>
-                        {isChecked && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={'flex-1 text-sm transition-colors ' + (isChecked ? 'line-through text-gray-300' : 'text-gray-700')}>
-                        {item.name}
-                      </span>
-                      {item.qty > 0 && (
-                        <span className={'text-xs flex-shrink-0 ' + (isChecked ? 'text-gray-300' : 'text-gray-500')}>
-                          {parseFloat(item.qty.toFixed(1))} {item.unit}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        );
-      })}
-    
-      </div>
-
-      {/* ── Printed shopping list (only visible when printing) ── */}
-      <style>{`
-        @media print {
-          @page { margin: 0.5in; }
-          /* Drop the app's full-screen heights so nothing spills onto a blank page */
-          html, body, #root, #root * { min-height: 0 !important; height: auto !important; }
-          #grocery-print .gp-box { width: 11px !important; height: 11px !important; }
-          body * { visibility: hidden !important; }
-          #grocery-print, #grocery-print * { visibility: visible !important; }
-          #grocery-print { position: absolute; left: 0; top: 0; width: 100%; }
-        }
-      `}</style>
-      {(function() {
-        // Print what's still needed; if everything is checked, print it all
-        var anyLeft = groceryGroups.some(function(g) {
-          return g.items.some(function(it) { return !checkedItems[it.name.toLowerCase().trim()]; });
-        });
-        var skipped = 0;
-        var printGroups = groceryGroups.map(function(g) {
-          var items = g.items.filter(function(it) {
-            var done = !!checkedItems[it.name.toLowerCase().trim()];
-            if (done && anyLeft) { skipped++; return false; }
-            return true;
-          });
-          return { category: g.category, icon: g.icon, items: items };
-        }).filter(function(g) { return g.items.length > 0; });
-        var count = printGroups.reduce(function(n, g) { return n + g.items.length; }, 0);
-
-        return (
-          <div id="grocery-print" className="hidden print:block text-black" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
-            <div style={{ borderBottom: '2px solid #000', paddingBottom: '6px', marginBottom: '14px' }}>
-              <div style={{ fontSize: '22px', fontWeight: 700 }}>Grocery List</div>
-              <div style={{ fontSize: '12px', marginTop: '2px' }}>
-                {(weekName ? weekName + ' · ' : '') + weekRange + ' · ' + count + ' item' + (count === 1 ? '' : 's')}
-                {skipped > 0 && ' · ' + skipped + ' already checked off, not shown'}
-              </div>
-            </div>
-            <div style={{ columnCount: 2, columnGap: '28px' }}>
-              {printGroups.map(function(g) {
-                return (
-                  <div key={g.category} style={{ breakInside: 'avoid', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid #999', paddingBottom: '2px', marginBottom: '4px' }}>
-                      {g.category}
-                    </div>
-                    {g.items.map(function(it, i) {
-                      return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '8px', fontSize: '13px', padding: '3px 0' }}>
-                          <span className="gp-box" style={{ display: 'inline-block', width: '11px', height: '11px', border: '1.5px solid #000', flexShrink: 0, position: 'relative', top: '1px' }}></span>
-                          <span style={{ flex: 1 }}>{it.name}</span>
-                          {it.qty > 0 && (
-                            <span style={{ fontSize: '11px', color: '#444', whiteSpace: 'nowrap' }}>
-                              {parseFloat(it.qty.toFixed(1))}{it.unit && it.unit !== 'piece' ? ' ' + it.unit : ''}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: '18px', fontSize: '10px', color: '#666', textAlign: 'center' }}>MealPrep Pro</div>
-          </div>
-        );
-      })()}
-</div>
-  );
 }
