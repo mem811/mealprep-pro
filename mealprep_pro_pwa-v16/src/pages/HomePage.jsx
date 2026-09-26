@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import pb from "../lib/pb";
 import RecipePickerModal from "../components/RecipePickerModal";
 import { createFoodLogEntry } from "../lib/foodLog";
@@ -562,8 +563,8 @@ export default function HomePage() {
 							<div className="hidden lg:flex flex-col gap-4 w-80 flex-shrink-0 sticky top-6 self-start">
 								<div className="bg-white/70 backdrop-blur rounded-3xl border border-emerald-100/70 shadow-lg shadow-emerald-100/40 overflow-hidden">
 									<div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100/60 bg-white/40">
-										<h3 className="font-bold text-gray-800 text-sm">🛒 This Week's Shopping</h3>
-										<a href="/grocery-list" className="text-xs text-emerald-700 font-semibold hover:underline">See all</a>
+										<h3 className="font-bold text-gray-800 text-sm">{weekStart===fmt(getWeekDays(new Date())[0])?"🛒 This Week's Shopping":"🛒 Shopping · Week of "+weekDays[0].toLocaleDateString("en-US",{month:"short",day:"numeric"})}</h3>
+										<Link to={"/app/grocery-list?week="+weekStart} className="text-xs text-emerald-700 font-semibold hover:underline">See all</Link>
 									</div>
 									{groceryGroups.length===0?(<p className="text-xs text-gray-400 italic p-4">Add meals to generate your list</p>):(
 										<div className="max-h-[520px] overflow-y-auto">
