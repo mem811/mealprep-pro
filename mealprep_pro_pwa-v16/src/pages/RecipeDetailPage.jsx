@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import pb from '../lib/pb';
 import { parseNutritionObject } from '../lib/recipeParse';
-
-const RECIPE_EXTRACT_WEBHOOK = 'https://n8n.srv1052955.hstgr.cloud/webhook/recipe-extract';
+import AddToPlannerModal from '../components/AddToPlannerModal';
 import {
-  ArrowLeft, Bookmark, BookmarkCheck, Pencil, Printer,
+  ArrowLeft, Bookmark, BookmarkCheck, Pencil, Printer, CalendarPlus,
   Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils, Heart, X
 } from 'lucide-react';
+
+const RECIPE_EXTRACT_WEBHOOK = 'https://n8n.srv1052955.hstgr.cloud/webhook/recipe-extract';
 
 const getProxiedImage = (url) => {
   if (!url) return null;
@@ -75,6 +76,7 @@ export default function RecipeDetailPage() {
   var [checkedIngredients, setCheckedIngredients] = useState({});
   var [checkedSteps, setCheckedSteps] = useState({});
   var [servingsMultiplier, setServingsMultiplier] = useState(1);
+  var [plannerOpen, setPlannerOpen] = useState(false);
   var [imgError, setImgError] = useState(false);
 
   // Nutrition state
@@ -354,6 +356,14 @@ export default function RecipeDetailPage() {
             Back
           </button>
           <div className="flex items-center gap-2">
+            <button
+              onClick={function() { setPlannerOpen(true); }}
+              className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add to Planner</span>
+              <span className="sm:hidden">Plan</span>
+            </button>
             <Link
               to={"/recipes/" + id + "/edit"}
               className="flex items-center gap-2 text-gray-500 hover:text-blue-500 border border-gray-200 rounded-xl px-3 py-1.5 text-sm font-medium hover:bg-blue-50 transition-colors"
@@ -746,6 +756,12 @@ export default function RecipeDetailPage() {
         </div>
 
         {/* Delete Confirmation Modal */}
+        <AddToPlannerModal
+          open={plannerOpen}
+          onClose={function() { setPlannerOpen(false); }}
+          recipe={recipe}
+          defaultMultiplier={servingsMultiplier}
+        />
         {showDeleteModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
             <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
