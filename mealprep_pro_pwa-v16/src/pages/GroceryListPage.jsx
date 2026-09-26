@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import pb from '../lib/pb';
 
 var CATEGORY_MAP = {
@@ -240,15 +240,26 @@ export default function GroceryListPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="print:hidden">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold text-gray-800">Grocery List</h1>
-        <button
-          onClick={fetchGrocery}
-          className="flex items-center gap-1 px-3 py-1.5 text-sm border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition"
-        >
-          {'\u{1F504}'} Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={function() { window.print(); }}
+            disabled={groceryGroups.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Printer size={15} /> Print
+          </button>
+          <button
+            onClick={fetchGrocery}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition"
+          >
+            {'\u{1F504}'} Refresh
+          </button>
+        </div>
       </div>
+
       <div className="flex items-center justify-between gap-3 mt-3 mb-6">
         <button
           onClick={function() { shiftWeek(-1); }}
@@ -346,6 +357,74 @@ export default function GroceryListPage() {
           </div>
         );
       })}
-    </div>
+    
+      </div>
+
+      {/* ── Printed shopping list (only visible when printing) ── */}
+      <style>{`
+        @media print {
+          @page { margin: 0.5in; }
+          /* Drop the app's full-screen heights so nothing spills onto a blank page */
+          html, body, #root, #root * { min-height: 0 !important; height: auto !important; }
+          #grocery-print .gp-box { width: 11px !important; height: 11px !important; }
+          body * { visibility: hidden !important; }
+          #grocery-print, #grocery-print * { visibility: visible !important; }
+          #grocery-print { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+      `}</style>
+      {(function() {
+        // Print what's still needed; if everything is checked, print it all
+        var anyLeft = groceryGroups.some(function(g) {
+          return g.items.some(function(it) { return !checkedItems[it.name.toLowerCase().trim()]; });
+        });
+        var skipped = 0;
+        var printGroups = groceryGroups.map(function(g) {
+          var items = g.items.filter(function(it) {
+            var done = !!checkedItems[it.name.toLowerCase().trim()];
+            if (done && anyLeft) { skipped++; return false; }
+            return true;
+          });
+          return { category: g.category, icon: g.icon, items: items };
+        }).filter(function(g) { return g.items.length > 0; });
+        var count = printGroups.reduce(function(n, g) { return n + g.items.length; }, 0);
+
+        return (
+          <div id="grocery-print" className="hidden print:block text-black" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+            <div style={{ borderBottom: '2px solid #000', paddingBottom: '6px', marginBottom: '14px' }}>
+              <div style={{ fontSize: '22px', fontWeight: 700 }}>Grocery List</div>
+              <div style={{ fontSize: '12px', marginTop: '2px' }}>
+                {(weekName ? weekName + ' · ' : '') + weekRange + ' · ' + count + ' item' + (count === 1 ? '' : 's')}
+                {skipped > 0 && ' · ' + skipped + ' already checked off, not shown'}
+              </div>
+            </div>
+            <div style={{ columnCount: 2, columnGap: '28px' }}>
+              {printGroups.map(function(g) {
+                return (
+                  <div key={g.category} style={{ breakInside: 'avoid', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid #999', paddingBottom: '2px', marginBottom: '4px' }}>
+                      {g.category}
+                    </div>
+                    {g.items.map(function(it, i) {
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '8px', fontSize: '13px', padding: '3px 0' }}>
+                          <span className="gp-box" style={{ display: 'inline-block', width: '11px', height: '11px', border: '1.5px solid #000', flexShrink: 0, position: 'relative', top: '1px' }}></span>
+                          <span style={{ flex: 1 }}>{it.name}</span>
+                          {it.qty > 0 && (
+                            <span style={{ fontSize: '11px', color: '#444', whiteSpace: 'nowrap' }}>
+                              {parseFloat(it.qty.toFixed(1))}{it.unit && it.unit !== 'piece' ? ' ' + it.unit : ''}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: '18px', fontSize: '10px', color: '#666', textAlign: 'center' }}>MealPrep Pro</div>
+          </div>
+        );
+      })()}
+</div>
   );
 }
