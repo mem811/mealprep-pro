@@ -4,7 +4,7 @@ import pb from '../lib/pb';
 import { parseNutritionObject } from '../lib/recipeParse';
 import AddToPlannerModal from '../components/AddToPlannerModal';
 import {
-  ArrowLeft, Bookmark, BookmarkCheck, Pencil, Printer, CalendarPlus,
+  ArrowLeft, Pencil, Printer, CalendarPlus,
   Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils, Heart, X
 } from 'lucide-react';
 
@@ -63,6 +63,41 @@ const getWWPoints = (nutrition) => {
   return Math.max(0, Math.round(cal / 50 + fat / 12));
 };
 
+// "0.5" → ½, "1.5" → 1½, "0.333" → ⅓ — reads like a cookbook
+const FRACTIONS = [[0.125, '⅛'], [0.25, '¼'], [0.333, '⅓'], [0.5, '½'], [0.667, '⅔'], [0.75, '¾']];
+
+const parseQty = (q) => {
+  if (q === null || q === undefined || q === '') return NaN;
+  if (typeof q === 'number') return q;
+  var s = String(q).trim();
+  if (/[^\d.\s\/]/.test(s)) return NaN; // things like "2-3" or "a pinch" stay as written
+  var m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (m) return Number(m[1]) + Number(m[2]) / Number(m[3]);
+  m = s.match(/^(\d+)\/(\d+)$/);
+  if (m) return Number(m[1]) / Number(m[2]);
+  return parseFloat(s);
+};
+
+const formatQty = (num) => {
+  var whole = Math.floor(num);
+  var frac = num - whole;
+  if (frac < 0.04) return String(whole);
+  if (frac > 0.96) return String(whole + 1);
+  for (var i = 0; i < FRACTIONS.length; i++) {
+    if (Math.abs(frac - FRACTIONS[i][0]) < 0.04) return (whole ? whole : '') + FRACTIONS[i][1];
+  }
+  return String(parseFloat(num.toFixed(2)));
+};
+
+const formatMinutes = (mins) => {
+  var m = Number(mins);
+  if (!m || m <= 0) return null;
+  if (m < 60) return m + ' min';
+  var h = Math.floor(m / 60);
+  var rest = m % 60;
+  return h + ' hr' + (rest ? ' ' + rest + ' min' : '');
+};
+
 export default function RecipeDetailPage() {
   var { id } = useParams();
   var navigate = useNavigate();
@@ -98,7 +133,8 @@ export default function RecipeDetailPage() {
         setLoading(true);
         var record = await pb.collection('recipes').getOne(id);
         setRecipe(record);
-        setFavorited(record.favorited || false);
+        // Same "favorite" field the My Recipes cards use, so the heart matches everywhere
+        setFavorited(record.favorite || false);
         setNutrition(parseNutrition(record.nutrition));
         setRating(record.rating || 0);
       } catch (e) {
@@ -114,8 +150,8 @@ export default function RecipeDetailPage() {
     if (!recipe) return;
     setFavLoading(true);
     try {
-      var updated = await pb.collection('recipes').update(recipe.id, { favorited: !favorited });
-      setFavorited(updated.favorited);
+      var updated = await pb.collection('recipes').update(recipe.id, { favorite: !favorited });
+      setFavorited(!!updated.favorite);
     } catch (e) {
       console.error(e);
     } finally {
@@ -321,15 +357,14 @@ export default function RecipeDetailPage() {
   var steps = parseInstructions(recipe.instructions);
   var sourceName = getSourceName(recipe.source_url);
   var proxiedImage = getProxiedImage(recipe.image_url);
+  var cookTimeLabel = formatMinutes(recipe.cook_time);
+  var chefNote = recipe.notes || recipe.chef_note || '';
 
   var scaledQty = function(qty) {
-    var num = parseFloat(qty);
+    var num = parseQty(qty);
     if (isNaN(num)) return qty;
-    var result = num * servingsMultiplier;
-    return result % 1 === 0 ? result : parseFloat(result.toFixed(2));
+    return formatQty(num * servingsMultiplier);
   };
-
-  var gradientStyle = { background: 'linear-gradient(135deg, #10b981, #059669)' };
 
   return (
     <>
@@ -369,14 +404,16 @@ export default function RecipeDetailPage() {
               className="flex items-center gap-2 text-gray-500 hover:text-blue-500 border border-gray-200 rounded-xl px-3 py-1.5 text-sm font-medium hover:bg-blue-50 transition-colors"
             >
               <Pencil className="w-4 h-4" />
-              Edit Recipe
+              <span className="hidden sm:inline">Edit Recipe</span>
+              <span className="sm:hidden">Edit</span>
             </Link>
             <button
               onClick={function() { setShowDeleteModal(true); }}
+              aria-label="Delete recipe"
               className="flex items-center gap-2 text-gray-500 hover:text-red-500 border border-gray-200 rounded-xl px-3 py-1.5 text-sm font-medium hover:bg-red-50 transition-colors"
             >
               <X className="w-4 h-4" />
-              Delete
+              <span className="hidden sm:inline">Delete</span>
             </button>
           </div>
         </div>
@@ -402,17 +439,19 @@ export default function RecipeDetailPage() {
                     <ChefHat className="w-20 h-20 text-green-400" />
                   </div>
                 )}
-                <div className="absolute top-3 right-3 flex items-center gap-2">
+                <div className="no-print absolute top-3 right-3 flex items-center gap-2">
                   <button
                     onClick={toggleFavorite}
                     disabled={favLoading}
-                    className={"p-2.5 rounded-full shadow-md transition-all " + (favorited ? 'bg-green-500 text-white' : 'bg-white/90 text-gray-500 hover:text-green-500')}
+                    aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+                    className="w-11 h-11 rounded-full bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center transition-transform hover:scale-110"
                   >
-                    {favorited ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
+                    <Heart className={"w-5 h-5 " + (favorited ? 'text-red-500 fill-red-500' : 'text-gray-500')} />
                   </button>
                   <button
                     onClick={handlePrint}
-                    className="p-2.5 rounded-full bg-white/90 text-gray-500 hover:text-gray-700 shadow-md transition-all"
+                    aria-label="Print recipe"
+                    className="w-11 h-11 rounded-full bg-white/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 shadow-md flex items-center justify-center transition-all"
                   >
                     <Printer className="w-5 h-5" />
                   </button>
@@ -429,7 +468,7 @@ export default function RecipeDetailPage() {
                   <span className="text-sm font-medium text-green-800">
                     {recipe.servings ? recipe.servings * servingsMultiplier : '—'} servings
                   </span>
-                  <div className="flex items-center gap-1 ml-1">
+                  <div className="no-print flex items-center gap-1 ml-1">
                     {[1, 2, 4].map(function(m) {
                       return (
                         <button
@@ -446,6 +485,12 @@ export default function RecipeDetailPage() {
                     })}
                   </div>
                 </div>
+                {cookTimeLabel && (
+                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2">
+                    <Clock className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700 font-medium">{cookTimeLabel}</span>
+                  </div>
+                )}
                 {sourceName && (
                   <a
                     href={recipe.source_url}
@@ -460,8 +505,8 @@ export default function RecipeDetailPage() {
               </div>
 
               {/* Rating */}
-              <div className="flex items-center gap-2 mt-4">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rating</span>
+              <div className="no-print flex items-center gap-2 mt-4">
+                <span className="text-sm font-semibold text-gray-500">Your rating</span>
                 <div className="flex items-center gap-0.5">
                   {[1, 2, 3, 4, 5].map(function(star) {
                     return (
@@ -470,6 +515,7 @@ export default function RecipeDetailPage() {
                         onClick={function() { handleSaveRating(star); }}
                         onMouseEnter={function() { setHoverRating(star); }}
                         onMouseLeave={function() { setHoverRating(0); }}
+                        aria-label={'Rate ' + star + ' out of 5'}
                         className="p-0.5 transition-transform hover:scale-110"
                       >
                         <Star
@@ -519,6 +565,7 @@ export default function RecipeDetailPage() {
                       <ul className="divide-y divide-gray-50">
                         {ingredients.map(function(ing, idx) {
                           var checked = !!checkedIngredients[idx];
+                          var qty = scaledQty(ing.quantity);
                           return (
                             <li
                               key={idx}
@@ -530,9 +577,11 @@ export default function RecipeDetailPage() {
                                 {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                               </div>
                               <span className={"text-sm text-gray-800 flex-1 " + (checked ? 'line-through text-gray-400' : '')}>
-                                <span className="font-semibold text-gray-900">
-                                  {scaledQty(ing.quantity)}{ing.unit ? ' ' + ing.unit : ''}
-                                </span>
+                                {(qty || ing.unit) && (
+                                  <span className="font-semibold text-gray-900">
+                                    {qty}{ing.unit ? ' ' + ing.unit : ''}
+                                  </span>
+                                )}
                                 {' '}
                                 {toTitleCase(ing.name)}
                               </span>
@@ -591,12 +640,12 @@ export default function RecipeDetailPage() {
               {nutrition ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="px-5 py-4 border-b border-gray-100">
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Nutrition Facts</h3>
+                    <h3 className="text-base font-bold text-gray-900">Nutrition facts</h3>
                     <p className="text-xs text-gray-400">
                       Per serving
-                      {nutrition.source === 'recipe' && ' · from the recipe'}
-                      {nutrition.source === 'estimate' && ' · estimated from ingredients'}
-                      {nutrition.source === 'manual' && ' · entered by you'}
+                      {nutrition.source === 'recipe' && ', from the recipe'}
+                      {nutrition.source === 'estimate' && ', estimated from ingredients'}
+                      {nutrition.source === 'manual' && ', entered by you'}
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4 p-5">
@@ -618,34 +667,32 @@ export default function RecipeDetailPage() {
                     </div>
                   </div>
                   {getWWPoints(nutrition) !== null && (
-                    <div className="col-span-2 text-center bg-purple-50 rounded-xl py-3 mx-5 mb-4">
+                    <div className="text-center bg-purple-50 rounded-xl py-3 mx-5 mb-4">
                       <div className="text-xl font-bold text-purple-600">{getWWPoints(nutrition)}</div>
                       <div className="text-xs text-gray-500 mt-0.5">WW Points (est.)</div>
                     </div>
                   )}
-                  <div className="px-5 pb-4">
+                  {/* Nutrition is already filled in, so these are quiet "redo" options */}
+                  <div className="no-print px-5 pb-4 grid grid-cols-2 gap-2">
                     <button
                       onClick={handleFetchNutrition}
                       disabled={fetchingNutrition}
-                      className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-green-600 py-2 rounded-xl font-medium transition-colors border border-gray-200 hover:border-green-300 mb-2"
+                      className="flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-green-600 py-2 rounded-xl font-medium transition-colors border border-gray-200 hover:border-green-300 disabled:opacity-60"
                     >
-                      {fetchingNutrition ? (
-                        <><Loader2 className="w-3 h-3 animate-spin" /> Re-fetching...</>
-                      ) : (
-                        <><Zap className="w-3 h-3" /> Re-fetch Nutrition</>
-                      )}
+                      {fetchingNutrition ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                      Re-fetch
                     </button>
                     <button
                       onClick={handleCalcFromIngredients}
                       disabled={fetchingNutrition}
-                      className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-60"
+                      className="flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 py-2 rounded-xl font-medium transition-colors border border-gray-200 hover:border-blue-300 disabled:opacity-60"
                     >
-                      {fetchingNutrition ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Calculating...</>
-                      ) : (
-                        <><Utensils className="w-4 h-4" /> Calculate from Ingredients</>
-                      )}
+                      {fetchingNutrition ? <Loader2 className="w-3 h-3 animate-spin" /> : <Utensils className="w-3 h-3" />}
+                      Recalculate
                     </button>
+                    {nutritionError && (
+                      <p className="col-span-2 text-red-500 text-xs mt-1 font-medium text-center">{nutritionError}</p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -654,7 +701,8 @@ export default function RecipeDetailPage() {
                     <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                       <Zap className="w-6 h-6 text-green-600" />
                     </div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Nutrition Scanner</h3>
+                    <h3 className="text-base font-bold text-gray-900 mb-1">Nutrition</h3>
+                    <p className="text-xs text-gray-500 mb-4">Pull it from the recipe's website, or calculate it from your ingredients.</p>
                     <button
                       onClick={handleFetchNutrition}
                       disabled={fetchingNutrition}
@@ -663,7 +711,7 @@ export default function RecipeDetailPage() {
                       {fetchingNutrition ? (
                         <><Loader2 size={14} className="animate-spin" /> Fetching...</>
                       ) : (
-                        <><Zap size={14} /> Re-fetch Nutrition</>
+                        <><Zap size={14} /> Get from website</>
                       )}
                     </button>
                     <button
@@ -684,8 +732,8 @@ export default function RecipeDetailPage() {
 
                   {/* Manual Entry */}
                   <div className="px-5 pb-5 border-t border-gray-100 pt-4">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                      <Pencil className="w-3 h-3" /> Manual Entry Fallback
+                    <p className="text-xs font-semibold text-gray-500 mb-3 flex items-center gap-1.5">
+                      <Pencil className="w-3 h-3" /> Or enter it yourself
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -735,15 +783,21 @@ export default function RecipeDetailPage() {
                 </div>
               )}
 
-              {/* Chef's Note */}
-              <div className="bg-green-500 rounded-2xl p-5 text-white shadow-sm">
-                <h3 className="font-bold text-sm flex items-center gap-2 mb-2">
-                  <span className="text-lg">✨</span> Chef's Note
-                </h3>
-                <p className="text-sm leading-relaxed opacity-95 italic">
-                  No chef's note yet. Add one by editing this recipe!
-                </p>
-              </div>
+              {/* Your notes — shows the note if there is one, otherwise a quiet invite */}
+              {chefNote ? (
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-5">
+                  <h3 className="font-bold text-sm text-green-800 mb-2">Your notes</h3>
+                  <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">{chefNote}</p>
+                </div>
+              ) : (
+                <Link
+                  to={"/recipes/" + id + "/edit"}
+                  className="no-print block border-2 border-dashed border-green-200 rounded-2xl p-5 text-center hover:bg-green-50 transition-colors"
+                >
+                  <p className="text-sm font-semibold text-green-700">Add your notes</p>
+                  <p className="text-xs text-gray-500 mt-1">Swaps you made, what the family thought, tips for next time.</p>
+                </Link>
+              )}
 
             </div>
           </div>
@@ -755,13 +809,14 @@ export default function RecipeDetailPage() {
           {sourceName && <p className="text-sm text-gray-500 mt-1">{sourceName}</p>}
         </div>
 
-        {/* Delete Confirmation Modal */}
         <AddToPlannerModal
           open={plannerOpen}
           onClose={function() { setPlannerOpen(false); }}
           recipe={recipe}
           defaultMultiplier={servingsMultiplier}
         />
+
+        {/* Delete Confirmation Modal */}
         {showDeleteModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
             <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
