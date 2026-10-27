@@ -4,7 +4,7 @@ import pb from "../lib/pb";
 import {
   Plus, Search, ListFilter, Filter, Star, X, Utensils, Clock,
   LayoutGrid, Coffee, UtensilsCrossed, Moon, Cake, Salad, Soup,
-  Leaf, Wheat, Dumbbell, Heart, Flame
+  Leaf, Wheat, Dumbbell, Heart, Flame, Users
 } from "lucide-react";
 
 var RECIPE_FILTERS = [
@@ -38,7 +38,7 @@ var SORT_OPTIONS = [
 
 function getProxiedImage(url) {
   if (!url) return null;
-  return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=400&fit=cover&q=80&n=-1";
+  return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=500&fit=cover&q=80&n=-1";
 }
 
 function parseNutrition(n) {
@@ -109,18 +109,18 @@ export default function RecipesPage() {
     fetchRecipes();
   }, []);
 
-      var handleDeleteRecipe = async function () {
-      if (!deleteRecipe) return;
-      try {
-        await pb.collection("recipes").delete(deleteRecipe);
-        setRecipes(function (prev) { return prev.filter(function (r) { return r.id !== deleteRecipe; }); });
-      } catch (e) {
-        console.error("Delete error:", e);
-        alert("Failed to delete recipe.");
-      } finally {
-        setDeleteRecipe(null);
-      }
-    };
+  var handleDeleteRecipe = async function () {
+    if (!deleteRecipe) return;
+    try {
+      await pb.collection("recipes").delete(deleteRecipe);
+      setRecipes(function (prev) { return prev.filter(function (r) { return r.id !== deleteRecipe; }); });
+    } catch (e) {
+      console.error("Delete error:", e);
+      alert("Failed to delete recipe.");
+    } finally {
+      setDeleteRecipe(null);
+    }
+  };
 
   var toggleFavorite = async function (e, recipeId) {
     e.preventDefault(); e.stopPropagation();
@@ -312,64 +312,68 @@ export default function RecipesPage() {
           <p className="text-gray-400 text-sm mt-1">Try adjusting your filters or add a new recipe.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredRecipes.map(function (recipe) {
             var nut = parseNutrition(recipe.nutrition);
             var proxied = getProxiedImage(recipe.image_url);
             var wwPts = getWWPoints(nut);
+            var cal = nut.calories > 0 ? Math.round(nut.calories) : null;
 
             return (
-              <div key={recipe.id} className="group bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden relative flex flex-col">
+              <div key={recipe.id} className="group bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg motion-safe:hover:-translate-y-1 transition-all duration-300 overflow-hidden relative flex flex-col">
 
-                {/* Image — clicking navigates to recipe */}
-                <Link to={"/recipes/" + recipe.id} className="block">
-                  <div className="w-full h-44 bg-emerald-50 relative overflow-hidden">
+                {/* Photo + details — tapping opens the recipe */}
+                <Link to={"/recipes/" + recipe.id} className="flex flex-col flex-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-3xl">
+                  <div className="w-full h-48 bg-emerald-50 relative overflow-hidden">
                     {proxied ? (
-                      <img src={proxied} alt={recipe.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      <img src={proxied} alt={recipe.title} loading="lazy" className="w-full h-full object-cover motion-safe:group-hover:scale-105 transition-transform duration-500" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Utensils size={32} className="text-emerald-300" />
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #ecfdf5, #d1fae5)" }}>
+                        <Utensils size={36} className="text-emerald-400" />
                       </div>
                     )}
+
+                    {/* Soft shade at the bottom so the rating stays readable on any photo */}
+                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 to-transparent pointer-events-none" />
+
                     {/* Favorite */}
-                    <button onClick={function (e) { toggleFavorite(e, recipe.id); }} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm transition-colors z-10 hover:scale-110">
-                      <Heart size={16} className={recipe.favorite ? "text-red-500 fill-red-500" : "text-gray-400"} />
+                    <button onClick={function (e) { toggleFavorite(e, recipe.id); }} aria-label={recipe.favorite ? "Remove from favorites" : "Add to favorites"} className="absolute top-2.5 right-2.5 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm transition-transform z-10 hover:scale-110">
+                      <Heart size={17} className={recipe.favorite ? "text-red-500 fill-red-500" : "text-gray-400"} />
                     </button>
-                    {/* Cook time */}
-                    {recipe.cook_time > 0 && (
-                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs font-bold text-gray-700 px-2 py-1 rounded-full">
-                        <Clock size={12} /> {recipe.cook_time} min
-                      </div>
-                    )}
+
                     {/* Rating */}
                     {recipe.rating > 0 && (
-                      <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm text-xs font-bold text-amber-600 px-2 py-1 rounded-full">
+                      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs font-bold text-amber-600 px-2 py-1 rounded-full">
                         <Star size={12} fill="currentColor" /> {recipe.rating}
-                      </div>
-                    )}
-                    {/* Calorie badge */}
-                    {nut.calories > 0 && (
-                      <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold text-emerald-700 px-2 py-1 rounded-full">
-                        🔥 {Math.round(nut.calories)} cal
                       </div>
                     )}
                   </div>
 
                   {/* Info */}
-                  <div className="p-3 pb-1">
-                    <h3 className="text-sm font-bold text-gray-900 line-clamp-2 mb-1">{recipe.title}</h3>
-                    {recipe.servings && <p className="text-xs text-gray-400">{recipe.servings} servings</p>}
+                  <div className="p-4 pb-2 flex-1">
+                    <h3 className="text-[15px] font-bold text-gray-900 leading-snug line-clamp-2">{recipe.title}</h3>
+                    {recipe.description && (
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-2">{recipe.description}</p>
+                    )}
+
+                    {/* Quick stats */}
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      <StatTile icon={Clock} value={recipe.cook_time > 0 ? recipe.cook_time + " min" : "–"} label="Cook time" />
+                      <StatTile icon={Users} value={recipe.servings ? recipe.servings : "–"} label="Servings" />
+                      <StatTile icon={Flame} value={cal ? cal : "–"} label="Calories" />
+                    </div>
+
                     {nut.protein > 0 && (
-                      <p className="text-[10px] text-gray-400 font-semibold mt-1">
-                        P {Math.round(nut.protein)}g · C {Math.round(nut.carbs || 0)}g · F {Math.round(nut.fat || 0)}g
-                        {wwPts !== null && <span className="text-purple-500"> · {wwPts} WW</span>}
+                      <p className="text-[11px] text-gray-400 font-semibold mt-2.5 text-center">
+                        Protein {Math.round(nut.protein)}g, carbs {Math.round(nut.carbs || 0)}g, fat {Math.round(nut.fat || 0)}g
+                        {wwPts !== null && <span className="text-purple-500">, {wwPts} WW</span>}
                       </p>
                     )}
                   </div>
                 </Link>
 
                 {/* Add to Planner button */}
-                <div className="px-3 pb-3 pt-2 mt-auto">
+                <div className="px-4 pb-4 pt-2 mt-auto">
                   <button
                     onClick={function (e) {
                       e.preventDefault();
@@ -378,51 +382,54 @@ export default function RecipesPage() {
                       setAddToPlannerDay(today);
                       setAddToPlannerMeal("lunch");
                     }}
-                    className="w-full text-[11px] font-bold py-1.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                    style={gradientStyle}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-2xl text-white hover:opacity-90 transition-opacity"
                   >
-                    + Add to Planner
+                    <Plus size={14} /> Add to Planner
                   </button>
                 </div>
 
-                {/* Delete */}
+                {/* Delete (shows on hover, top-left of the photo) */}
                 <button
                   onClick={function (e) { e.preventDefault(); e.stopPropagation(); setDeleteRecipe(recipe.id); }}
-                  className="absolute bottom-10 right-3 w-7 h-7 rounded-full bg-white border border-gray-100 text-gray-400 hidden group-hover:flex items-center justify-center shadow-sm hover:bg-red-50 hover:text-red-500 transition-colors"
+                  aria-label="Delete recipe"
+                  className="absolute top-2.5 left-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-400 hidden group-hover:flex items-center justify-center shadow-sm hover:bg-red-50 hover:text-red-500 transition-colors z-10"
                 >
-                  <X size={14} />
+                  <X size={15} />
                 </button>
               </div>
             );
           })}
         </div>
       )}
-      
-{/* Delete Confirmation Modal */}
-          {deleteRecipe && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <X size={24} className="text-red-500" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Recipe?</h3>
-                <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this recipe? This action cannot be undone.</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={function () { setDeleteRecipe(null); }}
-                    className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-                  >
-                    No, Keep It
-                  </button>
-                  <button
-                    onClick={handleDeleteRecipe}
-                    className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
-                  >
-                    Yes, Delete
-                  </button>
-                </div>
-              </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteRecipe && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <X size={24} className="text-red-500" />
             </div>
-          )}
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Recipe?</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this recipe? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={function () { setDeleteRecipe(null); }}
+                className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                No, Keep It
+              </button>
+              <button
+                onClick={handleDeleteRecipe}
+                className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add to Planner Modal */}
       {addToPlannerRecipe && (
         <AddToPlannerModal
@@ -437,6 +444,16 @@ export default function RecipesPage() {
         />
       )}
 
+    </div>
+  );
+}
+
+function StatTile({ icon: Icon, value, label }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-2 px-1 rounded-2xl bg-emerald-50">
+      <Icon size={15} className="text-emerald-600 mb-1" />
+      <span className="text-xs font-bold text-gray-800 leading-tight">{value}</span>
+      <span className="text-[10px] text-gray-500 leading-tight mt-0.5">{label}</span>
     </div>
   );
 }
