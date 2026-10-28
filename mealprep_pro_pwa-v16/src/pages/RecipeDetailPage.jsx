@@ -1,953 +1,861 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import pb from '../lib/pb';
-import { parseNutritionObject } from '../lib/recipeParse';
-import AddToPlannerModal from '../components/AddToPlannerModal';
-import {
-  ArrowLeft, Pencil, Printer, CalendarPlus,
-  Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils, Heart, X
-} from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat, Clock, ClipboardPaste, ChevronDown, ChevronUp } from 'lucide-react';
+import { fetchNutritionFromIngredients } from '../utils/fetchNutritionFromIngredients';
+import { parseRecipeText, parseBookmarkletPayload, parseIngredientLine, normalizeUnit, parseNutritionObject, decideNutrition } from '../lib/recipeParse';
+import SaveButtonInstall from '../components/SaveButtonInstall';
 
-const RECIPE_EXTRACT_WEBHOOK = 'https://n8n.srv1052955.hstgr.cloud/webhook/recipe-extract';
+const TAG_OPTIONS = [
+  'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Sides', 'Soups',
+  'Vegetarian', 'Vegan', 'Gluten-Free', 'High-Protein', 'Low-Carb',
+  'Quick (under 30 min)', 'Meal Prep', 'Bread'
+];
 
-const getProxiedImage = (url) => {
-  if (!url) return null;
-  return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=1200&fit=inside&q=85";
-};
+const UNITS = ['cup', 'tbsp', 'tsp', 'oz', 'lb', 'g', 'kg', 'ml', 'l', 'piece', 'slice', 'clove', 'bunch', 'can', 'package', 'pinch', 'to taste'];
 
-const toTitleCase = (str) => {
-  if (!str) return '';
-  return str.charAt(0).toUpperCase() + str.slice(1);
-};
-
-const parseIngredients = (raw) => {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  try { return JSON.parse(raw); } catch { return []; }
-};
-
-const parseTags = (raw) => {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  try { return JSON.parse(raw); } catch { return []; }
-};
-
-const parseNutrition = (raw) => {
-  if (!raw) return null;
-  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
-  try { return JSON.parse(raw); } catch { return null; }
-};
-
-const parseInstructions = (raw) => {
-  if (!raw) return [];
-  var text = typeof raw === 'string' ? raw : String(raw);
-  return text
-    .split(/\n+/)
-    .map(function(s) { return s.replace(/^\d+\.\s*/, '').trim(); })
-    .filter(Boolean);
-};
-
-const getSourceName = (url) => {
-  if (!url) return null;
-  try {
-    var hostname = new URL(url).hostname.replace(/^www\./, '');
-    return hostname;
-  } catch { return url; }
-};
-
-const getWWPoints = (nutrition) => {
-  if (!nutrition) return null;
-  var cal = Math.abs(parseFloat(nutrition.calories) || 0);
-  var fat = Math.abs(parseFloat(nutrition.fat) || 0);
-  if (!cal && !fat) return null;
-  return Math.max(0, Math.round(cal / 50 + fat / 12));
-};
-
-// "0.5" → ½, "1.5" → 1½, "0.333" → ⅓ — reads like a cookbook
-const FRACTIONS = [[0.125, '⅛'], [0.25, '¼'], [0.333, '⅓'], [0.5, '½'], [0.667, '⅔'], [0.75, '¾']];
-
-const parseQty = (q) => {
-  if (q === null || q === undefined || q === '') return NaN;
-  if (typeof q === 'number') return q;
-  var s = String(q).trim();
-  if (/[^\d.\s\/]/.test(s)) return NaN; // things like "2-3" or "a pinch" stay as written
-  var m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-  if (m) return Number(m[1]) + Number(m[2]) / Number(m[3]);
-  m = s.match(/^(\d+)\/(\d+)$/);
-  if (m) return Number(m[1]) / Number(m[2]);
-  return parseFloat(s);
-};
-
-const formatQty = (num) => {
-  var whole = Math.floor(num);
-  var frac = num - whole;
-  if (frac < 0.04) return String(whole);
-  if (frac > 0.96) return String(whole + 1);
-  for (var i = 0; i < FRACTIONS.length; i++) {
-    if (Math.abs(frac - FRACTIONS[i][0]) < 0.04) return (whole ? whole : '') + FRACTIONS[i][1];
-  }
-  return String(parseFloat(num.toFixed(2)));
-};
-
-// Recipe sites write times as 25, "PT25M", "PT1H15M", "25 mins", etc.
-// This turns any of them into plain minutes ('' if there's no time).
+// ── Cook time helpers ──
+// Recipe sites write times in many ways: 25, "25", "PT25M", "PT1H15M",
+// "25 mins", "1 hour 15 minutes". This turns any of them into plain minutes
+// (or '' if there's no time), which is what the Cook/Prep boxes and the
+// database expect.
 const toMinutes = (value) => {
   if (value === null || value === undefined || value === '') return '';
   if (typeof value === 'number') return value > 0 ? Math.round(value) : '';
-  var s = String(value).trim();
+  const s = String(value).trim();
   if (!s) return '';
+
+  // Plain number: "25"
   if (/^\d+(\.\d+)?$/.test(s)) {
-    var n0 = Math.round(Number(s));
-    return n0 > 0 ? n0 : '';
+    const n = Math.round(Number(s));
+    return n > 0 ? n : '';
   }
-  var iso = s.match(/^P(?:(\d+)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i);
+
+  // Coded format recipe sites use behind the scenes: "PT1H15M", "P0DT0H25M"
+  const iso = s.match(/^P(?:(\d+)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i);
   if (iso && /\d/.test(s)) {
-    var m1 = (Number(iso[1]) || 0) * 1440 + (Number(iso[2]) || 0) * 60 + (Number(iso[3]) || 0) + (Number(iso[4]) || 0) / 60;
-    return m1 > 0 ? Math.round(m1) : '';
+    const mins = (Number(iso[1]) || 0) * 1440 + (Number(iso[2]) || 0) * 60 + (Number(iso[3]) || 0) + (Number(iso[4]) || 0) / 60;
+    return mins > 0 ? Math.round(mins) : '';
   }
-  var hours = s.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i);
-  var minutes = s.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i);
+
+  // Written out: "1 hour 15 minutes", "1 hr 15 min", "25 mins"
+  const hours = s.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i);
+  const minutes = s.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i);
   if (hours || minutes) {
-    var m2 = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
-    return m2 > 0 ? Math.round(m2) : '';
+    const mins = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
+    return mins > 0 ? Math.round(mins) : '';
   }
-  var n = parseInt(s, 10);
+
+  const n = parseInt(s, 10);
   return n > 0 ? n : '';
 };
 
-// Prep and cook time from the importer. A site that only lists a total time
-// gets cook time = total minus prep (or the total).
+// Pulls prep and cook time out of whatever the importer sent. If a site only
+// lists a total time, cook time becomes the total minus prep (or the total).
 const pickTimes = (data) => {
   if (!data) return { prep: '', cook: '' };
-  var prep = toMinutes(data.prep_time != null ? data.prep_time : data.prepTime);
-  var cook = toMinutes(data.cook_time != null ? data.cook_time : data.cookTime);
-  var total = toMinutes(data.total_time != null ? data.total_time : data.totalTime);
+  const prep = toMinutes(data.prep_time ?? data.prepTime);
+  let cook = toMinutes(data.cook_time ?? data.cookTime);
+  const total = toMinutes(data.total_time ?? data.totalTime);
   if (!cook && total) cook = prep && total > prep ? total - prep : total;
-  return { prep: prep, cook: cook };
+  return { prep, cook };
 };
 
-const formatMinutes = (mins) => {
-  var m = Number(mins);
-  if (!m || m <= 0) return null;
-  if (m < 60) return m + ' min';
-  var h = Math.floor(m / 60);
-  var rest = m % 60;
-  return h + ' hr' + (rest ? ' ' + rest + ' min' : '');
-};
+export default function RecipeFormPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isEdit = !!id;
 
-export default function RecipeDetailPage() {
-  var { id } = useParams();
-  var navigate = useNavigate();
-  var printRef = useRef(null);
+  const [title, setTitle] = useState('');
+  const [servings, setServings] = useState(4);
+  const [prepTime, setPrepTime] = useState('');
+  const [cookTime, setCookTime] = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [tags, setTags] = useState([]);
+  const [ingredients, setIngredients] = useState([{ name: '', quantity: '', unit: 'cup' }]);
 
-  var [recipe, setRecipe] = useState(null);
-  var [loading, setLoading] = useState(true);
-  var [error, setError] = useState('');
-  var [favorited, setFavorited] = useState(false);
-  var [favLoading, setFavLoading] = useState(false);
-  var [checkedIngredients, setCheckedIngredients] = useState({});
-  var [checkedSteps, setCheckedSteps] = useState({});
-  var [servingsMultiplier, setServingsMultiplier] = useState(1);
-  var [plannerOpen, setPlannerOpen] = useState(false);
-  var [imgError, setImgError] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(isEdit);
+  const [error, setError] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
+  const [duplicateRecipe, setDuplicateRecipe] = useState(null);
+  const [updatingDuplicate, setUpdatingDuplicate] = useState(false);
+  const [duplicateNote, setDuplicateNote] = useState(null);
 
-  // Nutrition state
-  var [nutrition, setNutrition] = useState(null);
-  var [fetchingNutrition, setFetchingNutrition] = useState(false);
-  var [nutritionError, setNutritionError] = useState('');
-  var [refetchNote, setRefetchNote] = useState('');
-  var [manualNutrition, setManualNutrition] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
+  const [nutrition, setNutrition] = useState(null);
 
-  // Rating state
-  var [rating, setRating] = useState(0);
-  var [hoverRating, setHoverRating] = useState(0);
+  const userPlan = pb.authStore.model?.plan || 'free';
+  const isPro = userPlan === 'pro';
 
-  // Delete modal state
-  var [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [importNotice, setImportNotice] = useState(null);
 
-  useEffect(function() {
-    var fetchRecipe = async function() {
-      try {
-        setLoading(true);
-        var record = await pb.collection('recipes').getOne(id);
-        setRecipe(record);
-        // Same "favorite" field the My Recipes cards use, so the heart matches everywhere
-        setFavorited(record.favorite || false);
-        setNutrition(parseNutrition(record.nutrition));
-        setRating(record.rating || 0);
-      } catch (e) {
-        setError('Recipe not found.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRecipe();
-  }, [id]);
+  // Ingredients as they were when an existing recipe was opened, so a save
+  // can tell whether published nutrition still applies
+  const originalIngredientsKey = useRef(null);
+  const ingredientsKey = (list) => JSON.stringify(
+    (list || [])
+      .filter((i) => i && i.name && i.name.trim())
+      .map((i) => [i.name.trim().toLowerCase(), String(i.quantity ?? '').trim(), i.unit || ''])
+  );
+  const readNutrition = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+  // Nutrition published by the recipe itself, tagged so saving won't overwrite it
+  const setPublishedNutrition = (n, recipeServings) => {
+    setNutrition(n ? JSON.stringify({ ...n, source: 'recipe', servings: Number(recipeServings) || null }) : null);
+  };
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteNote, setPasteNote] = useState(null);
 
-  var toggleFavorite = async function() {
-    if (!recipe) return;
-    setFavLoading(true);
-    try {
-      var updated = await pb.collection('recipes').update(recipe.id, { favorite: !favorited });
-      setFavorited(!!updated.favorite);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setFavLoading(false);
+  // Drop parsed fields into the form. Only overwrites what was actually found,
+  // so a sparse paste doesn't wipe fields the person already filled in.
+  const applyParsed = (p) => {
+    if (p.title) setTitle(p.title);
+    if (p.servings) setServings(p.servings);
+    const times = pickTimes(p);
+    if (times.prep) setPrepTime(times.prep);
+    if (times.cook) setCookTime(times.cook);
+    if (p.image_url) setImageUrl(p.image_url);
+    if (p.source_url) setSourceUrl(p.source_url);
+    if (p.ingredients?.length) setIngredients(p.ingredients);
+    if (p.instructions) setInstructions(p.instructions);
+    if (p.nutrition) setPublishedNutrition(p.nutrition, p.servings);
+  };
+
+  // Browser Save button lands here as /app/recipes/new#mpp=<recipe data>
+  useEffect(() => {
+    if (isEdit) return;
+    const match = window.location.hash.match(/^#mpp=(.+)$/);
+    if (!match) return;
+
+    // Clear it right away so a refresh doesn't re-import
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+    if (!isPro) {
+      setImportError('Saving recipes from other sites is a Pro feature. Upgrade to unlock it.');
+      return;
     }
-  };
 
-  var toggleIngredient = function(idx) {
-    setCheckedIngredients(function(prev) { return Object.assign({}, prev, { [idx]: !prev[idx] }); });
-  };
-
-  var toggleStep = function(idx) {
-    setCheckedSteps(function(prev) { return Object.assign({}, prev, { [idx]: !prev[idx] }); });
-  };
-
-  var handlePrint = function() {
-    window.print();
-  };
-
-  // Fills in prep/cook time from the recipe's website, but only where this
-  // recipe doesn't have one yet, so times you typed yourself are never replaced
-  var saveMissingTimes = async function(data) {
-    var t = pickTimes(data);
-    var updates = {};
-    var hadTimes = Number(recipe.prep_time) > 0 || Number(recipe.cook_time) > 0;
-    if (t.prep && !(Number(recipe.prep_time) > 0)) updates.prep_time = t.prep;
-    if (t.cook && !(Number(recipe.cook_time) > 0)) updates.cook_time = t.cook;
-    if (Object.keys(updates).length === 0) {
-      // Nothing new: either it already had times, or the site doesn't list any
-      return hadTimes ? '' : "This site doesn't list prep or cook times. You can add them with Edit Recipe.";
-    }
     try {
-      var saved = await pb.collection('recipes').update(recipe.id, updates);
-      setRecipe(saved);
-      var added = [];
-      if (updates.prep_time) added.push('prep ' + formatMinutes(updates.prep_time));
-      if (updates.cook_time) added.push('cook ' + formatMinutes(updates.cook_time));
-      return 'Added ' + added.join(' and ') + '.';
+      let raw;
+      try { raw = JSON.parse(decodeURIComponent(match[1])); } catch { raw = JSON.parse(match[1]); }
+      const parsed = parseBookmarkletPayload(raw);
+      if (!parsed || (!parsed.title && parsed.ingredients.length === 0)) throw new Error('empty');
+      // The raw page data may carry times the parser didn't keep
+      const rawTimes = pickTimes(raw);
+      if (!parsed.prep_time && rawTimes.prep) parsed.prep_time = rawTimes.prep;
+      if (!parsed.cook_time && rawTimes.cook) parsed.cook_time = rawTimes.cook;
+      applyParsed(parsed);
+      setImportNotice('Recipe grabbed from your browser. Look it over, then save.');
     } catch (err) {
-      console.error('Time save error:', err);
-      return "Found the times but couldn't save them. Try again in a moment.";
+      console.error('Browser import error:', err);
+      setImportError("Couldn't read that recipe. Highlight the recipe text on the page and click the Save button again.");
     }
+  }, [isEdit, isPro]);
+
+  const handlePasteParse = () => {
+    const parsed = parseRecipeText(pasteText);
+    if (!parsed.title && parsed.ingredients.length === 0 && !parsed.instructions) {
+      setPasteNote("Couldn't find a recipe in that text. Try including the ingredient list.");
+      return;
+    }
+    // If they got here after a failed URL import, keep that URL as the source
+    if (!sourceUrl && importUrl.trim()) parsed.source_url = importUrl.trim();
+
+    applyParsed(parsed);
+    setPasteNote(null);
+    setPasteText('');
+    setShowPaste(false);
+    setImportError(null);
+    const count = parsed.ingredients.length;
+    setImportNotice(
+      `Filled in ${count} ingredient${count === 1 ? '' : 's'}${parsed.instructions ? ' and the steps' : ''}. Check everything over${parsed.title ? '' : ' and add a title'}, then save.`
+    );
   };
 
-  var handleFetchNutrition = async function() {
-    if (!recipe) return;
-    setFetchingNutrition(true);
-    setNutritionError('');
-    setRefetchNote('');
-    var apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
-    var siteRead = false;
-    var timeNote = '';
-    try {
-      // 1. The recipe's own published nutrition, via our importer
-      if (recipe.source_url) {
+  useEffect(() => {
+    if (isEdit) {
+      (async () => {
         try {
-          var extractRes = await fetch(RECIPE_EXTRACT_WEBHOOK, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: recipe.source_url }),
-          });
-          if (extractRes.ok) {
-            var payload = await extractRes.json();
-            var extracted = Array.isArray(payload) ? payload[0] : payload;
-            if (extracted && extracted.ok) {
-              siteRead = true;
-              timeNote = await saveMissingTimes(extracted);
-            }
-            var published = extracted && extracted.ok ? parseNutritionObject(extracted.nutrition) : null;
-            if (published) {
-              var recipeServings = Number(extracted.servings) || Number(recipe.servings) || null;
-              var ours = Number(recipe.servings) || recipeServings;
-              // If this recipe's servings differ from the source's, scale per bowl
-              var scale = recipeServings && ours ? recipeServings / ours : 1;
-              var np = {
-                calories: Math.round(published.calories * scale),
-                protein: Math.round(published.protein * scale * 10) / 10,
-                carbs: Math.round(published.carbs * scale * 10) / 10,
-                fat: Math.round(published.fat * scale * 10) / 10,
-                source: 'recipe',
-                servings: ours,
-              };
-              await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(np) });
-              setNutrition(np);
-              setRefetchNote(timeNote || 'Everything is up to date.');
-              setFetchingNutrition(false);
-              return;
-            }
+          const record = await pb.collection('recipes').getOne(id);
+          setTitle(record.title || '');
+          setServings(record.servings || 4);
+          setPrepTime(record.prep_time || '');
+          setCookTime(record.cook_time || '');
+          setInstructions(record.instructions || '');
+          setImageUrl(record.image_url || '');
+          setSourceUrl(record.source_url || '');
+
+          if (record.image_file) {
+            setImagePreview(pb.getFileUrl(record, record.image_file));
           }
-        } catch (extractErr) {
-          console.error('Recipe nutrition lookup failed, trying Spoonacular:', extractErr);
+
+          let parsedTags = [];
+          if (typeof record.tags === 'string') {
+            try { parsedTags = JSON.parse(record.tags); } catch { parsedTags = []; }
+          } else if (Array.isArray(record.tags)) {
+            parsedTags = record.tags;
+          }
+          setTags(parsedTags);
+
+          let parsedIngredients = [];
+          if (typeof record.ingredients === 'string') {
+            try { parsedIngredients = JSON.parse(record.ingredients); } catch { parsedIngredients = []; }
+          } else if (Array.isArray(record.ingredients)) {
+            parsedIngredients = record.ingredients;
+          }
+          if (parsedIngredients.length > 0) {
+            setIngredients(parsedIngredients);
+          }
+          originalIngredientsKey.current = ingredientsKey(parsedIngredients);
+          setNutrition(record.nutrition
+            ? (typeof record.nutrition === 'string' ? record.nutrition : JSON.stringify(record.nutrition))
+            : null);
+        } catch (err) {
+          console.error('Error loading recipe:', err);
+          setError('Failed to load recipe.');
+        } finally {
+          setPageLoading(false);
         }
-      }
-      // The recipe's own numbers are better than any estimate, so keep them
-      // when the website couldn't be reached
-      if (nutrition && nutrition.source === 'recipe') {
-        setRefetchNote(siteRead
-          ? (timeNote || 'Everything is up to date.')
-          : "This recipe's website wouldn't let us in right now, so nothing changed. You can add times yourself with Edit Recipe.");
-        setFetchingNutrition(false);
+      })();
+    }
+  }, [id, isEdit]);
+
+  const handleIngredientChange = (index, field, value) => {
+    setIngredients((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const addIngredient = () => {
+    setIngredients((prev) => [...prev, { name: '', quantity: '', unit: 'cup' }]);
+  };
+
+  const removeIngredient = (index) => {
+    setIngredients((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleTag = (tag) => {
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const handleImport = async () => {
+    if (!isPro) {
+      setImportError('Recipe import is a Pro feature. Upgrade to unlock it.');
+      return;
+    }
+    if (!importUrl.trim()) {
+      setImportError('Please enter a URL.');
+      return;
+    }
+    setImporting(true);
+    setImportError(null);
+    setImportNotice(null);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const res = await fetch(
+        'https://n8n.srv1052955.hstgr.cloud/webhook/recipe-extract',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: importUrl.trim() }),
+          signal: controller.signal
+        }
+      );
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`Import error: ${res.status}`);
+      const payload = await res.json();
+      const data = Array.isArray(payload) ? payload[0] : payload;
+
+      // The extractor reports failure in the body, not the status code.
+      if (data?.ok === false || !data?.title) {
+        setImportError("That site wouldn't let us read the recipe. Paste the recipe text below, or use the Save button while you're on the recipe page.");
+        setShowPaste(true);
         return;
       }
-      if (timeNote) setRefetchNote(timeNote);
-      else if (!siteRead && recipe.source_url) setRefetchNote("This recipe's website wouldn't let us in, so we couldn't check for times. You can add them with Edit Recipe.");
-      // 2. Fall back to Spoonacular's estimate
-      if (recipe.source_url) {
-        var res = await fetch(
-          "https://api.spoonacular.com/recipes/extract?url=" + encodeURIComponent(recipe.source_url) + "&addRecipeNutrition=true&apiKey=" + apiKey
+
+      // Handy for checking what the importer actually sends (open the browser console)
+      console.log('Importer times:', { prep_time: data.prep_time, cook_time: data.cook_time, total_time: data.total_time, prepTime: data.prepTime, cookTime: data.cookTime, totalTime: data.totalTime });
+
+      const times = pickTimes(data);
+      setTitle(data.title || '');
+      setServings(data.servings || 4);
+      setPrepTime(times.prep);
+      setCookTime(times.cook);
+      setImageUrl(data.image_url || '');
+      setSourceUrl(data.source_url || importUrl.trim());
+
+      if (data.ingredients?.length) {
+        setIngredients(
+          data.ingredients
+            .map((ing) => {
+              if (typeof ing === 'string') return parseIngredientLine(ing);
+              return { name: ing.name || '', quantity: String(ing.quantity || ''), unit: normalizeUnit(ing.unit) };
+            })
+            .filter((ing) => ing && ing.name)
         );
-        if (res.ok) {
-          var data = await res.json();
-          if (data.nutrition && data.nutrition.nutrients) {
-            var nutrients = data.nutrition.nutrients;
-            var n = {
-              calories: Math.round((nutrients.find(function(x) { return x.name === 'Calories'; }) || {}).amount || 0),
-              protein: Math.round((nutrients.find(function(x) { return x.name === 'Protein'; }) || {}).amount || 0),
-              carbs: Math.round((nutrients.find(function(x) { return x.name === 'Carbohydrates'; }) || {}).amount || 0),
-              fat: Math.round((nutrients.find(function(x) { return x.name === 'Fat'; }) || {}).amount || 0),
-              source: 'estimate'
-            };
-            await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
-            setNutrition(n);
-            setFetchingNutrition(false);
+      }
+      if (data.instructions) {
+        setInstructions(data.instructions);
+      }
+      // The importer sends zeros when a page publishes no nutrition
+      setPublishedNutrition(parseNutritionObject(data.nutrition), data.servings);
+      setImportUrl('');
+      setImportNotice('Recipe imported. Look it over, then save.');
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err.name === 'AbortError') {
+        setImportError('That site took too long to respond. Try again, or paste the recipe text below.');
+      } else {
+        setImportError("That site wouldn't let us read the recipe. Paste the recipe text below, or use the Save button while you're on the recipe page.");
+      }
+      setShowPaste(true);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // When a recipe is already saved, fill in the times it's missing instead of
+  // making a second copy. Keeps its rating, favorite, notes, and planner spots.
+  const prepFound = Number(toMinutes(prepTime)) || 0;
+  const cookFound = Number(toMinutes(cookTime)) || 0;
+  const duplicateMissing = duplicateRecipe ? {
+    prep: prepFound && !(Number(duplicateRecipe.prep_time) > 0) ? prepFound : 0,
+    cook: cookFound && !(Number(duplicateRecipe.cook_time) > 0) ? cookFound : 0,
+  } : { prep: 0, cook: 0 };
+
+  const handleUpdateDuplicateTimes = async () => {
+    if (!duplicateRecipe) return;
+    const updates = {};
+    if (duplicateMissing.prep) updates.prep_time = duplicateMissing.prep;
+    if (duplicateMissing.cook) updates.cook_time = duplicateMissing.cook;
+    if (Object.keys(updates).length === 0) return;
+    setUpdatingDuplicate(true);
+    setDuplicateNote(null);
+    try {
+      await pb.collection('recipes').update(duplicateRecipe.id, updates);
+      navigate('/recipes/' + duplicateRecipe.id, { replace: true });
+    } catch (err) {
+      console.error('Update times error:', err);
+      setDuplicateNote("Couldn't update it just now. Try again in a moment.");
+    } finally {
+      setUpdatingDuplicate(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitError(null);
+    setDuplicateRecipe(null);
+    setDuplicateNote(null);
+
+    if (!title.trim()) {
+      setSubmitError('Recipe title is required.');
+      return;
+    }
+
+    if (sourceUrl && !isEdit) {
+      try {
+        const dupeCheck = await pb.collection('recipes').getList(1, 1, {
+          filter: `user = "${pb.authStore.model.id}" && source_url = "${sourceUrl}"`,
+        });
+        if (dupeCheck.items.length > 0) {
+          setDuplicateRecipe(dupeCheck.items[0]);
+          return;
+        }
+      } catch (err) {
+        console.error('Duplicate check error:', err);
+      }
+    }
+
+    setLoading(true);
+    try {
+      let payload;
+      const prepMinutes = Number(toMinutes(prepTime)) || 0;
+      const cookMinutes = Number(toMinutes(cookTime)) || 0;
+
+      if (imageFile) {
+        payload = new FormData();
+        payload.append('user', pb.authStore.model.id);
+        payload.append('title', title.trim());
+        payload.append('servings', Number(servings));
+        payload.append('prep_time', prepMinutes);
+        payload.append('cook_time', cookMinutes);
+        payload.append('instructions', instructions.trim());
+        payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
+        payload.append('tags', JSON.stringify(tags));
+        payload.append('image_file', imageFile);
+        payload.append('image_url', imageUrl || '');
+        if (sourceUrl) payload.append('source_url', sourceUrl);
+        if (nutrition) payload.append('nutrition', nutrition);
+      } else {
+        payload = {
+          user: pb.authStore.model.id,
+          title: title.trim(),
+          servings: Number(servings),
+          prep_time: prepMinutes,
+          cook_time: cookMinutes,
+          instructions: instructions.trim(),
+          ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
+          tags: JSON.stringify(tags),
+          ...(imageUrl ? { image_url: imageUrl } : {}),
+          ...(sourceUrl ? { source_url: sourceUrl } : {}),
+          ...(nutrition ? { nutrition } : {}),
+        };
+      }
+
+      if (isEdit) {
+        var savedRecipe = await pb.collection('recipes').update(id, payload);
+      } else {
+        if (sourceUrl) {
+          const existing = await pb.collection('recipes').getList(1, 1, {
+            filter: `user = "${pb.authStore.model.id}" && source_url = "${sourceUrl}"`,
+          });
+          if (existing.items.length > 0) {
+            setSubmitError('This recipe is already in your collection!');
+            setLoading(false);
             return;
           }
         }
+        var savedRecipe = await pb.collection('recipes').create(payload);
       }
-      var title = recipe.title || '';
-      var nutRes = await fetch(
-        "https://api.spoonacular.com/recipes/guessNutrition?title=" + encodeURIComponent(title) + "&apiKey=" + apiKey
-      );
-      if (nutRes.ok) {
-        var nutData = await nutRes.json();
-        var n2 = {
-          calories: Math.round((nutData.calories ? nutData.calories.value : 0) || 0),
-          protein: Math.round((nutData.protein ? nutData.protein.value : 0) || 0),
-          carbs: Math.round((nutData.carbs ? nutData.carbs.value : 0) || 0),
-          fat: Math.round((nutData.fat ? nutData.fat.value : 0) || 0),
-          source: 'estimate'
-        };
-        await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n2) });
-        setNutrition(n2);
-      } else {
-        setNutritionError('Could not fetch nutrition data.');
+      // ── Fix image URL after file upload ──
+      if (imageFile && savedRecipe && savedRecipe.image_file) {
+        var fileUrl = pb.getFileUrl(savedRecipe, savedRecipe.image_file);
+        await pb.collection('recipes').update(savedRecipe.id, { image_url: fileUrl });
+        console.log('Image URL set:', fileUrl);
       }
-    } catch (e) {
-      console.error(e);
-      setNutritionError("Couldn't get new nutrition right now. Your current numbers are unchanged.");
-    } finally {
-      setFetchingNutrition(false);
-    }
-  };
+      // ── Nutrition ──
+      // Numbers published by the recipe win over an estimate. They're kept while
+      // they still describe this recipe, scaled if only the servings changed, and
+      // replaced with an estimate if the ingredients were edited.
+      const ingredientList = ingredients.filter(i => i.name.trim());
+      const servingCount = Number(servings) || 1;
+      const recipeId = savedRecipe?.id || id;
+      const decision = decideNutrition({
+        current: readNutrition(nutrition),
+        servingCount,
+        ingredientsChanged: isEdit && originalIngredientsKey.current !== null
+          && originalIngredientsKey.current !== ingredientsKey(ingredientList),
+      });
 
-  var handleCalcFromIngredients = async function() {
-    if (!recipe) return;
-    setFetchingNutrition(true);
-    setNutritionError('');
-    try {
-      var mod = await import('../utils/fetchNutritionFromIngredients');
-      var fetchNutritionFromIngredients = mod.fetchNutritionFromIngredients;
-      var ingredientList = parseIngredients(recipe.ingredients);
-      var servingCount = recipe.servings || 1;
-
-      if (ingredientList.length === 0) {
-        setNutritionError('No ingredients found. Add ingredients first.');
-        setFetchingNutrition(false);
-        return;
+      try {
+        if (decision.action !== 'estimate') {
+          await pb.collection('recipes').update(recipeId, { nutrition: JSON.stringify(decision.nutrition) });
+        } else if (ingredientList.length > 0) {
+          const { fetchNutritionFromIngredients } = await import('../utils/fetchNutritionFromIngredients');
+          const result = await fetchNutritionFromIngredients(ingredientList, servingCount);
+          if (result?.perServing) {
+            await pb.collection('recipes').update(recipeId, {
+              nutrition: JSON.stringify({
+                calories: result.perServing.calories,
+                protein: result.perServing.protein,
+                carbs: result.perServing.carbs,
+                fat: result.perServing.fat,
+                source: 'estimate',
+                servings: servingCount,
+              }),
+            });
+          }
+        }
+      } catch (nutritionErr) {
+        console.error('Nutrition save error (non-blocking):', nutritionErr);
       }
 
-      console.log('Calculating from', ingredientList.length, 'ingredients...');
-      var result = await fetchNutritionFromIngredients(ingredientList, servingCount);
-      console.log('Result:', result);
-
-      if (result && result.perServing) {
-        var n = {
-          calories: result.perServing.calories,
-          protein: result.perServing.protein,
-          carbs: result.perServing.carbs,
-          fat: result.perServing.fat,
-          source: 'estimate',
-          servings: servingCount,
-        };
-        await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(n) });
-        setNutrition(n);
-      } else {
-        setNutritionError('Could not calculate nutrition. Try manual entry.');
-      }
-    } catch (err) {
-      console.error('Calc from ingredients error:', err);
-      setNutritionError('Calculation failed. Try manual entry.');
-    } finally {
-      setFetchingNutrition(false);
-    }
-  };
-
-  var handleSaveManualNutrition = async function() {
-    try {
-      var mn = Object.assign({}, manualNutrition, { source: 'manual', servings: Number(recipe.servings) || null });
-      await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(mn) });
-      setNutrition(mn);
-    } catch (err) {
-      console.error('Save nutrition error:', err);
-    }
-  };
-
-  var handleSaveRating = async function(newRating) {
-    setRating(newRating);
-    if (!recipe) return;
-    try {
-      await pb.collection('recipes').update(recipe.id, { rating: newRating });
-    } catch (err) {
-      console.error('Rating error:', err);
-    }
-  };
-
-  var handleDeleteRecipe = async function() {
-    try {
-      await pb.collection('recipes').delete(recipe.id);
       navigate('/app/recipes', { replace: true });
     } catch (err) {
-      console.error('Delete error:', err);
-      alert('Failed to delete recipe.');
+      console.error('Full error:', err.response);
+      setSubmitError(err?.response?.message || err?.message || 'Failed to save recipe.');
     } finally {
-      setShowDeleteModal(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
+  if (pageLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
       </div>
     );
   }
-
-  if (error || !recipe) {
-    return (
-      <div className="max-w-xl mx-auto p-8 text-center">
-        <p className="text-red-500 mb-4">{error || 'Recipe not found.'}</p>
-        <Link to="/recipes" className="text-green-600 hover:underline">← Back to Recipes</Link>
-      </div>
-    );
-  }
-
-  var ingredients = parseIngredients(recipe.ingredients);
-  var tags = parseTags(recipe.tags);
-  var steps = parseInstructions(recipe.instructions);
-  var sourceName = getSourceName(recipe.source_url);
-  var proxiedImage = getProxiedImage(recipe.image_url);
-  var prepMins = Number(recipe.prep_time) > 0 ? Number(recipe.prep_time) : 0;
-  var cookMins = Number(recipe.cook_time) > 0 ? Number(recipe.cook_time) : 0;
-  // Each time gets its own label; total only shows when there's both to add up
-  var timeParts = [];
-  if (prepMins) timeParts.push({ label: 'Prep', value: formatMinutes(prepMins) });
-  if (cookMins) timeParts.push({ label: 'Cook', value: formatMinutes(cookMins) });
-  if (prepMins && cookMins) timeParts.push({ label: 'Total', value: formatMinutes(prepMins + cookMins) });
-  var chefNote = recipe.notes || recipe.chef_note || '';
-
-  var scaledQty = function(qty) {
-    var num = parseQty(qty);
-    if (isNaN(num)) return qty;
-    return formatQty(num * servingsMultiplier);
-  };
 
   return (
-    <>
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          body { background: white !important; }
-        }
-        @media screen {
-          .print-only { display: none; }
-        }
-      `}</style>
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="flex items-center gap-3 mb-6">
+        <Link to="/app/recipes" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+          <ArrowLeft size={20} className="text-gray-600" />
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {isEdit ? 'Edit Recipe' : 'Add Recipe'}
+        </h1>
+      </div>
 
-      <div className="min-h-screen bg-gray-50" ref={printRef}>
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">{error}</div>
+      )}
 
-        {/* Back button & actions */}
-        <div className="no-print sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+      {/* Import from URL */}
+      <div className={`mb-6 p-4 rounded-2xl border ${isPro ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <Download size={18} className={isPro ? 'text-green-600' : 'text-gray-400'} />
+          <span className="font-semibold text-gray-800 text-sm">Import from URL</span>
+          {!isPro && (
+            <span className="ml-auto flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">
+              <Lock size={11} /> Pro
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            placeholder="Paste recipe URL..."
+            value={importUrl}
+            onChange={(e) => setImportUrl(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+            disabled={!isPro}
+          />
           <button
-            onClick={function() { navigate(-1); }}
-            className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors font-medium text-sm"
+            type="button"
+            onClick={handleImport}
+            disabled={importing}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-colors ${
+              isPro ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back
+            {importing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Import
           </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={function() { setPlannerOpen(true); }}
-              className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
-            >
-              <CalendarPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add to Planner</span>
-              <span className="sm:hidden">Plan</span>
-            </button>
-            <Link
-              to={"/recipes/" + id + "/edit"}
-              className="flex items-center gap-2 text-gray-500 hover:text-blue-500 border border-gray-200 rounded-xl px-3 py-1.5 text-sm font-medium hover:bg-blue-50 transition-colors"
-            >
-              <Pencil className="w-4 h-4" />
-              <span className="hidden sm:inline">Edit Recipe</span>
-              <span className="sm:hidden">Edit</span>
+        </div>
+        {importError && <p className="text-red-500 text-xs mt-2">{importError}</p>}
+        {importNotice && <p className="text-green-700 text-xs mt-2 font-medium">{importNotice}</p>}
+        {!isEdit && readNutrition(nutrition)?.source === 'recipe' && (
+          <p className="text-xs text-gray-500 mt-1">
+            Using the recipe's own nutrition: {readNutrition(nutrition).calories} cal per serving.
+          </p>
+        )}
+        {!isPro && <p className="text-xs text-gray-400 mt-2">Upgrade to Pro to import recipes from any URL.</p>}
+        {isPro && <SaveButtonInstall />}
+      </div>
+
+      {/* Paste recipe text — free for everyone, and the fallback when a site blocks import */}
+      {!isEdit && (
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white">
+          <button
+            type="button"
+            onClick={() => setShowPaste((s) => !s)}
+            className="w-full flex items-center gap-2 p-4 text-sm font-semibold text-gray-800"
+          >
+            <ClipboardPaste size={18} className="text-green-600" />
+            Paste recipe text
+            <span className="ml-auto text-gray-400">
+              {showPaste ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </span>
+          </button>
+          {showPaste && (
+            <div className="px-4 pb-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                Copy a recipe from any website, note, or message and paste it here. We'll sort it into
+                ingredients and steps for you to check.
+              </p>
+              <textarea
+                rows={8}
+                value={pasteText}
+                onChange={(e) => { setPasteText(e.target.value); setPasteNote(null); }}
+                placeholder={'Recipe name\n\nIngredients\n2 cups flour\n1 tsp salt\n\nInstructions\n1. Mix everything together...'}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              {pasteNote && <p className="text-red-500 text-xs">{pasteNote}</p>}
+              <button
+                type="button"
+                onClick={handlePasteParse}
+                disabled={!pasteText.trim()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ClipboardPaste size={16} />
+                Fill in the form
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+
+        {/* Title */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Recipe Title *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Avocado Toast"
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+            required
+          />
+        </div>
+
+        {/* Servings + Prep Time + Cook Time */}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Servings</label>
+            <input
+              type="number"
+              min="1"
+              value={servings}
+              onChange={(e) => setServings(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <span className="flex items-center gap-1"><Clock size={13} /> Prep (min)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={prepTime}
+              onChange={(e) => setPrepTime(e.target.value)}
+              placeholder="e.g. 15"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <span className="flex items-center gap-1"><Clock size={13} /> Cook (min)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={cookTime}
+              onChange={(e) => setCookTime(e.target.value)}
+              placeholder="e.g. 30"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Image */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Recipe Image</label>
+
+          <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors text-sm text-gray-500 hover:text-green-600 mb-2">
+            <ChefHat size={16} />
+            {imageFile ? imageFile.name : 'Upload a photo from your device'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  setImageFile(file);
+                  setImagePreview(URL.createObjectURL(file));
+                  setImageUrl('');
+                }
+              }}
+            />
+          </label>
+
+          <div className="flex items-center gap-2 my-2">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 font-medium">or paste URL</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          <input
+            type="url"
+            value={imageUrl}
+            onChange={(e) => { setImageUrl(e.target.value); setImageFile(null); setImagePreview(''); }}
+            placeholder="https://..."
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+          />
+
+          {(imagePreview || imageUrl) && (
+            <div className="mt-2 h-32 rounded-xl overflow-hidden bg-gray-100 relative">
+              <img
+                src={imagePreview || 'https://images.weserv.nl/?url=' + encodeURIComponent(imageUrl) + '&w=400&h=200&fit=cover&q=80'}
+                alt="Preview"
+                className="w-full h-full object-cover"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              {imageFile && (
+                <button
+                  type="button"
+                  onClick={() => { setImageFile(null); setImagePreview(''); }}
+                  className="absolute top-2 right-2 bg-white/80 rounded-full p-1 hover:bg-white"
+                >
+                  <X size={14} className="text-gray-600" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Source URL */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Source URL</label>
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+          />
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tags</label>
+          <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-xl bg-white min-h-[48px]">
+            {tags.map((tag) => (
+              <span key={tag} className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                {tag}
+                <button type="button" onClick={() => toggleTag(tag)} className="hover:text-green-900 transition-colors">
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            {tags.length === 0 && <span className="text-gray-400 text-xs self-center">Select tags below...</span>}
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {TAG_OPTIONS.filter((t) => !tags.includes(t)).map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-700 transition-colors border border-gray-200"
+              >
+                + {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Ingredients */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Ingredients</label>
+          <div className="space-y-2">
+            {ingredients.map((ing, index) => (
+              <div key={index} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="Quantity"
+                  value={ing.quantity}
+                  onChange={(e) => handleIngredientChange(index, 'quantity', e.target.value)}
+                  className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                <select
+                  value={ing.unit}
+                  onChange={(e) => handleIngredientChange(index, 'unit', e.target.value)}
+                  className="w-24 px-2 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+                >
+                  {UNITS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Ingredient name"
+                  value={ing.name}
+                  onChange={(e) => handleIngredientChange(index, 'name', e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                {ingredients.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeIngredient(index)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addIngredient}
+            className="mt-2 flex items-center gap-2 text-green-600 hover:text-green-700 text-sm font-medium px-3 py-2 hover:bg-green-50 rounded-xl transition-colors"
+          >
+            <Plus size={16} />
+            Add Ingredient
+          </button>
+        </div>
+
+        {/* Instructions */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Instructions</label>
+          <textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Write the steps..."
+            rows={6}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm resize-none"
+          />
+        </div>
+
+        {/* Duplicate Warning */}
+        {duplicateRecipe && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
+            <p className="font-semibold mb-1">Looks like you already have this recipe!</p>
+            {(duplicateMissing.prep || duplicateMissing.cook) ? (
+              <>
+                <p className="text-amber-700 text-xs mb-3">
+                  Your saved copy is missing its
+                  {duplicateMissing.prep && duplicateMissing.cook ? ' prep and cook times' : duplicateMissing.prep ? ' prep time' : ' cook time'}.
+                  Add them from this import without losing your rating, notes, or meal plans.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleUpdateDuplicateTimes}
+                  disabled={updatingDuplicate}
+                  className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 mb-2"
+                >
+                  {updatingDuplicate ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
+                  Add the times to my saved recipe
+                </button>
+                {duplicateNote && <p className="text-red-500 text-xs mb-2">{duplicateNote}</p>}
+              </>
+            ) : null}
+            <Link to={`/recipes/${duplicateRecipe.id}`} className="text-green-600 underline font-medium">
+              View existing recipe →
             </Link>
-            <button
-              onClick={function() { setShowDeleteModal(true); }}
-              aria-label="Delete recipe"
-              className="flex items-center gap-2 text-gray-500 hover:text-red-500 border border-gray-200 rounded-xl px-3 py-1.5 text-sm font-medium hover:bg-red-50 transition-colors"
-            >
-              <X className="w-4 h-4" />
-              <span className="hidden sm:inline">Delete</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Two Column Layout */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {/* Left Column */}
-            <div className="lg:col-span-2">
-
-              {/* Hero Image */}
-              <div className="relative w-full h-72 sm:h-96 bg-gray-200 rounded-2xl overflow-hidden">
-                {proxiedImage && !imgError ? (
-                  <img
-                    src={proxiedImage}
-                    alt={recipe.title}
-                    className="w-full h-full object-cover"
-                    onError={function() { setImgError(true); }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-100 to-green-200">
-                    <ChefHat className="w-20 h-20 text-green-400" />
-                  </div>
-                )}
-                <div className="no-print absolute top-3 right-3 flex items-center gap-2">
-                  <button
-                    onClick={toggleFavorite}
-                    disabled={favLoading}
-                    aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
-                    className="w-11 h-11 rounded-full bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center transition-transform hover:scale-110"
-                  >
-                    <Heart className={"w-5 h-5 " + (favorited ? 'text-red-500 fill-red-500' : 'text-gray-500')} />
-                  </button>
-                  <button
-                    onClick={handlePrint}
-                    aria-label="Print recipe"
-                    className="w-11 h-11 rounded-full bg-white/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 shadow-md flex items-center justify-center transition-all"
-                  >
-                    <Printer className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Title */}
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mt-5">{recipe.title}</h1>
-
-              {/* Stats */}
-              <div className="flex flex-wrap items-center gap-3 mt-3">
-                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">
-                    {recipe.servings ? recipe.servings * servingsMultiplier : '—'} servings
-                  </span>
-                  <div className="no-print flex items-center gap-1 ml-1">
-                    {[1, 2, 4].map(function(m) {
-                      return (
-                        <button
-                          key={m}
-                          onClick={function() { setServingsMultiplier(m); }}
-                          className={"text-xs px-2 py-0.5 rounded-full font-semibold transition-all " +
-                            (servingsMultiplier === m
-                              ? 'bg-green-600 text-white'
-                              : 'bg-white text-green-600 border border-green-300 hover:bg-green-100')}
-                        >
-                          {m}×
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                {timeParts.length > 0 && (
-                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2">
-                    <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                    {timeParts.map(function(part, i) {
-                      return (
-                        <span key={part.label} className="flex items-center gap-2 text-sm">
-                          {i > 0 && <span className="w-px h-4 bg-gray-300" aria-hidden="true" />}
-                          <span className="text-gray-500">{part.label}</span>
-                          <span className="text-gray-800 font-semibold">{part.value}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-                {sourceName && (
-                  <a
-                    href={recipe.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-100 transition-colors"
-                  >
-                    <Globe className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-600 font-medium">{sourceName}</span>
-                  </a>
-                )}
-              </div>
-
-              {/* Rating */}
-              <div className="no-print flex items-center gap-2 mt-4">
-                <span className="text-sm font-semibold text-gray-500">Your rating</span>
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map(function(star) {
-                    return (
-                      <button
-                        key={star}
-                        onClick={function() { handleSaveRating(star); }}
-                        onMouseEnter={function() { setHoverRating(star); }}
-                        onMouseLeave={function() { setHoverRating(0); }}
-                        aria-label={'Rate ' + star + ' out of 5'}
-                        className="p-0.5 transition-transform hover:scale-110"
-                      >
-                        <Star
-                          className={"w-5 h-5 " +
-                            (star <= (hoverRating || rating)
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'text-gray-300')}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tags */}
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {tags.map(function(tag, i) {
-                    return (
-                      <span
-                        key={i}
-                        className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full border border-green-200"
-                      >
-                        {tag}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Ingredients & Instructions */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-
-                {/* Ingredients */}
-                <div>
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                      <h2 className="text-lg font-bold text-green-700 flex items-center gap-2">
-                        <span className="w-1 h-5 bg-green-500 rounded-full"></span>
-                        Ingredients
-                      </h2>
-                      <span className="text-xs text-gray-400 font-medium">{ingredients.length} items</span>
-                    </div>
-                    {ingredients.length === 0 ? (
-                      <p className="px-6 py-4 text-gray-400 text-sm">No ingredients listed.</p>
-                    ) : (
-                      <ul className="divide-y divide-gray-50">
-                        {ingredients.map(function(ing, idx) {
-                          var checked = !!checkedIngredients[idx];
-                          var qty = scaledQty(ing.quantity);
-                          return (
-                            <li
-                              key={idx}
-                              onClick={function() { toggleIngredient(idx); }}
-                              className={"flex items-center gap-3 px-6 py-3.5 cursor-pointer transition-colors hover:bg-gray-50 " + (checked ? 'opacity-50' : '')}
-                            >
-                              <div className={"w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all " +
-                                (checked ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-green-400')}>
-                                {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                              </div>
-                              <span className={"text-sm text-gray-800 flex-1 " + (checked ? 'line-through text-gray-400' : '')}>
-                                {(qty || ing.unit) && (
-                                  <span className="font-semibold text-gray-900">
-                                    {qty}{ing.unit ? ' ' + ing.unit : ''}
-                                  </span>
-                                )}
-                                {' '}
-                                {toTitleCase(ing.name)}
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-
-                {/* Instructions */}
-                <div>
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                      <h2 className="text-lg font-bold text-green-700 flex items-center gap-2">
-                        <span className="w-1 h-5 bg-green-500 rounded-full"></span>
-                        Instructions
-                      </h2>
-                      <span className="text-xs text-gray-400 font-medium">{steps.length} steps</span>
-                    </div>
-                    {steps.length === 0 ? (
-                      <p className="px-6 py-4 text-gray-400 text-sm">No instructions listed.</p>
-                    ) : (
-                      <div className="divide-y divide-gray-50">
-                        {steps.map(function(step, idx) {
-                          var done = !!checkedSteps[idx];
-                          return (
-                            <div
-                              key={idx}
-                              onClick={function() { toggleStep(idx); }}
-                              className={"flex gap-4 px-6 py-4 cursor-pointer transition-colors hover:bg-gray-50 " + (done ? 'opacity-50' : '')}
-                            >
-                              <div className={"w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm transition-all mt-0.5 " +
-                                (done ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700')}>
-                                {done ? <Check className="w-4 h-4" strokeWidth={3} /> : idx + 1}
-                              </div>
-                              <p className={"text-sm text-gray-700 leading-relaxed flex-1 pt-1 " + (done ? 'line-through text-gray-400' : '')}>
-                                {step}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Right Sidebar */}
-            <div className="lg:col-span-1 space-y-5">
-
-              {/* Nutrition Card */}
-              {nutrition ? (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-gray-100">
-                    <h3 className="text-base font-bold text-gray-900">Nutrition facts</h3>
-                    <p className="text-xs text-gray-400">
-                      Per serving
-                      {nutrition.source === 'recipe' && ', from the recipe'}
-                      {nutrition.source === 'estimate' && ', estimated from ingredients'}
-                      {nutrition.source === 'manual' && ', entered by you'}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 p-5">
-                    <div className="text-center bg-green-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-green-600">{nutrition.calories}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Calories</div>
-                    </div>
-                    <div className="text-center bg-blue-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-blue-600">{nutrition.protein}g</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Protein</div>
-                    </div>
-                    <div className="text-center bg-amber-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-amber-600">{nutrition.carbs}g</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Carbs</div>
-                    </div>
-                    <div className="text-center bg-red-50 rounded-xl py-3">
-                      <div className="text-xl font-bold text-red-500">{nutrition.fat}g</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Fat</div>
-                    </div>
-                  </div>
-                  {getWWPoints(nutrition) !== null && (
-                    <div className="text-center bg-purple-50 rounded-xl py-3 mx-5 mb-4">
-                      <div className="text-xl font-bold text-purple-600">{getWWPoints(nutrition)}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">WW Points (est.)</div>
-                    </div>
-                  )}
-                  {/* Nutrition is already filled in, so these are quiet "redo" options */}
-                  <div className="no-print px-5 pb-4 grid grid-cols-2 gap-2">
-                    <button
-                      onClick={handleFetchNutrition}
-                      disabled={fetchingNutrition}
-                      className="flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-green-600 py-2 rounded-xl font-medium transition-colors border border-gray-200 hover:border-green-300 disabled:opacity-60"
-                    >
-                      {fetchingNutrition ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-                      Re-fetch
-                    </button>
-                    <button
-                      onClick={handleCalcFromIngredients}
-                      disabled={fetchingNutrition}
-                      className="flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 py-2 rounded-xl font-medium transition-colors border border-gray-200 hover:border-blue-300 disabled:opacity-60"
-                    >
-                      {fetchingNutrition ? <Loader2 className="w-3 h-3 animate-spin" /> : <Utensils className="w-3 h-3" />}
-                      Recalculate
-                    </button>
-                    {refetchNote && (
-                      <p className="col-span-2 text-gray-500 text-xs mt-1 text-center leading-relaxed">{refetchNote}</p>
-                    )}
-                    {nutritionError && (
-                      <p className="col-span-2 text-red-500 text-xs mt-1 font-medium text-center">{nutritionError}</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="p-6 text-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Zap className="w-6 h-6 text-green-600" />
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900 mb-1">Nutrition</h3>
-                    <p className="text-xs text-gray-500 mb-4">Pull it from the recipe's website, or calculate it from your ingredients.</p>
-                    <button
-                      onClick={handleFetchNutrition}
-                      disabled={fetchingNutrition}
-                      className="w-full flex items-center justify-center gap-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl px-4 py-2 hover:bg-gray-50 transition-colors disabled:opacity-60 mb-2"
-                    >
-                      {fetchingNutrition ? (
-                        <><Loader2 size={14} className="animate-spin" /> Fetching...</>
-                      ) : (
-                        <><Zap size={14} /> Get from website</>
-                      )}
-                    </button>
-                    <button
-                      onClick={handleCalcFromIngredients}
-                      disabled={fetchingNutrition}
-                      className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-60"
-                    >
-                      {fetchingNutrition ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Calculating...</>
-                      ) : (
-                        <><Utensils className="w-4 h-4" /> Calculate from Ingredients</>
-                      )}
-                    </button>
-                    {refetchNote && (
-                      <p className="text-gray-500 text-xs mt-2 leading-relaxed">{refetchNote}</p>
-                    )}
-                    {nutritionError && (
-                      <p className="text-red-500 text-xs mt-2 font-medium">{nutritionError}</p>
-                    )}
-                  </div>
-
-                  {/* Manual Entry */}
-                  <div className="px-5 pb-5 border-t border-gray-100 pt-4">
-                    <p className="text-xs font-semibold text-gray-500 mb-3 flex items-center gap-1.5">
-                      <Pencil className="w-3 h-3" /> Or enter it yourself
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Calories</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.calories}
-                          onChange={function(e) { setManualNutrition(function(prev) { return Object.assign({}, prev, { calories: Number(e.target.value) }); }); }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Protein</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.protein}
-                          onChange={function(e) { setManualNutrition(function(prev) { return Object.assign({}, prev, { protein: Number(e.target.value) }); }); }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Carbs</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.carbs}
-                          onChange={function(e) { setManualNutrition(function(prev) { return Object.assign({}, prev, { carbs: Number(e.target.value) }); }); }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Fat</label>
-                        <input
-                          type="number"
-                          value={manualNutrition.fat}
-                          onChange={function(e) { setManualNutrition(function(prev) { return Object.assign({}, prev, { fat: Number(e.target.value) }); }); }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleSaveManualNutrition}
-                      className="mt-3 w-full flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-xl font-medium text-sm transition-colors border border-green-200"
-                    >
-                      <Save className="w-4 h-4" /> Save Nutrition
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Your notes — shows the note if there is one, otherwise a quiet invite */}
-              {chefNote ? (
-                <div className="bg-green-50 border border-green-100 rounded-2xl p-5">
-                  <h3 className="font-bold text-sm text-green-800 mb-2">Your notes</h3>
-                  <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">{chefNote}</p>
-                </div>
-              ) : (
-                <Link
-                  to={"/recipes/" + id + "/edit"}
-                  className="no-print block border-2 border-dashed border-green-200 rounded-2xl p-5 text-center hover:bg-green-50 transition-colors"
-                >
-                  <p className="text-sm font-semibold text-green-700">Add your notes</p>
-                  <p className="text-xs text-gray-500 mt-1">Swaps you made, what the family thought, tips for next time.</p>
-                </Link>
-              )}
-
-            </div>
-          </div>
-        </div>
-
-        {/* Print header */}
-        <div className="print-only p-6 border-b">
-          <h1 className="text-2xl font-bold text-gray-900">{recipe.title}</h1>
-          {sourceName && <p className="text-sm text-gray-500 mt-1">{sourceName}</p>}
-        </div>
-
-        <AddToPlannerModal
-          open={plannerOpen}
-          onClose={function() { setPlannerOpen(false); }}
-          recipe={recipe}
-          defaultMultiplier={servingsMultiplier}
-        />
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-[28px] shadow-2xl p-6 w-full max-w-sm text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <X size={24} className="text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Recipe?</h3>
-              <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this recipe? This action cannot be undone.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={function() { setShowDeleteModal(false); }}
-                  className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  No, Keep It
-                </button>
-                <button
-                  onClick={handleDeleteRecipe}
-                  className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
-                >
-                  Yes, Delete
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
-        {/* Bottom padding */}
-        <div className="h-12 no-print" />
-      </div>
-    </>
+        {submitError && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm">{submitError}</div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-60"
+        >
+          {loading ? (
+            <><Loader2 size={18} className="animate-spin" /> Saving...</>
+          ) : (
+            <><ChefHat size={18} /> {isEdit ? 'Update Recipe' : 'Save Recipe'}</>
+          )}
+        </button>
+      </form>
+    </div>
   );
 }
