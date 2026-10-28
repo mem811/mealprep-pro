@@ -155,6 +155,7 @@ export default function RecipeDetailPage() {
   var [nutrition, setNutrition] = useState(null);
   var [fetchingNutrition, setFetchingNutrition] = useState(false);
   var [nutritionError, setNutritionError] = useState('');
+  var [refetchNote, setRefetchNote] = useState('');
   var [manualNutrition, setManualNutrition] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
 
   // Rating state
@@ -213,14 +214,23 @@ export default function RecipeDetailPage() {
   var saveMissingTimes = async function(data) {
     var t = pickTimes(data);
     var updates = {};
+    var hadTimes = Number(recipe.prep_time) > 0 || Number(recipe.cook_time) > 0;
     if (t.prep && !(Number(recipe.prep_time) > 0)) updates.prep_time = t.prep;
     if (t.cook && !(Number(recipe.cook_time) > 0)) updates.cook_time = t.cook;
-    if (Object.keys(updates).length === 0) return;
+    if (Object.keys(updates).length === 0) {
+      // Nothing new: either it already had times, or the site doesn't list any
+      return hadTimes ? '' : "This site doesn't list prep or cook times. You can add them with Edit Recipe.";
+    }
     try {
       var saved = await pb.collection('recipes').update(recipe.id, updates);
       setRecipe(saved);
+      var added = [];
+      if (updates.prep_time) added.push('prep ' + formatMinutes(updates.prep_time));
+      if (updates.cook_time) added.push('cook ' + formatMinutes(updates.cook_time));
+      return 'Added ' + added.join(' and ') + '.';
     } catch (err) {
       console.error('Time save error:', err);
+      return "Found the times but couldn't save them. Try again in a moment.";
     }
   };
 
@@ -228,7 +238,10 @@ export default function RecipeDetailPage() {
     if (!recipe) return;
     setFetchingNutrition(true);
     setNutritionError('');
+    setRefetchNote('');
     var apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
+    var siteRead = false;
+    var timeNote = '';
     try {
       // 1. The recipe's own published nutrition, via our importer
       if (recipe.source_url) {
@@ -241,7 +254,10 @@ export default function RecipeDetailPage() {
           if (extractRes.ok) {
             var payload = await extractRes.json();
             var extracted = Array.isArray(payload) ? payload[0] : payload;
-            if (extracted && extracted.ok) await saveMissingTimes(extracted);
+            if (extracted && extracted.ok) {
+              siteRead = true;
+              timeNote = await saveMissingTimes(extracted);
+            }
             var published = extracted && extracted.ok ? parseNutritionObject(extracted.nutrition) : null;
             if (published) {
               var recipeServings = Number(extracted.servings) || Number(recipe.servings) || null;
@@ -258,6 +274,7 @@ export default function RecipeDetailPage() {
               };
               await pb.collection('recipes').update(recipe.id, { nutrition: JSON.stringify(np) });
               setNutrition(np);
+              setRefetchNote(timeNote || 'Everything is up to date.');
               setFetchingNutrition(false);
               return;
             }
@@ -266,6 +283,17 @@ export default function RecipeDetailPage() {
           console.error('Recipe nutrition lookup failed, trying Spoonacular:', extractErr);
         }
       }
+      // The recipe's own numbers are better than any estimate, so keep them
+      // when the website couldn't be reached
+      if (nutrition && nutrition.source === 'recipe') {
+        setRefetchNote(siteRead
+          ? (timeNote || 'Everything is up to date.')
+          : "This recipe's website wouldn't let us in right now, so nothing changed. You can add times yourself with Edit Recipe.");
+        setFetchingNutrition(false);
+        return;
+      }
+      if (timeNote) setRefetchNote(timeNote);
+      else if (!siteRead && recipe.source_url) setRefetchNote("This recipe's website wouldn't let us in, so we couldn't check for times. You can add them with Edit Recipe.");
       // 2. Fall back to Spoonacular's estimate
       if (recipe.source_url) {
         var res = await fetch(
@@ -309,7 +337,7 @@ export default function RecipeDetailPage() {
       }
     } catch (e) {
       console.error(e);
-      setNutritionError('Error fetching nutrition.');
+      setNutritionError("Couldn't get new nutrition right now. Your current numbers are unchanged.");
     } finally {
       setFetchingNutrition(false);
     }
@@ -758,6 +786,9 @@ export default function RecipeDetailPage() {
                       {fetchingNutrition ? <Loader2 className="w-3 h-3 animate-spin" /> : <Utensils className="w-3 h-3" />}
                       Recalculate
                     </button>
+                    {refetchNote && (
+                      <p className="col-span-2 text-gray-500 text-xs mt-1 text-center leading-relaxed">{refetchNote}</p>
+                    )}
                     {nutritionError && (
                       <p className="col-span-2 text-red-500 text-xs mt-1 font-medium text-center">{nutritionError}</p>
                     )}
@@ -793,6 +824,9 @@ export default function RecipeDetailPage() {
                         <><Utensils className="w-4 h-4" /> Calculate from Ingredients</>
                       )}
                     </button>
+                    {refetchNote && (
+                      <p className="text-gray-500 text-xs mt-2 leading-relaxed">{refetchNote}</p>
+                    )}
                     {nutritionError && (
                       <p className="text-red-500 text-xs mt-2 font-medium">{nutritionError}</p>
                     )}
