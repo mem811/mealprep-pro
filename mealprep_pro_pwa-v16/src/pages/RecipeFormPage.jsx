@@ -14,6 +14,53 @@ const TAG_OPTIONS = [
 
 const UNITS = ['cup', 'tbsp', 'tsp', 'oz', 'lb', 'g', 'kg', 'ml', 'l', 'piece', 'slice', 'clove', 'bunch', 'can', 'package', 'pinch', 'to taste'];
 
+// ── Cook time helpers ──
+// Recipe sites write times in many ways: 25, "25", "PT25M", "PT1H15M",
+// "25 mins", "1 hour 15 minutes". This turns any of them into plain minutes
+// (or '' if there's no time), which is what the Cook/Prep boxes and the
+// database expect.
+const toMinutes = (value) => {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'number') return value > 0 ? Math.round(value) : '';
+  const s = String(value).trim();
+  if (!s) return '';
+
+  // Plain number: "25"
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = Math.round(Number(s));
+    return n > 0 ? n : '';
+  }
+
+  // Coded format recipe sites use behind the scenes: "PT1H15M", "P0DT0H25M"
+  const iso = s.match(/^P(?:(\d+)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i);
+  if (iso && /\d/.test(s)) {
+    const mins = (Number(iso[1]) || 0) * 1440 + (Number(iso[2]) || 0) * 60 + (Number(iso[3]) || 0) + (Number(iso[4]) || 0) / 60;
+    return mins > 0 ? Math.round(mins) : '';
+  }
+
+  // Written out: "1 hour 15 minutes", "1 hr 15 min", "25 mins"
+  const hours = s.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i);
+  const minutes = s.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i);
+  if (hours || minutes) {
+    const mins = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
+    return mins > 0 ? Math.round(mins) : '';
+  }
+
+  const n = parseInt(s, 10);
+  return n > 0 ? n : '';
+};
+
+// Pulls prep and cook time out of whatever the importer sent. If a site only
+// lists a total time, cook time becomes the total minus prep (or the total).
+const pickTimes = (data) => {
+  if (!data) return { prep: '', cook: '' };
+  const prep = toMinutes(data.prep_time ?? data.prepTime);
+  let cook = toMinutes(data.cook_time ?? data.cookTime);
+  const total = toMinutes(data.total_time ?? data.totalTime);
+  if (!cook && total) cook = prep && total > prep ? total - prep : total;
+  return { prep, cook };
+};
+
 export default function RecipeFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -36,6 +83,8 @@ export default function RecipeFormPage() {
   const [error, setError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [duplicateRecipe, setDuplicateRecipe] = useState(null);
+  const [updatingDuplicate, setUpdatingDuplicate] = useState(false);
+  const [duplicateNote, setDuplicateNote] = useState(null);
 
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
@@ -73,13 +122,28 @@ export default function RecipeFormPage() {
   const applyParsed = (p) => {
     if (p.title) setTitle(p.title);
     if (p.servings) setServings(p.servings);
-    if (p.prep_time) setPrepTime(p.prep_time);
-    if (p.cook_time) setCookTime(p.cook_time);
+    const times = pickTimes(p);
+    if (times.prep) setPrepTime(times.prep);
+    if (times.cook) setCookTime(times.cook);
     if (p.image_url) setImageUrl(p.image_url);
     if (p.source_url) setSourceUrl(p.source_url);
     if (p.ingredients?.length) setIngredients(p.ingredients);
     if (p.instructions) setInstructions(p.instructions);
     if (p.nutrition) setPublishedNutrition(p.nutrition, p.servings);
+  };
+
+  // As soon as a recipe comes in, check whether it's already saved, so the
+  // "already have this" box shows right away instead of after tapping Save
+  const checkExisting = async (url) => {
+    if (isEdit || !url || !pb.authStore.model) return;
+    try {
+      const found = await pb.collection('recipes').getList(1, 1, {
+        filter: `user = "${pb.authStore.model.id}" && source_url = "${url}"`,
+      });
+      if (found.items.length > 0) setDuplicateRecipe(found.items[0]);
+    } catch (err) {
+      console.error('Existing recipe check error:', err);
+    }
   };
 
   // Browser Save button lands here as /app/recipes/new#mpp=<recipe data>
@@ -101,8 +165,13 @@ export default function RecipeFormPage() {
       try { raw = JSON.parse(decodeURIComponent(match[1])); } catch { raw = JSON.parse(match[1]); }
       const parsed = parseBookmarkletPayload(raw);
       if (!parsed || (!parsed.title && parsed.ingredients.length === 0)) throw new Error('empty');
+      // The raw page data may carry times the parser didn't keep
+      const rawTimes = pickTimes(raw);
+      if (!parsed.prep_time && rawTimes.prep) parsed.prep_time = rawTimes.prep;
+      if (!parsed.cook_time && rawTimes.cook) parsed.cook_time = rawTimes.cook;
       applyParsed(parsed);
       setImportNotice('Recipe grabbed from your browser. Look it over, then save.');
+      checkExisting(parsed.source_url);
     } catch (err) {
       console.error('Browser import error:', err);
       setImportError("Couldn't read that recipe. Highlight the recipe text on the page and click the Save button again.");
@@ -237,10 +306,14 @@ export default function RecipeFormPage() {
         return;
       }
 
+      // Handy for checking what the importer actually sends (open the browser console)
+      console.log('Importer times:', { prep_time: data.prep_time, cook_time: data.cook_time, total_time: data.total_time, prepTime: data.prepTime, cookTime: data.cookTime, totalTime: data.totalTime });
+
+      const times = pickTimes(data);
       setTitle(data.title || '');
       setServings(data.servings || 4);
-      setPrepTime(data.prep_time || '');
-      setCookTime(data.cook_time || '');
+      setPrepTime(times.prep);
+      setCookTime(times.cook);
       setImageUrl(data.image_url || '');
       setSourceUrl(data.source_url || importUrl.trim());
 
@@ -259,6 +332,7 @@ export default function RecipeFormPage() {
       }
       // The importer sends zeros when a page publishes no nutrition
       setPublishedNutrition(parseNutritionObject(data.nutrition), data.servings);
+      checkExisting(data.source_url || importUrl.trim());
       setImportUrl('');
       setImportNotice('Recipe imported. Look it over, then save.');
     } catch (err) {
@@ -274,10 +348,39 @@ export default function RecipeFormPage() {
     }
   };
 
+  // When a recipe is already saved, fill in the times it's missing instead of
+  // making a second copy. Keeps its rating, favorite, notes, and planner spots.
+  const prepFound = Number(toMinutes(prepTime)) || 0;
+  const cookFound = Number(toMinutes(cookTime)) || 0;
+  const duplicateMissing = duplicateRecipe ? {
+    prep: prepFound && !(Number(duplicateRecipe.prep_time) > 0) ? prepFound : 0,
+    cook: cookFound && !(Number(duplicateRecipe.cook_time) > 0) ? cookFound : 0,
+  } : { prep: 0, cook: 0 };
+
+  const handleUpdateDuplicateTimes = async () => {
+    if (!duplicateRecipe) return;
+    const updates = {};
+    if (duplicateMissing.prep) updates.prep_time = duplicateMissing.prep;
+    if (duplicateMissing.cook) updates.cook_time = duplicateMissing.cook;
+    if (Object.keys(updates).length === 0) return;
+    setUpdatingDuplicate(true);
+    setDuplicateNote(null);
+    try {
+      await pb.collection('recipes').update(duplicateRecipe.id, updates);
+      navigate('/recipes/' + duplicateRecipe.id, { replace: true });
+    } catch (err) {
+      console.error('Update times error:', err);
+      setDuplicateNote("Couldn't update it just now. Try again in a moment.");
+    } finally {
+      setUpdatingDuplicate(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
     setDuplicateRecipe(null);
+    setDuplicateNote(null);
 
     if (!title.trim()) {
       setSubmitError('Recipe title is required.');
@@ -291,6 +394,7 @@ export default function RecipeFormPage() {
         });
         if (dupeCheck.items.length > 0) {
           setDuplicateRecipe(dupeCheck.items[0]);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
       } catch (err) {
@@ -301,14 +405,16 @@ export default function RecipeFormPage() {
     setLoading(true);
     try {
       let payload;
+      const prepMinutes = Number(toMinutes(prepTime)) || 0;
+      const cookMinutes = Number(toMinutes(cookTime)) || 0;
 
       if (imageFile) {
         payload = new FormData();
         payload.append('user', pb.authStore.model.id);
         payload.append('title', title.trim());
         payload.append('servings', Number(servings));
-        payload.append('prep_time', Number(prepTime) || 0);
-        payload.append('cook_time', Number(cookTime) || 0);
+        payload.append('prep_time', prepMinutes);
+        payload.append('cook_time', cookMinutes);
         payload.append('instructions', instructions.trim());
         payload.append('ingredients', JSON.stringify(ingredients.filter((i) => i.name.trim())));
         payload.append('tags', JSON.stringify(tags));
@@ -321,8 +427,8 @@ export default function RecipeFormPage() {
           user: pb.authStore.model.id,
           title: title.trim(),
           servings: Number(servings),
-          prep_time: Number(prepTime) || 0,
-          cook_time: Number(cookTime) || 0,
+          prep_time: prepMinutes,
+          cook_time: cookMinutes,
           instructions: instructions.trim(),
           ingredients: JSON.stringify(ingredients.filter((i) => i.name.trim())),
           tags: JSON.stringify(tags),
@@ -348,49 +454,49 @@ export default function RecipeFormPage() {
         var savedRecipe = await pb.collection('recipes').create(payload);
       }
       // ── Fix image URL after file upload ──
-        if (imageFile && savedRecipe && savedRecipe.image_file) {
-          var fileUrl = pb.getFileUrl(savedRecipe, savedRecipe.image_file);
-          await pb.collection('recipes').update(savedRecipe.id, { image_url: fileUrl });
-          console.log('Image URL set:', fileUrl);
-        }
-// ── Nutrition ──
-// Numbers published by the recipe win over an estimate. They're kept while
-// they still describe this recipe, scaled if only the servings changed, and
-// replaced with an estimate if the ingredients were edited.
-const ingredientList = ingredients.filter(i => i.name.trim());
-const servingCount = Number(servings) || 1;
-const recipeId = savedRecipe?.id || id;
-const decision = decideNutrition({
-  current: readNutrition(nutrition),
-  servingCount,
-  ingredientsChanged: isEdit && originalIngredientsKey.current !== null
-    && originalIngredientsKey.current !== ingredientsKey(ingredientList),
-});
-
-try {
-  if (decision.action !== 'estimate') {
-    await pb.collection('recipes').update(recipeId, { nutrition: JSON.stringify(decision.nutrition) });
-  } else if (ingredientList.length > 0) {
-    const { fetchNutritionFromIngredients } = await import('../utils/fetchNutritionFromIngredients');
-    const result = await fetchNutritionFromIngredients(ingredientList, servingCount);
-    if (result?.perServing) {
-      await pb.collection('recipes').update(recipeId, {
-        nutrition: JSON.stringify({
-          calories: result.perServing.calories,
-          protein: result.perServing.protein,
-          carbs: result.perServing.carbs,
-          fat: result.perServing.fat,
-          source: 'estimate',
-          servings: servingCount,
-        }),
+      if (imageFile && savedRecipe && savedRecipe.image_file) {
+        var fileUrl = pb.getFileUrl(savedRecipe, savedRecipe.image_file);
+        await pb.collection('recipes').update(savedRecipe.id, { image_url: fileUrl });
+        console.log('Image URL set:', fileUrl);
+      }
+      // ── Nutrition ──
+      // Numbers published by the recipe win over an estimate. They're kept while
+      // they still describe this recipe, scaled if only the servings changed, and
+      // replaced with an estimate if the ingredients were edited.
+      const ingredientList = ingredients.filter(i => i.name.trim());
+      const servingCount = Number(servings) || 1;
+      const recipeId = savedRecipe?.id || id;
+      const decision = decideNutrition({
+        current: readNutrition(nutrition),
+        servingCount,
+        ingredientsChanged: isEdit && originalIngredientsKey.current !== null
+          && originalIngredientsKey.current !== ingredientsKey(ingredientList),
       });
-    }
-  }
-} catch (nutritionErr) {
-  console.error('Nutrition save error (non-blocking):', nutritionErr);
-}
 
-navigate('/app/recipes', { replace: true });
+      try {
+        if (decision.action !== 'estimate') {
+          await pb.collection('recipes').update(recipeId, { nutrition: JSON.stringify(decision.nutrition) });
+        } else if (ingredientList.length > 0) {
+          const { fetchNutritionFromIngredients } = await import('../utils/fetchNutritionFromIngredients');
+          const result = await fetchNutritionFromIngredients(ingredientList, servingCount);
+          if (result?.perServing) {
+            await pb.collection('recipes').update(recipeId, {
+              nutrition: JSON.stringify({
+                calories: result.perServing.calories,
+                protein: result.perServing.protein,
+                carbs: result.perServing.carbs,
+                fat: result.perServing.fat,
+                source: 'estimate',
+                servings: servingCount,
+              }),
+            });
+          }
+        }
+      } catch (nutritionErr) {
+        console.error('Nutrition save error (non-blocking):', nutritionErr);
+      }
+
+      navigate('/app/recipes', { replace: true });
     } catch (err) {
       console.error('Full error:', err.response);
       setSubmitError(err?.response?.message || err?.message || 'Failed to save recipe.');
@@ -421,6 +527,36 @@ navigate('/app/recipes', { replace: true });
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">{error}</div>
       )}
+
+      {/* Already saved — shown at the top so it can't be missed */}
+      {duplicateRecipe && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm mb-6">
+          <p className="font-semibold mb-1">Looks like you already have this recipe!</p>
+          {(duplicateMissing.prep || duplicateMissing.cook) ? (
+            <>
+              <p className="text-amber-700 text-xs mb-3">
+                Your saved copy is missing its
+                {duplicateMissing.prep && duplicateMissing.cook ? ' prep and cook times' : duplicateMissing.prep ? ' prep time' : ' cook time'}.
+                Add them from this import without losing your rating, notes, or meal plans.
+              </p>
+              <button
+                type="button"
+                onClick={handleUpdateDuplicateTimes}
+                disabled={updatingDuplicate}
+                className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 mb-2"
+              >
+                {updatingDuplicate ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
+                Add the times to my saved recipe
+              </button>
+              {duplicateNote && <p className="text-red-500 text-xs mb-2">{duplicateNote}</p>}
+            </>
+          ) : null}
+          <Link to={`/recipes/${duplicateRecipe.id}`} className="text-green-600 underline font-medium">
+            View existing recipe →
+          </Link>
+        </div>
+      )}
+
 
       {/* Import from URL */}
       <div className={`mb-6 p-4 rounded-2xl border ${isPro ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
@@ -721,16 +857,6 @@ navigate('/app/recipes', { replace: true });
             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 text-sm resize-none"
           />
         </div>
-
-        {/* Duplicate Warning */}
-        {duplicateRecipe && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
-            <p className="font-semibold mb-1">Looks like you already have this recipe!</p>
-            <Link to={`/app/recipes/${duplicateRecipe.id}`} className="text-green-600 underline font-medium">
-              View existing recipe →
-            </Link>
-          </div>
-        )}
 
         {submitError && (
           <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm">{submitError}</div>
