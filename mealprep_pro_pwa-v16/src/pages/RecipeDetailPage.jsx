@@ -89,6 +89,43 @@ const formatQty = (num) => {
   return String(parseFloat(num.toFixed(2)));
 };
 
+// Recipe sites write times as 25, "PT25M", "PT1H15M", "25 mins", etc.
+// This turns any of them into plain minutes ('' if there's no time).
+const toMinutes = (value) => {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'number') return value > 0 ? Math.round(value) : '';
+  var s = String(value).trim();
+  if (!s) return '';
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    var n0 = Math.round(Number(s));
+    return n0 > 0 ? n0 : '';
+  }
+  var iso = s.match(/^P(?:(\d+)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i);
+  if (iso && /\d/.test(s)) {
+    var m1 = (Number(iso[1]) || 0) * 1440 + (Number(iso[2]) || 0) * 60 + (Number(iso[3]) || 0) + (Number(iso[4]) || 0) / 60;
+    return m1 > 0 ? Math.round(m1) : '';
+  }
+  var hours = s.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i);
+  var minutes = s.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i);
+  if (hours || minutes) {
+    var m2 = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
+    return m2 > 0 ? Math.round(m2) : '';
+  }
+  var n = parseInt(s, 10);
+  return n > 0 ? n : '';
+};
+
+// Prep and cook time from the importer. A site that only lists a total time
+// gets cook time = total minus prep (or the total).
+const pickTimes = (data) => {
+  if (!data) return { prep: '', cook: '' };
+  var prep = toMinutes(data.prep_time != null ? data.prep_time : data.prepTime);
+  var cook = toMinutes(data.cook_time != null ? data.cook_time : data.cookTime);
+  var total = toMinutes(data.total_time != null ? data.total_time : data.totalTime);
+  if (!cook && total) cook = prep && total > prep ? total - prep : total;
+  return { prep: prep, cook: cook };
+};
+
 const formatMinutes = (mins) => {
   var m = Number(mins);
   if (!m || m <= 0) return null;
@@ -171,6 +208,22 @@ export default function RecipeDetailPage() {
     window.print();
   };
 
+  // Fills in prep/cook time from the recipe's website, but only where this
+  // recipe doesn't have one yet, so times you typed yourself are never replaced
+  var saveMissingTimes = async function(data) {
+    var t = pickTimes(data);
+    var updates = {};
+    if (t.prep && !(Number(recipe.prep_time) > 0)) updates.prep_time = t.prep;
+    if (t.cook && !(Number(recipe.cook_time) > 0)) updates.cook_time = t.cook;
+    if (Object.keys(updates).length === 0) return;
+    try {
+      var saved = await pb.collection('recipes').update(recipe.id, updates);
+      setRecipe(saved);
+    } catch (err) {
+      console.error('Time save error:', err);
+    }
+  };
+
   var handleFetchNutrition = async function() {
     if (!recipe) return;
     setFetchingNutrition(true);
@@ -188,6 +241,7 @@ export default function RecipeDetailPage() {
           if (extractRes.ok) {
             var payload = await extractRes.json();
             var extracted = Array.isArray(payload) ? payload[0] : payload;
+            if (extracted && extracted.ok) await saveMissingTimes(extracted);
             var published = extracted && extracted.ok ? parseNutritionObject(extracted.nutrition) : null;
             if (published) {
               var recipeServings = Number(extracted.servings) || Number(recipe.servings) || null;
@@ -357,7 +411,13 @@ export default function RecipeDetailPage() {
   var steps = parseInstructions(recipe.instructions);
   var sourceName = getSourceName(recipe.source_url);
   var proxiedImage = getProxiedImage(recipe.image_url);
-  var cookTimeLabel = formatMinutes(recipe.cook_time);
+  var prepMins = Number(recipe.prep_time) > 0 ? Number(recipe.prep_time) : 0;
+  var cookMins = Number(recipe.cook_time) > 0 ? Number(recipe.cook_time) : 0;
+  // Each time gets its own label; total only shows when there's both to add up
+  var timeParts = [];
+  if (prepMins) timeParts.push({ label: 'Prep', value: formatMinutes(prepMins) });
+  if (cookMins) timeParts.push({ label: 'Cook', value: formatMinutes(cookMins) });
+  if (prepMins && cookMins) timeParts.push({ label: 'Total', value: formatMinutes(prepMins + cookMins) });
   var chefNote = recipe.notes || recipe.chef_note || '';
 
   var scaledQty = function(qty) {
@@ -485,10 +545,18 @@ export default function RecipeDetailPage() {
                     })}
                   </div>
                 </div>
-                {cookTimeLabel && (
+                {timeParts.length > 0 && (
                   <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2">
-                    <Clock className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-700 font-medium">{cookTimeLabel}</span>
+                    <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    {timeParts.map(function(part, i) {
+                      return (
+                        <span key={part.label} className="flex items-center gap-2 text-sm">
+                          {i > 0 && <span className="w-px h-4 bg-gray-300" aria-hidden="true" />}
+                          <span className="text-gray-500">{part.label}</span>
+                          <span className="text-gray-800 font-semibold">{part.value}</span>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
                 {sourceName && (
