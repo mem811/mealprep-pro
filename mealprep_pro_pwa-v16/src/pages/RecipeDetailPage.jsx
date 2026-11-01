@@ -5,8 +5,15 @@ import { parseNutritionObject } from '../lib/recipeParse';
 import AddToPlannerModal from '../components/AddToPlannerModal';
 import {
   ArrowLeft, Pencil, Printer, CalendarPlus,
-  Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils, Heart, X
+  Clock, Users, Globe, ChefHat, Check, Loader2, Zap, Star, Save, Utensils, Heart, X, Plus
 } from 'lucide-react';
+
+// Same list as the Add/Edit Recipe form, so tags match everywhere
+const TAG_OPTIONS = [
+  'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Sides', 'Soups',
+  'Vegetarian', 'Vegan', 'Gluten-Free', 'High-Protein', 'Low-Carb',
+  'Quick (under 30 min)', 'Meal Prep', 'Bread'
+];
 
 const RECIPE_EXTRACT_WEBHOOK = 'https://n8n.srv1052955.hstgr.cloud/webhook/recipe-extract';
 
@@ -164,6 +171,10 @@ export default function RecipeDetailPage() {
 
   // Delete modal state
   var [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Quick tag picker
+  var [showTagPicker, setShowTagPicker] = useState(false);
+  var [tagError, setTagError] = useState('');
 
   useEffect(function() {
     var fetchRecipe = async function() {
@@ -405,6 +416,25 @@ export default function RecipeDetailPage() {
     }
   };
 
+  // Add or remove a tag right from the recipe page. Saves immediately.
+  var toggleTag = async function(tag) {
+    if (!recipe) return;
+    var current = parseTags(recipe.tags);
+    var next = current.includes(tag)
+      ? current.filter(function(t) { return t !== tag; })
+      : current.concat([tag]);
+    var previous = recipe;
+    setTagError('');
+    setRecipe(Object.assign({}, recipe, { tags: next })); // show it right away
+    try {
+      await pb.collection('recipes').update(recipe.id, { tags: JSON.stringify(next) });
+    } catch (err) {
+      console.error('Tag save error:', err);
+      setRecipe(previous);
+      setTagError("Couldn't save that tag. Try again in a moment.");
+    }
+  };
+
   var handleDeleteRecipe = async function() {
     try {
       await pb.collection('recipes').delete(recipe.id);
@@ -626,21 +656,69 @@ export default function RecipeDetailPage() {
                 </div>
               </div>
 
-              {/* Tags */}
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {tags.map(function(tag, i) {
+              {/* Tags — add or remove without going into Edit */}
+              <div className="mt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {tags.map(function(tag) {
                     return (
                       <span
-                        key={i}
-                        className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full border border-green-200"
+                        key={tag}
+                        className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold pl-3 pr-1.5 py-1 rounded-full border border-green-200"
                       >
                         {tag}
+                        <button
+                          onClick={function() { toggleTag(tag); }}
+                          aria-label={'Remove ' + tag}
+                          className="no-print w-4 h-4 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </span>
                     );
                   })}
+                  <button
+                    onClick={function() { setShowTagPicker(function(v) { return !v; }); }}
+                    className={"no-print flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full border border-dashed transition-colors " +
+                      (tags.length === 0
+                        ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        : 'border-green-300 text-green-700 hover:bg-green-50')}
+                  >
+                    <Plus className="w-3 h-3" />
+                    {tags.length === 0 ? 'Add a category' : 'Add tag'}
+                  </button>
                 </div>
-              )}
+
+                {showTagPicker && (
+                  <div className="no-print mt-3 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
+                    <p className="text-xs text-gray-500 mb-3">Tap to add or remove. It saves right away.</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TAG_OPTIONS.map(function(option) {
+                        var on = tags.includes(option);
+                        return (
+                          <button
+                            key={option}
+                            onClick={function() { toggleTag(option); }}
+                            className={"flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors " +
+                              (on
+                                ? 'bg-green-500 text-white border-green-500'
+                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-green-50 hover:text-green-700')}
+                          >
+                            {on ? <Check className="w-3 h-3" strokeWidth={3} /> : <Plus className="w-3 h-3" />}
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={function() { setShowTagPicker(false); }}
+                      className="mt-3 text-xs font-semibold text-green-700 hover:underline"
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
+                {tagError && <p className="text-red-500 text-xs mt-2">{tagError}</p>}
+              </div>
 
               {/* Ingredients & Instructions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
