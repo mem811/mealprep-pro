@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, ArrowRight, Box, User, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Box, User, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import pb from '../lib/pb';
 
 export default function AuthPage() {
@@ -11,9 +11,14 @@ export default function AuthPage() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isReset, setIsReset] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
+
+  const openReset = () => { setIsReset(true); setResetSent(false); setError(''); };
+  const closeReset = () => { setIsReset(false); setResetSent(false); setError(''); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,6 +26,19 @@ export default function AuthPage() {
 
     setLoading(true);
     setError('');
+
+    // Forgot password: PocketBase emails a link to set a new password
+    if (isReset) {
+      try {
+        await pb.collection('users').requestPasswordReset(email);
+        setResetSent(true);
+      } catch (err) {
+        setError(err.response?.message || err.message || 'Could not send the reset email. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       let result;
@@ -81,13 +99,25 @@ export default function AuthPage() {
             <Box className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isLogin ? 'Welcome Back' : 'Get Started'}
+            {isReset ? 'Reset Password' : isLogin ? 'Welcome Back' : 'Get Started'}
           </h1>
           <p className="text-gray-500 text-sm mt-1 text-center">
-            {isLogin ? 'Sign in to access your meal plan' : 'Create an account to start planning'}
+            {isReset
+              ? "Enter your email and we'll send you a link to set a new password"
+              : isLogin ? 'Sign in to access your meal plan' : 'Create an account to start planning'}
           </p>
         </div>
 
+        {isReset && resetSent ? (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+            <p className="text-emerald-700 text-sm font-medium leading-relaxed">
+              If an account exists for {email}, a reset link is on its way. Check your inbox (and spam folder).
+            </p>
+          </div>
+        ) : (
+        <>
+        {!isReset && (
         <div className="flex bg-gray-100 rounded-2xl p-1 mb-8">
           <button
             type="button"
@@ -104,9 +134,10 @@ export default function AuthPage() {
             Join Now
           </button>
         </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
+          {!isLogin && !isReset && (
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase px-1">Full Name</label>
               <div className="relative">
@@ -138,6 +169,7 @@ export default function AuthPage() {
             </div>
           </div>
 
+          {!isReset && (
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-500 uppercase px-1">Password</label>
             <div className="relative">
@@ -151,7 +183,19 @@ export default function AuthPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
+            {isLogin && (
+              <div className="text-right pt-1">
+                <button
+                  type="button"
+                  onClick={openReset}
+                  className="text-xs font-bold text-emerald-600 hover:underline px-1"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
+          )}
 
           {error && (
             <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-start gap-3">
@@ -168,17 +212,30 @@ export default function AuthPage() {
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Authenticating...</span>
+                <span>{isReset ? 'Sending...' : 'Authenticating...'}</span>
               </>
             ) : (
               <>
-                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+                <span>{isReset ? 'Send Reset Link' : isLogin ? 'Sign In' : 'Create Account'}</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </>
             )}
           </button>
         </form>
+        </>
+        )}
 
+        {isReset ? (
+        <p className="text-center text-sm font-medium text-gray-400 mt-8">
+          <button
+            type="button"
+            onClick={closeReset}
+            className="text-emerald-600 font-bold hover:underline"
+          >
+            Back to Sign In
+          </button>
+        </p>
+        ) : (
         <p className="text-center text-sm font-medium text-gray-400 mt-8">
           {isLogin ? "New to MealPrep Pro?" : "Already have an account?"}{' '}
           <button
@@ -189,6 +246,7 @@ export default function AuthPage() {
             {isLogin ? 'Sign Up Free' : 'Sign In'}
           </button>
         </p>
+        )}
       </div>
     </div>
   );
