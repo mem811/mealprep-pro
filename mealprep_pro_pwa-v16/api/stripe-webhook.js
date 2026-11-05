@@ -51,6 +51,11 @@ async function setUserPlan(userId, plan, customerId) {
       body: JSON.stringify(body),
     }
   );
+  // This Stripe account also serves other apps; their users aren't in PocketBase
+  if (pbRes.status === 404) {
+    console.warn(`User ${userId} not found in PocketBase; skipping`);
+    return;
+  }
   if (!pbRes.ok) {
     const err = await pbRes.json().catch(() => ({}));
     throw new Error(`PocketBase update failed: ${JSON.stringify(err)}`);
@@ -113,9 +118,12 @@ export default async function handler(req, res) {
 
       // Card failed or a renewal was paid: re-check the subscription status
       case 'invoice.payment_failed':
-      case 'invoice.paid':
-        if (obj.subscription) await syncFromSubscription(obj.subscription);
+      case 'invoice.paid': {
+        // Newer Stripe API versions moved the subscription id under parent
+        const subId = obj.subscription || obj.parent?.subscription_details?.subscription;
+        if (subId) await syncFromSubscription(subId);
         break;
+      }
 
       default:
         break;
