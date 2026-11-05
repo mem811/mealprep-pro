@@ -93,7 +93,6 @@ function parseIngredient(ing) {
 export async function fetchNutritionFromIngredients(ingredients, servings) {
   try {
     const parsed = ingredients.map(parseIngredient);
-    console.log('Parsed ingredients for n8n:', parsed);
 
     const res = await fetch(N8N_NUTRITION_WEBHOOK, {
       method: 'POST',

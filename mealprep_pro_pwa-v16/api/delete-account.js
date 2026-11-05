@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { adminToken, pbFetch } from './_pbAdmin.js';
+import { adminToken, pbFetch, currentUser } from './_pbAdmin.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -58,15 +58,8 @@ export default async function handler(req, res) {
   }
 
   // Confirm who is asking, using the user's own login token
-  const userToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!userToken) return res.status(401).json({ error: 'Not signed in' });
-
-  const who = await fetch(`${process.env.POCKETBASE_URL}/api/collections/users/auth-refresh`, {
-    method: 'POST',
-    headers: { Authorization: userToken },
-  });
-  if (!who.ok) return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
-  const { record: user } = await who.json();
+  const user = await currentUser(req);
+  if (!user) return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
 
   try {
     // Stop billing first, so nobody is charged for a deleted account

@@ -111,7 +111,6 @@ export default function GroceryListPage() {
         }
         setCheckedItems(savedChecks);
       } catch (err) {
-        console.log('No saved checks found');
       }
 
       var allItems = finalizeGroceryItems(itemMap);
@@ -162,7 +161,7 @@ export default function GroceryListPage() {
         });
       }
     } catch (err) {
-      console.log('Error saving check: ' + err);
+      console.error('Error saving check:', err);
     }
   }
 

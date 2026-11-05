@@ -18,10 +18,14 @@ export default async function handler(req, res) {
       mode: 'subscription',
       allow_promotion_codes: true,
       payment_method_types: ['card'],
+      // Trial needs no card. If no card is added by the end, the
+      // subscription cancels and the webhook moves them back to Free.
+      payment_method_collection: 'if_required',
       line_items: [{ price: priceId, quantity: 1 }],
       customer_email: userEmail,
       subscription_data: {
         trial_period_days: 14,
+        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
         metadata: { userId },
       },
       success_url: `https://mealplanner.cloud/app/profile?upgraded=true`,

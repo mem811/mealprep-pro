@@ -250,7 +250,7 @@ export default function RecipeDetailPage() {
     setFetchingNutrition(true);
     setNutritionError('');
     setRefetchNote('');
-    var apiKey = import.meta.env.VITE_SPOONACULAR_API_KEY;
+    var authHeader = { Authorization: 'Bearer ' + pb.authStore.token };
     var siteRead = false;
     var timeNote = '';
     try {
@@ -308,7 +308,8 @@ export default function RecipeDetailPage() {
       // 2. Fall back to Spoonacular's estimate
       if (recipe.source_url) {
         var res = await fetch(
-          "https://api.spoonacular.com/recipes/extract?url=" + encodeURIComponent(recipe.source_url) + "&addRecipeNutrition=true&apiKey=" + apiKey
+          "/api/spoonacular?action=extract&url=" + encodeURIComponent(recipe.source_url),
+          { headers: authHeader }
         );
         if (res.ok) {
           var data = await res.json();
@@ -330,7 +331,8 @@ export default function RecipeDetailPage() {
       }
       var title = recipe.title || '';
       var nutRes = await fetch(
-        "https://api.spoonacular.com/recipes/guessNutrition?title=" + encodeURIComponent(title) + "&apiKey=" + apiKey
+        "/api/spoonacular?action=guessNutrition&title=" + encodeURIComponent(title),
+        { headers: authHeader }
       );
       if (nutRes.ok) {
         var nutData = await nutRes.json();
@@ -370,9 +372,7 @@ export default function RecipeDetailPage() {
         return;
       }
 
-      console.log('Calculating from', ingredientList.length, 'ingredients...');
       var result = await fetchNutritionFromIngredients(ingredientList, servingCount);
-      console.log('Result:', result);
 
       if (result && result.perServing) {
         var n = {

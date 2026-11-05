@@ -259,7 +259,7 @@ export default function HomePage() {
 			var existing=await pb.collection("grocery_checks").getList(1,1,{filter:`user="${userId}" && week_start="${weekStart}" && item_key="${itemKey}"`});
 			if(existing.items.length>0){await pb.collection("grocery_checks").update(existing.items[0].id,{checked:next});}
 			else{await pb.collection("grocery_checks").create({user:userId,week_start:weekStart,item_key:itemKey,checked:next});}
-		}catch(err){console.log(err);}
+		}catch(err){console.error(err);}
 	}
 
 	var removeSlot = async function(slotId) {

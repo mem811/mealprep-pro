@@ -19,6 +19,26 @@ export default function ProfilePage() {
   const [goalsSaved, setGoalsSaved] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState('');
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    setPortalError('');
+    try {
+      const res = await fetch('/api/billing-portal', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${pb.authStore.token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.error || 'Could not open subscription settings.');
+      window.location.href = data.url;
+    } catch (err) {
+      setPortalError(err.message);
+      setPortalLoading(false);
+    }
+  };
+
   const [showDelete, setShowDelete] = useState(false);
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -53,7 +73,7 @@ export default function ProfilePage() {
     queryKey: ['recipe-count', user?.id],
     queryFn: async () => {
       const result = await pb.collection('recipes').getList(1, 1, {
-        filter: `user_id = "${user.id}"`,
+        filter: `user = "${user.id}"`,
       });
       return result.totalItems;
     },
@@ -236,6 +256,29 @@ export default function ProfilePage() {
           </div>
         </form>
       </div>
+
+      {/* Manage subscription */}
+      {isPro && (
+        <div className="mb-3">
+          <button
+            onClick={handleManageSubscription}
+            disabled={portalLoading}
+            className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-amber-200 hover:bg-amber-50 transition-all disabled:opacity-60"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center">
+                {portalLoading ? <Loader2 className="w-4 h-4 text-amber-500 animate-spin" /> : <Crown className="w-4 h-4 text-amber-500" />}
+              </div>
+              <div className="text-left">
+                <span className="block text-sm font-semibold text-gray-700">Manage subscription</span>
+                <span className="block text-xs text-gray-400">Update card, view invoices or cancel</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          </button>
+          {portalError && <p className="text-sm text-red-500 mt-2 text-center">{portalError}</p>}
+        </div>
+      )}
 
       {/* Logout */}
       <button

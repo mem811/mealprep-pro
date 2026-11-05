@@ -27,3 +27,17 @@ export async function pbFetch(path, token, options = {}) {
     },
   });
 }
+
+// Who is calling? Checks the user's own PocketBase login token.
+// Returns the user record, or null if they aren't signed in.
+export async function currentUser(req) {
+  const userToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!userToken) return null;
+  const res = await fetch(`${PB()}/api/collections/users/auth-refresh`, {
+    method: 'POST',
+    headers: { Authorization: userToken },
+  });
+  if (!res.ok) return null;
+  const { record } = await res.json();
+  return record;
+}

@@ -307,7 +307,6 @@ export default function RecipeFormPage() {
       }
 
       // Handy for checking what the importer actually sends (open the browser console)
-      console.log('Importer times:', { prep_time: data.prep_time, cook_time: data.cook_time, total_time: data.total_time, prepTime: data.prepTime, cookTime: data.cookTime, totalTime: data.totalTime });
 
       const times = pickTimes(data);
       setTitle(data.title || '');
@@ -457,7 +456,6 @@ export default function RecipeFormPage() {
       if (imageFile && savedRecipe && savedRecipe.image_file) {
         var fileUrl = pb.getFileUrl(savedRecipe, savedRecipe.image_file);
         await pb.collection('recipes').update(savedRecipe.id, { image_url: fileUrl });
-        console.log('Image URL set:', fileUrl);
       }
       // ── Nutrition ──
       // Numbers published by the recipe win over an estimate. They're kept while
