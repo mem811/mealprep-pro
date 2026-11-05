@@ -6,7 +6,10 @@ export async function sendMail(message) {
   // Tidy pasted values: Gmail shows app passwords with spaces, and quotes sneak in
   const clean = (v) => (v || '').trim().replace(/^["']|["']$/g, '');
   const user = clean(process.env.SMTP_USER);
-  const pass = clean(process.env.SMTP_PASS).replace(/\s+/g, '');
+  let pass = clean(process.env.SMTP_PASS).replace(/\s+/g, '');
+  // Gmail app passwords are 16 letters; drop any separators that came along with the copy
+  const lettersOnly = pass.replace(/[^a-zA-Z]/g, '');
+  if (lettersOnly.length === 16) pass = lettersOnly;
   if (!user || !pass) return false;
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
