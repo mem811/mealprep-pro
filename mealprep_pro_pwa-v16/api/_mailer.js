@@ -3,8 +3,10 @@ import nodemailer from 'nodemailer';
 // Sends email through the Gmail account set in Vercel (SMTP_USER / SMTP_PASS).
 // Returns false without sending if those aren't set yet.
 export async function sendMail(message) {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  // Tidy pasted values: Gmail shows app passwords with spaces, and quotes sneak in
+  const clean = (v) => (v || '').trim().replace(/^["']|["']$/g, '');
+  const user = clean(process.env.SMTP_USER);
+  const pass = clean(process.env.SMTP_PASS).replace(/\s+/g, '');
   if (!user || !pass) return false;
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
