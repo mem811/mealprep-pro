@@ -1,4 +1,26 @@
+import nodemailer from 'nodemailer';
 import { adminToken, pbFetch } from './_pbAdmin.js';
+
+// Emails you about each new message. Uses SMTP_USER / SMTP_PASS set in
+// Vercel (server-only, never sent to the browser). Skipped if they're missing.
+async function notifyOwner(data) {
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) return;
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: { user, pass },
+  });
+  await transporter.sendMail({
+    from: `"MealPrep Pro" <${user}>`,
+    to: process.env.CONTACT_NOTIFY_TO || user,
+    replyTo: data.name ? `"${data.name.replace(/"/g, '')}" <${data.email}>` : data.email,
+    subject: `MealPrep Pro contact: ${data.topic || 'New message'}`,
+    text: `From: ${data.name || '(no name)'} <${data.email}>\nTopic: ${data.topic}\n\n${data.message}\n\n— Sent from the mealplanner.cloud contact form. Just hit Reply to answer.`,
+  });
+}
 
 // Messages are saved to a PocketBase collection only superusers can read,
 // so no email address is ever published on the site.
@@ -62,6 +84,13 @@ export default async function handler(req, res) {
       saved = await saveMessage(token, data);
     }
     if (!saved.ok) throw new Error(`Save failed with ${saved.status}`);
+
+    // The message is already saved, so a failed alert email shouldn't fail the form
+    try {
+      await notifyOwner(data);
+    } catch (mailErr) {
+      console.error('Contact notification email failed:', mailErr);
+    }
 
     return res.status(200).json({ sent: true });
   } catch (err) {
