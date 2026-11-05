@@ -1,21 +1,10 @@
-import nodemailer from 'nodemailer';
 import { adminToken, pbFetch } from './_pbAdmin.js';
+import { sendMail } from './_mailer.js';
 
-// Emails you about each new message. Uses SMTP_USER / SMTP_PASS set in
-// Vercel (server-only, never sent to the browser). Skipped if they're missing.
+// Emails you about each new message (skipped until SMTP is set in Vercel)
 async function notifyOwner(data) {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) return;
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: { user, pass },
-  });
-  await transporter.sendMail({
-    from: `"MealPrep Pro" <${user}>`,
-    to: process.env.CONTACT_NOTIFY_TO || user,
+  return sendMail({
+    to: process.env.CONTACT_NOTIFY_TO || process.env.SMTP_USER,
     replyTo: data.name ? `"${data.name.replace(/"/g, '')}" <${data.email}>` : data.email,
     subject: `MealPrep Pro contact: ${data.topic || 'New message'}`,
     text: `From: ${data.name || '(no name)'} <${data.email}>\nTopic: ${data.topic}\n\n${data.message}\n\n— Sent from the mealplanner.cloud contact form. Just hit Reply to answer.`,

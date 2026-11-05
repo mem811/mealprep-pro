@@ -37,7 +37,15 @@ export function AuthProvider({ children }) {
         name: name.trim(),
         plan: 'free',
       });
-      return await login(email, password);
+      const result = await login(email, password);
+      // Welcome email; never block sign-up on it
+      if (!result.error) {
+        fetch('/api/welcome', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${pb.authStore.token}` },
+        }).catch(() => {});
+      }
+      return result;
     } catch (error) {
       console.error('Registration error:', error);
       return { error, user: null };
