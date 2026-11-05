@@ -48,9 +48,10 @@ MealPrep Pro`,
         buttonUrl: 'https://mealplanner.cloud/app',
       }),
     });
-    return res.status(200).json({ sent });
+    return res.status(200).json(sent ? { sent } : { sent, reason: 'SMTP_USER / SMTP_PASS not set in Vercel' });
   } catch (err) {
     console.error('Welcome email failed:', err);
-    return res.status(200).json({ sent: false });
+    // Short error code only (e.g. EAUTH = Gmail refused the login), never the password
+    return res.status(200).json({ sent: false, reason: err.code || 'send failed' });
   }
 }
