@@ -11,6 +11,9 @@ import GroceryListPage from './pages/GroceryListPage';
 import ProfilePage from './pages/ProfilePage';
 import FoodLogPage from './pages/FoodLogPage.jsx';
 import LandingPage from './pages/LandingPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
+import ContactPage from './pages/ContactPage';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -33,6 +36,9 @@ function AppRoutes() {
     <Routes>
       {/* PUBLIC */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/contact" element={<ContactPage />} />
       <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
       <Route path="/signup" element={<Navigate to="/auth" replace />} />
       <Route path="/login" element={<Navigate to="/auth" replace />} />

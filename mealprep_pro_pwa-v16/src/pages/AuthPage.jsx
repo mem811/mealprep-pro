@@ -222,6 +222,13 @@ export default function AuthPage() {
             )}
           </button>
         </form>
+        {!isLogin && !isReset && (
+          <p className="text-center text-xs text-gray-400 mt-4">
+            By creating an account, you agree to our{' '}
+            <a href="/terms" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">Terms</a> and{' '}
+            <a href="/privacy" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">Privacy Policy</a>.
+          </p>
+        )}
         </>
         )}
 

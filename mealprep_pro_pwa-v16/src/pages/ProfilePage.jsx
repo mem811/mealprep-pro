@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
   User, Crown, ChevronRight, LogOut, CheckCircle,
-  ShieldCheck, Loader2
+  ShieldCheck, Loader2, Trash2
 } from 'lucide-react';
 import { getUserGoals, saveUserGoals } from "../lib/userGoals";
 
@@ -19,6 +19,29 @@ export default function ProfilePage() {
   const [goalsSaved, setGoalsSaved] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${pb.authStore.token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not delete your account. Please try again.');
+      qc.clear();
+      await logout();
+      navigate('/', { replace: true });
+    } catch (err) {
+      setDeleteError(err.message);
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     getUserGoals().then((g) => {
@@ -229,6 +252,55 @@ export default function ProfilePage() {
         </div>
         <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-red-400 transition-colors" />
       </button>
+
+      {/* Delete account */}
+      {!showDelete ? (
+        <button
+          onClick={() => setShowDelete(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-red-600 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete my account
+        </button>
+      ) : (
+        <div className="p-5 bg-red-50 border border-red-200 rounded-2xl space-y-3">
+          <p className="text-sm font-bold text-red-700">Delete your account permanently?</p>
+          <p className="text-sm text-red-700">
+            This deletes all your recipes, meal plans, grocery lists, food log and goals. It can't be undone.
+            {isPro && ' Your Pro subscription will be cancelled and you will not be charged again.'}
+          </p>
+          <label className="block text-sm text-red-700">
+            Type <strong>DELETE</strong> to confirm
+            <input
+              value={deleteText}
+              onChange={(e) => setDeleteText(e.target.value)}
+              className="mt-1.5 w-full px-3 py-2 rounded-xl border border-red-200 bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
+              autoComplete="off"
+            />
+          </label>
+          {deleteError && <p className="text-sm font-medium text-red-600">{deleteError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowDelete(false); setDeleteText(''); setDeleteError(''); }}
+              disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deleteText !== 'DELETE' || deleting}
+              className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {deleting ? (<><Loader2 className="w-4 h-4 animate-spin" />Deleting...</>) : 'Delete account'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <p className="text-center text-xs text-gray-400">
+        <a href="/privacy" className="hover:underline">Privacy</a> · <a href="/terms" className="hover:underline">Terms</a> · <a href="/contact" className="hover:underline">Contact us</a>
+      </p>
     </div>
   );
 }
