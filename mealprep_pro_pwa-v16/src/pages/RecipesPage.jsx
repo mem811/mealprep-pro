@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import pb from "../lib/pb";
+import { FREE_RECIPE_LIMIT, isProUser } from "../lib/plans";
 import {
   Plus, Search, ListFilter, Filter, Star, X, Utensils, Clock,
   LayoutGrid, Coffee, UtensilsCrossed, Moon, Cake, Salad, Soup,
@@ -211,6 +212,12 @@ export default function RecipesPage() {
         <div className="flex items-baseline gap-2">
           <h1 className="text-2xl font-bold text-gray-900">My Recipes</h1>
           <span className="text-gray-400 text-sm font-medium">· {filteredRecipes.length} recipes</span>
+          {/* Free plan: how much of the allowance is used */}
+          {!loading && !isProUser() && (
+            <Link to="/app/profile" className={"text-xs font-semibold px-2 py-0.5 rounded-full " + (recipes.length >= FREE_RECIPE_LIMIT ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500")}>
+              {Math.min(recipes.length, FREE_RECIPE_LIMIT)} of {FREE_RECIPE_LIMIT} free
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Sort */}

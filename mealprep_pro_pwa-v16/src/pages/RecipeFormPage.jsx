@@ -5,6 +5,7 @@ import { Plus, Trash2, ArrowLeft, Loader2, Download, Lock, X, ChefHat, Clock, Cl
 import { fetchNutritionFromIngredients } from '../utils/fetchNutritionFromIngredients';
 import { parseRecipeText, parseBookmarkletPayload, parseIngredientLine, normalizeUnit, parseNutritionObject, decideNutrition } from '../lib/recipeParse';
 import SaveButtonInstall from '../components/SaveButtonInstall';
+import { FREE_RECIPE_LIMIT, countMyRecipes } from '../lib/plans';
 
 const TAG_OPTIONS = [
   'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Sides', 'Soups',
@@ -82,6 +83,8 @@ export default function RecipeFormPage() {
   const [pageLoading, setPageLoading] = useState(isEdit);
   const [error, setError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
+  // Free plan: true once they've saved FREE_RECIPE_LIMIT recipes
+  const [atRecipeLimit, setAtRecipeLimit] = useState(false);
   const [duplicateRecipe, setDuplicateRecipe] = useState(null);
   const [updatingDuplicate, setUpdatingDuplicate] = useState(false);
   const [duplicateNote, setDuplicateNote] = useState(null);
@@ -375,6 +378,14 @@ export default function RecipeFormPage() {
     }
   };
 
+  // Free users: check the recipe allowance when opening the Add Recipe page
+  useEffect(() => {
+    if (isEdit || isPro) return;
+    countMyRecipes()
+      .then((n) => setAtRecipeLimit(n >= FREE_RECIPE_LIMIT))
+      .catch((err) => console.error('Recipe count error:', err));
+  }, [isEdit, isPro]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
@@ -398,6 +409,19 @@ export default function RecipeFormPage() {
         }
       } catch (err) {
         console.error('Duplicate check error:', err);
+      }
+    }
+
+    // Check again right before saving, in case recipes were added in another tab
+    if (!isEdit && !isPro) {
+      try {
+        if ((await countMyRecipes()) >= FREE_RECIPE_LIMIT) {
+          setAtRecipeLimit(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      } catch (err) {
+        console.error('Recipe count error:', err);
       }
     }
 
@@ -511,6 +535,34 @@ export default function RecipeFormPage() {
     );
   }
 
+  // Free plan full: show the upgrade offer instead of the form
+  if (atRecipeLimit && !isEdit && !isPro) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Link to="/app/recipes" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <ArrowLeft size={20} className="text-gray-600" />
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Add Recipe</h1>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-2xl text-center">
+          <Lock size={28} className="text-emerald-500 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-gray-900 mb-1">You've saved {FREE_RECIPE_LIMIT} recipes</h2>
+          <p className="text-gray-600 text-sm mb-5">
+            That's the limit on the Free plan. Upgrade to Pro for unlimited recipes, recipe import from any site, and more.
+          </p>
+          <Link
+            to="/app/profile"
+            className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
+          >
+            Upgrade to Pro
+          </Link>
+          <p className="text-xs text-gray-400 mt-4">Or delete a recipe you don't use to make room.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <div className="flex items-center gap-3 mb-6">
@@ -525,6 +577,7 @@ export default function RecipeFormPage() {
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm">{error}</div>
       )}
+
 
       {/* Already saved — shown at the top so it can't be missed */}
       {duplicateRecipe && (
