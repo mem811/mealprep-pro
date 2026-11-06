@@ -52,12 +52,6 @@ MealPrep Pro`,
   } catch (err) {
     console.error('Welcome email failed:', err);
     // Short error code only (e.g. EAUTH = Gmail refused the login), never the password
-    return res.status(200).json({ sent: false, reason: err.code || 'send failed',
-      // TEMP diagnostic: which login Vercel is using (never the password itself)
-      smtpUser: (process.env.SMTP_USER || '').trim(),
-      smtpPassLength: (process.env.SMTP_PASS || '').replace(/\s+/g, '').length,
-      smtpPassLetters: (process.env.SMTP_PASS || '').replace(/[^a-zA-Z]/g, '').length,
-      env: process.env.VERCEL_ENV,
-    });
+    return res.status(200).json({ sent: false, reason: err.code || 'send failed' });
   }
 }
