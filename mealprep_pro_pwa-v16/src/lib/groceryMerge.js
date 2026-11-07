@@ -41,18 +41,97 @@ function familyOf(unit) {
   return 'each:' + unit; // counts only combine with the same kind of count
 }
 
+// ── Matching the same food written different ways ────────────
+// "Garlic cloves, minced", "2 minced garlic" and "garlic" are one item.
+// Only prep and size words are dropped. Words that change what you buy
+// ("ground" beef, "sweet" potato, "brown" sugar) are kept.
+
+var PREP_WORDS = /\b(fresh|freshly|large|medium|small|chopped|diced|minced|sliced|grated|shredded|cubed|crumbled|finely|roughly|coarsely|thinly|packed|softened|melted|divided|optional|peeled|seeded|deseeded|rinsed|drained|trimmed|halved|quartered|beaten|room|temperature|about|plus|more|taste|garnish|serving|needed)\b/g;
+// Small words that only matter for matching, not for display
+var JOIN_WORDS = /\b(of|a|an|the|to|for|and|or|with|at)\b/g;
+
+// Same thing in the shop, different words in the recipe
+var SAME_AS = {
+  'yellow onion': 'onion', 'white onion': 'onion', 'sweet onion': 'onion', 'brown onion': 'onion',
+  'extra virgin olive oil': 'olive oil', 'virgin olive oil': 'olive oil', 'evoo': 'olive oil',
+  'kosher salt': 'salt', 'sea salt': 'salt', 'table salt': 'salt', 'fine salt': 'salt', 'fine sea salt': 'salt',
+  'ground black pepper': 'black pepper', 'cracked black pepper': 'black pepper', 'pepper': 'black pepper',
+  'scallion': 'green onion', 'spring onion': 'green onion',
+  'cheddar': 'cheddar cheese', 'sharp cheddar cheese': 'cheddar cheese', 'sharp cheddar': 'cheddar cheese',
+  'parmesan': 'parmesan cheese', 'parmigiano reggiano': 'parmesan cheese', 'parmigiano': 'parmesan cheese',
+  'mozzarella': 'mozzarella cheese', 'feta': 'feta cheese',
+  'all purpose flour': 'flour', 'all-purpose flour': 'flour', 'white sugar': 'sugar', 'granulated sugar': 'sugar',
+  'cilantro leaf': 'cilantro', 'parsley leaf': 'parsley', 'basil leaf': 'basil',
+};
+
+// "garlic CLOVE", "celery STALK": the count word isn't the food
+var COUNT_WORDS = { clove: 1, head: 1, bunch: 1, stalk: 1, sprig: 1, piece: 1, can: 1, package: 1, bag: 1, jar: 1, box: 1 };
+
+function cleanName(name) {
+  return String(name || '')
+    .replace(/\([^)]*\)/g, ' ')          // "(about 2 cups)"
+    .split(',')[0]                          // "onion, diced" -> "onion"
+    .replace(/[^A-Za-z\u00c0-\u00ff\s'-]/g, ' ');
+}
+
+function nameWords(name) {
+  var words = cleanName(name).toLowerCase().replace(PREP_WORDS, ' ').replace(JOIN_WORDS, ' ')
+    .split(/[\s-]+/).filter(Boolean).map(singular);
+  if (words.length > 1) {
+    var kept = words.filter(function(w) { return !COUNT_WORDS[w]; });
+    if (kept.length) words = kept;
+  }
+  return words;
+}
+
+/** Key that two spellings of the same food share. */
+export function groceryKey(name) {
+  var words = nameWords(name);
+  var key = words.length ? words.join(' ') : String(name || '').trim().toLowerCase();
+  return SAME_AS[key] || key;
+}
+
+// Readable name for the list: the recipe's wording minus prep notes
+// "2 celery stalks" with no unit -> 2 stalks
+function countWordIn(name) {
+  var words = cleanName(name).toLowerCase().split(/\s+/).filter(Boolean).map(singular);
+  if (words.length < 2) return null;
+  for (var i = 0; i < words.length; i++) if (COUNT_WORDS[words[i]]) return words[i];
+  return null;
+}
+
+function displayName(name) {
+  var words = cleanName(name).replace(PREP_WORDS, ' ').split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    var kept = words.filter(function(w) { return !COUNT_WORDS[singular(w.toLowerCase())]; });
+    if (kept.length) words = kept;
+  }
+  var text = words.join(' ').trim() || String(name).trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** Add one recipe ingredient (already scaled by multiplier) into the map. */
 export function addGroceryIngredient(map, ing, multiplier, categorize) {
   if (!ing || !ing.name || !String(ing.name).trim()) return;
-  var name = String(ing.name).trim();
-  var key = name.toLowerCase();
+
+  // "Salt and pepper" is two things on the shopping list
+  if (/^\s*salt\s*(and|&)\s*(black\s+)?pepper\b/i.test(ing.name)) {
+    addGroceryIngredient(map, { name: 'Salt' }, multiplier, categorize);
+    addGroceryIngredient(map, { name: 'Black pepper' }, multiplier, categorize);
+    return;
+  }
+  var name = displayName(ing.name);
+  var key = groceryKey(ing.name);
   var qty = (parseFloat(ing.quantity) || 0) * (Number(multiplier) || 1);
   var unit = normalizeGroceryUnit(ing.unit);
+  if (unit === 'piece') unit = countWordIn(ing.name) || unit;
 
   var item = map.get(key);
   if (!item) {
     item = { name: name, category: categorize ? categorize(name) : 'Other', parts: {}, order: [] };
     map.set(key, item);
+  } else if (name.length < item.name.length) {
+    item.name = name; // prefer the plainest wording: "Garlic" over "Garlic cloves"
   }
   if (!(qty > 0) || unit === 'to taste') return; // "salt to taste": listed, no amount
 
