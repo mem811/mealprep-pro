@@ -45,10 +45,12 @@ export default function PricingTable() {
           <ul className="space-y-3 text-sm text-gray-600 mb-8">
             {[
               'Save up to 15 recipes',
-              'Weekly meal plan grid',
-              'Auto-generated grocery list',
-              'Serving size scaling',
-              'Installable as PWA',
+              'Weekly meal planner',
+              'Grocery list sorted by aisle',
+              'Batch size scaling',
+              'Nutrition estimates (cal, protein, carbs, fat)',
+              'Food log with barcode scanner',
+              'Add to your phone like an app',
             ].map((f) => (
               <li key={f} className="flex items-center gap-2">
                 <span className="text-emerald-500">✓</span> {f}
@@ -76,11 +78,7 @@ export default function PricingTable() {
               'Everything in Free',
               'Unlimited recipe saves',
               'Import from any recipe website',
-              'Grocery list by store category',
-              'Nutrition estimates (cal, protein, carbs)',
-              'Saved grocery staples templates',
-              'Monthly meal history',
-              'Weekly meal summary emails',
+              'One-click Save button for your browser',
             ].map((f) => (
               <li key={f} className="flex items-center gap-2">
                 <span className="text-emerald-500">✓</span> {f}

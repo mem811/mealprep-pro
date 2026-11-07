@@ -342,7 +342,7 @@ export default function ProfilePage() {
       )}
 
       <p className="text-center text-xs text-gray-400">
-        <a href="/privacy" className="hover:underline">Privacy</a> · <a href="/terms" className="hover:underline">Terms</a> · <a href="/contact" className="hover:underline">Contact us</a>
+        <a href="/help" className="hover:underline font-semibold text-emerald-600">How to use</a> · <a href="/privacy" className="hover:underline">Privacy</a> · <a href="/terms" className="hover:underline">Terms</a> · <a href="/contact" className="hover:underline">Contact us</a>
       </p>
     </div>
   );

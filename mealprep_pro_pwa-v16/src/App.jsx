@@ -14,6 +14,7 @@ import LandingPage from './pages/LandingPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import ContactPage from './pages/ContactPage';
+import HelpPage from './pages/HelpPage';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/contact" element={<ContactPage />} />
+      <Route path="/help" element={<HelpPage />} />
       <Route path="/auth" element={user ? <Navigate to="/app" replace /> : <AuthPage />} />
       <Route path="/signup" element={<Navigate to="/auth" replace />} />
       <Route path="/login" element={<Navigate to="/auth" replace />} />

@@ -139,7 +139,7 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer className="text-center text-gray-400 text-sm py-6 border-t">
-        © 2026 Mealplanner.cloud · <a href="/auth" className="hover:underline">Log in</a> · <a href="/privacy" className="hover:underline">Privacy</a> · <a href="/terms" className="hover:underline">Terms</a> · <a href="/contact" className="hover:underline">Contact</a>
+        © 2026 Mealplanner.cloud · <a href="/auth" className="hover:underline">Log in</a> · <a href="/help" className="hover:underline">How to use</a> · <a href="/privacy" className="hover:underline">Privacy</a> · <a href="/terms" className="hover:underline">Terms</a> · <a href="/contact" className="hover:underline">Contact</a>
       </footer>
 
     </div>

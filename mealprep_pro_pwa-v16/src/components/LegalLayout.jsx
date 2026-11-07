@@ -6,6 +6,8 @@ export const EFFECTIVE_DATE = 'November 5, 2026';
 export function LegalFooterLinks({ className = '' }) {
   return (
     <span className={className}>
+      <Link to="/help" className="hover:underline">How to use</Link>
+      {' · '}
       <Link to="/privacy" className="hover:underline">Privacy</Link>
       {' · '}
       <Link to="/terms" className="hover:underline">Terms</Link>
