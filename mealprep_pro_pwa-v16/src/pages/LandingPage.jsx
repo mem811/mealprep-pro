@@ -108,26 +108,10 @@ export default function LandingPage() {
       {/* PRICING */}
       <PricingTable />
 
-      {/* SOCIAL PROOF */}
-      <section className="bg-gray-50 px-6 py-16 max-w-3xl mx-auto text-center">
-        <h2 className="text-2xl font-bold mb-8">Built for real home cooks</h2>
-        <div className="space-y-6">
-          {[
-            { quote: 'I finally stopped forgetting things at the grocery store. My whole week is planned before I even leave the house.', label: 'Early user' },
-            { quote: 'Importing recipes from Skinnytaste with one click is a game changer. I used to spend 20 minutes typing everything in.', label: 'Pro user' },
-          ].map(({ quote, label }) => (
-            <div key={label} className="bg-white rounded-2xl p-6 shadow-sm text-left">
-              <p className="text-gray-600 italic">"{quote}"</p>
-              <p className="text-sm text-gray-400 mt-2">— {label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* BOTTOM CTA */}
       <section className="text-center px-6 py-20">
         <h2 className="text-3xl font-bold mb-4">Ready to actually stick to your meal plan?</h2>
-        <p className="text-gray-500 mb-8">Join home cooks who plan smarter every week.</p>
+        <p className="text-gray-500 mb-8">Plan your whole week in minutes, then shop from one list.</p>
         <a
           href="/auth"
           className="inline-block bg-emerald-600 text-white text-lg px-8 py-4 rounded-xl hover:bg-emerald-700 transition"
